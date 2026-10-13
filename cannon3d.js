@@ -94,13 +94,55 @@ const NOISE = `float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*437
 float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);}
 float fbm(vec2 p){float s=0.,a=.5;for(int i=0;i<4;i++){s+=a*noise(p);p=p*2.03+17.1;a*=.5;}return s;}`;
 
+/* ------------------------------------------------------------------ */
+/* sunset scenery + soldier/bazooka/rocket assets (procedural)           */
+/* ------------------------------------------------------------------ */
+function oliveTex() {
+  const W = 512, H = 256, c = cv2(W, H), g = c.getContext('2d'), b = cv2(W, H), bg = b.getContext('2d');
+  g.fillStyle = '#56652f'; g.fillRect(0, 0, W, H); bg.fillStyle = '#808080'; bg.fillRect(0, 0, W, H);
+  for (let i = 0; i < 1400; i++) { const v = (Math.random() * 40 - 20) | 0; g.fillStyle = 'rgba(' + (90 + v) + ',' + (104 + v) + ',' + (50 + v) + ',' + rnd(.15, .4) + ')'; g.fillRect(rnd(0, W), rnd(0, H), rnd(1, 7), rnd(1, 4)); }
+  for (let i = 0; i < 90; i++) { const x = rnd(0, W), y = rnd(0, H), r = rnd(1, 4); g.fillStyle = 'rgba(150,130,96,.85)'; g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill(); bg.fillStyle = 'rgba(0,0,0,.6)'; bg.beginPath(); bg.arc(x, y, r + 1, 0, 6.283); bg.fill(); } /* paint chips */
+  for (let i = 0; i < 24; i++) { g.strokeStyle = 'rgba(30,34,16,' + rnd(.25, .5) + ')'; g.lineWidth = rnd(.6, 1.6); g.beginPath(); let x = rnd(0, W), y = rnd(0, H); g.moveTo(x, y); g.lineTo(x + rnd(-40, 40), y + rnd(-6, 6)); g.stroke(); }
+  g.fillStyle = 'rgba(214,190,70,.8)'; g.font = 'bold 18px monospace'; g.fillText('M72  FIRE', 60, 130);
+  const t = ctex(c, true), tb = ctex(b, false); return { map: t, bump: tb };
+}
+function puffTex() {
+  const c = cv2(128, 128), g = c.getContext('2d');
+  for (let i = 0; i < 9; i++) { const x = 64 + rnd(-26, 26), y = 64 + rnd(-26, 26), r = rnd(22, 40), rg = g.createRadialGradient(x, y, 2, x, y, r); rg.addColorStop(0, 'rgba(255,255,255,.55)'); rg.addColorStop(.6, 'rgba(255,255,255,.22)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = rg; g.fillRect(0, 0, 128, 128); }
+  return ctex(c, false);
+}
+function pineTex() {
+  const c = cv2(256, 512), g = c.getContext('2d'); g.fillStyle = '#16251f';
+  const cx = 128; g.fillRect(cx - 5, 380, 10, 130);
+  for (let k = 0; k < 11; k++) { const y1 = 20 + k * 38, w = 24 + k * 10; g.beginPath(); g.moveTo(cx, y1 - 36); g.lineTo(cx + w, y1 + 30); g.lineTo(cx - w, y1 + 30); g.closePath(); g.fill(); }
+  g.globalCompositeOperation = 'source-atop'; const rg = g.createLinearGradient(0, 0, 256, 0); rg.addColorStop(0, 'rgba(0,0,0,0)'); rg.addColorStop(.7, 'rgba(0,0,0,0)'); rg.addColorStop(1, 'rgba(255,150,90,.55)'); g.fillStyle = rg; g.fillRect(0, 0, 256, 512);
+  return ctex(c, true);
+}
+function ridgeTexC() {
+  const W = 2048, H = 256, c = cv2(W, H), g = c.getContext('2d'), ph = [rnd(0, 6), rnd(0, 6), rnd(0, 6)];
+  const hgt = x => { const u = x / W * 6.283, r = 1 - Math.abs(Math.sin(u * 2 + ph[0])), r2 = 1 - Math.abs(Math.sin(u * 5 + ph[1])); let h = .24 + .30 * Math.pow(r, 1.6) + .08 * Math.pow(r2, 2) + .012 * Math.sin(u * 60 + ph[2]); const s = x / W - .56; return h - .30 * Math.exp(-s * s * 110); };
+  const fl = g.createLinearGradient(0, 0, 0, H); fl.addColorStop(0, '#7b6a96'); fl.addColorStop(.5, '#a8789a'); fl.addColorStop(1, '#f2a272');
+  g.fillStyle = fl; g.beginPath(); g.moveTo(0, H); for (let x = 0; x <= W; x += 2) g.lineTo(x, H * (1 - hgt(x))); g.lineTo(W, H); g.closePath(); g.fill();
+  g.globalCompositeOperation = 'source-atop'; g.strokeStyle = 'rgba(255,175,120,.6)'; g.lineWidth = 2.5; g.beginPath(); for (let x = 0; x <= W; x += 2) { const y = H * (1 - hgt(x)) + 1.5; x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+  return ctex(c, true);
+}
+function makeRocketModel() {
+  const g = new THREE.Group(), o = new THREE.MeshStandardMaterial({ color: 0x59693a, roughness: .5, metalness: .45 }), y = new THREE.MeshStandardMaterial({ color: 0xd9b62a, roughness: .5, metalness: .3 }), d = new THREE.MeshStandardMaterial({ color: 0x2c2f33, roughness: .4, metalness: .75 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.24, .24, 1.9, 16), o); g.add(body);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(.248, .248, .22, 16), y); band.position.y = .25; g.add(band);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(.24, .75, 16), d); nose.position.y = 1.32; g.add(nose);
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(.24, .14, .35, 14), d); tail.position.y = -1.12; g.add(tail);
+  for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(.025, .55, .5), o); f.position.set(Math.cos(i * 1.5708) * .36, -.95, Math.sin(i * 1.5708) * .36); f.rotation.y = -i * 1.5708; g.add(f); }
+  return g;
+}
+
 /* ---------------- scene ---------------- */
 export function createCannonScene(opt) {
   const tier = opt.tier == null ? pickTier() : opt.tier, Q = TIERS[tier], tl = opt.timeline, UR = tl.mode == 'ur', errors = [], onErr = opt.onError || (() => { });
   const renderer = new THREE.WebGLRenderer({ canvas: opt.canvas, antialias: Q.aa, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: !!opt.preserve });
   renderer.debug.onShaderError = (gl, prog) => { const m = 'GLSL 셰이더 컴파일/링크 오류: ' + (gl.getProgramInfoLog(prog) || '').slice(0, 400); errors.push(m); onErr(new Error(m)); };
   let dpr = Math.min(Q.dpr, window.devicePixelRatio || 1), W = opt.W, H = opt.H;
-  renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); renderer.setClearColor(0x03050c, 1); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
+  renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); renderer.setClearColor(0x03050c, 1); renderer.outputColorSpace = THREE.SRGBColorSpace; { const tm = /[?&]tm=([012])/.exec(location.search), k = tm ? +tm[1] : 1; renderer.toneMapping = k == 0 ? THREE.NoToneMapping : k == 1 ? THREE.ACESFilmicToneMapping : THREE.AgXToneMapping; renderer.toneMappingExposure = 1.05; }
   const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(50, W / H, .1, 500);
   const CAM = { y: UR ? 5 : 3.4, z: 10, pitch: UR ? 0 : -.1, fov: 50 };
   const uTime = { value: 0 }, uSpace = { value: 0 }, uScroll = { value: 0 };
@@ -115,23 +157,23 @@ export function createCannonScene(opt) {
     side: THREE.BackSide, depthWrite: false, uniforms: { uTime, uSpace, uScroll },
     vertexShader: 'varying vec3 vD;void main(){vD=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
     fragmentShader: 'varying vec3 vD;uniform float uTime;uniform float uSpace;uniform float uScroll;' + NOISE + `
-void main(){vec3 d=normalize(vD);float h=clamp(d.y,0.,1.);
- vec3 night=mix(vec3(.17,.25,.40),vec3(.016,.024,.05),smoothstep(0.,.55,h));
- vec3 atmo=mix(vec3(.18,.28,.47),vec3(.06,.11,.23),smoothstep(0.,.7,h));
- vec3 c=mix(night,atmo,${UR ? '(1.-uSpace)' : '0.0'});
- vec2 su=vec2(atan(d.x,d.z)*9.,d.y*9.+uScroll*.04);
- float neb=fbm(su*.55+vec2(uTime*.01,0.));c+=vec3(.23,.11,.36)*smoothstep(.45,.85,neb)*.5*(.4+.6*h);c+=vec3(.06,.18,.34)*smoothstep(.5,.9,fbm(su*.4+9.))*.4;
- vec2 g=su*14.;vec2 id=floor(g);float rr=hash(id);vec2 f=fract(g)-.5;float st=smoothstep(.12,.0,length(f-(vec2(hash(id+3.1),hash(id+7.7))-.5)*.6))*step(.93,rr);
- st*=.5+.5*sin(uTime*(1.2+rr*2.)+rr*40.);c+=vec3(1.)*st*(${UR ? '.35+.65*uSpace' : '1.'});
+void main(){vec3 d=normalize(vD);float h=clamp(d.y,0.,1.);vec3 sd=normalize(vec3(.35,.07,-1.));float cs=max(dot(d,sd),0.);
+ vec3 c=mix(vec3(1.,.62,.38),vec3(.62,.36,.52),smoothstep(0.,.22,h));c=mix(c,vec3(.10,.17,.40),smoothstep(.15,.78,h));
+ c+=vec3(1.,.55,.25)*pow(cs,8.)*.5+vec3(1.,.8,.5)*pow(cs,60.)*.9+vec3(1.,.95,.8)*smoothstep(.9992,.9998,cs)*2.;
+ if(d.y>0.){vec2 p=d.xz/(d.y+.2);float cl=fbm(p*1.1+vec2(uTime*.01,uScroll*.0004));float dn=smoothstep(.42,.78,cl)*smoothstep(0.,.12,d.y)*(1.-smoothstep(.6,1.,d.y));
+  vec3 lit=mix(vec3(.38,.26,.46),vec3(1.,.62,.42),.35+.65*pow(cs,.3));lit+=vec3(1.,.8,.55)*pow(cs,12.)*.5;c=mix(c,lit,dn*.85);}
+ vec3 sp=mix(vec3(.17,.25,.40),vec3(.016,.024,.05),smoothstep(0.,.55,h));
+ ${UR ? 'vec2 su=vec2(atan(d.x,d.z)*9.,d.y*9.+uScroll*.04);float neb=fbm(su*.55+vec2(uTime*.01,0.));sp+=vec3(.23,.11,.36)*smoothstep(.45,.85,neb)*.5*(.4+.6*h);vec2 g=su*14.;vec2 id=floor(g);float rr=hash(id);vec2 f=fract(g)-.5;float st=smoothstep(.12,.0,length(f-(vec2(hash(id+3.1),hash(id+7.7))-.5)*.6))*step(.93,rr);st*=.5+.5*sin(uTime*(1.2+rr*2.)+rr*40.);sp+=vec3(1.)*st;c=mix(c,sp,uSpace);' : ''}
  gl_FragColor=vec4(c,1.);}`
   }));
   sky.frustumCulled = false; sky.renderOrder = -20; scene.add(sky);
   /* lights */
-  scene.add(new THREE.HemisphereLight(0x7f98d8, 0x141a2a, .9));
-  const moon = new THREE.DirectionalLight(0xaec4ff, 1.7); moon.position.set(-4, 8, 4); scene.add(moon);
+  scene.add(new THREE.HemisphereLight(0x9aa8e0, 0x3a2a20, 1.0));
+  const moon = new THREE.DirectionalLight(0xffc9a0, 1.7); moon.position.set(-4, 8, 6); scene.add(moon);
+  { const rimL = new THREE.DirectionalLight(0xff9a5a, 2.2); rimL.position.set(4, 3, -10); scene.add(rimL); } /* sunset behind the targets: warm rim on the soldier */
   const flashL = new THREE.PointLight(0xffa04a, 0, 22, 2); scene.add(flashL);
   const dot = dotTex();
-  const spark = new Pts(Q.parts, dot, { add: true, g: -6, drag: .8, alpha: 1, order: 14 }), smoke = new Pts(Math.round(Q.parts * .5), dot, { g: .3, drag: 1.2, alpha: .55, order: 12 }), trail = new Pts(Q.parts, dot, { add: true, drag: 2, alpha: .85, order: 13 });
+  const spark = new Pts(Q.parts, dot, { add: true, g: -6, drag: .8, alpha: 1, order: 14 }), smoke = new Pts(Math.round(Q.parts * .5), puffTex(), { g: .3, drag: 1.2, alpha: .55, order: 12 }), trail = new Pts(Q.parts, dot, { add: true, drag: 2, alpha: .85, order: 13 });
   scene.add(spark.mesh, smoke.mesh, trail.mesh);
   const cTmp = new THREE.Color();
   function col(hex) { return cTmp.set(hex).clone(); }
@@ -141,19 +183,53 @@ void main(){vec3 d=normalize(vD);float h=clamp(d.y,0.,1.);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.ShaderMaterial({
     uniforms: { uTime }, vertexShader: 'varying vec3 vW;void main(){vec4 w=modelMatrix*vec4(position,1.);vW=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}',
     fragmentShader: 'varying vec3 vW;uniform float uTime;' + NOISE + `
-void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));vec3 base=mix(vec3(.17,.21,.32),vec3(.025,.035,.07),smoothstep(3.,40.,d));
- base*=.82+.3*noise(vW.xz*.6);vec2 g=abs(fract(vW.xz*.5)-.5);float ln=smoothstep(.03,.0,min(g.x,g.y))*.22*(1.-smoothstep(6.,30.,d));base+=vec3(.78,.6,.2)*ln;
- float rim=smoothstep(40.,70.,d);gl_FragColor=vec4(mix(base,vec3(.09,.13,.23),rim),1.);}`
+void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));
+ vec3 gr=mix(vec3(.15,.19,.08),vec3(.30,.26,.13),noise(vW.xz*.7));gr=mix(gr,vec3(.42,.34,.24),smoothstep(.55,.8,noise(vW.xz*.25+4.))*.6);gr*=.7+.5*noise(vW.xz*3.1);
+ float pb=smoothstep(.72,.78,noise(vW.xz*5.5));gr=mix(gr,vec3(.5,.46,.40),pb*.5);
+ vec3 base=gr*vec3(1.15,.95,.8);
+ float lake=smoothstep(26.,42.,d);float sx=clamp(1.-abs(vW.x-14.)/34.,0.,1.);
+ vec3 wat=mix(vec3(.50,.32,.42),vec3(.98,.64,.42),sx*sx);wat+=vec3(1.,.82,.52)*pow(noise(vec2(vW.x*1.4,vW.z*.45+uTime*.5)),6.)*clamp(1.-abs(vW.x-14.)/12.,0.,1.)*.8;
+ gl_FragColor=vec4(mix(base,wat,lake),1.);}`
   }));
   ground.rotation.x = -Math.PI / 2; gGroup.add(ground);
   const cannon = new THREE.Group(), steel = new THREE.MeshStandardMaterial({ color: 0x5b6a85, roughness: .38, metalness: .55 }), gold = new THREE.MeshStandardMaterial({ color: 0xc79a33, roughness: .35, metalness: .7 });
-  const cbase = new THREE.Mesh(new THREE.CylinderGeometry(.62, .72, .26, Q.seg), new THREE.MeshStandardMaterial({ color: 0x252d3c, roughness: .5, metalness: .5 })); cbase.position.y = .13; cannon.add(cbase);
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(.64, .05, 8, Q.seg), gold); rim.rotation.x = Math.PI / 2; rim.position.y = .27; cannon.add(rim);
-  const pivot = new THREE.Group(); pivot.position.y = .4; cannon.add(pivot);
-  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.2, .28, 2.1, Q.seg), steel); barrel.position.y = 1.05; pivot.add(barrel);
-  const muzR = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .2, Q.seg), gold); muzR.position.y = 2.15; pivot.add(muzR);
-  const midR = new THREE.Mesh(new THREE.CylinderGeometry(.29, .29, .12, Q.seg), gold); midR.position.y = 1.0; pivot.add(midR);
-  const cPos = groundPoint(.5, .93, 0); cannon.position.copy(cPos); cannon.scale.setScalar(.6); gGroup.add(cannon);
+  const ol = oliveTex(), tubeM = new THREE.MeshStandardMaterial({ map: ol.map, bumpMap: ol.bump, bumpScale: 1.4, roughness: .55, metalness: .4 }), yelM = new THREE.MeshStandardMaterial({ color: 0xd9b62a, roughness: .5, metalness: .3 }),
+    bronzeM = new THREE.MeshStandardMaterial({ color: 0x6b5a3a, roughness: .4, metalness: .8 }), blackM = new THREE.MeshStandardMaterial({ color: 0x23262a, roughness: .45, metalness: .7 }),
+    clothM = new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: .85 }), pantM = new THREE.MeshStandardMaterial({ color: 0x5a6034, roughness: .85 }), skinM = new THREE.MeshStandardMaterial({ color: 0xe0ac86, roughness: .7 }),
+    bagM = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: .9 }), capM = new THREE.MeshStandardMaterial({ color: 0x4f6b34, roughness: .85 }), hairM = new THREE.MeshStandardMaterial({ color: 0x1c1612, roughness: .9 });
+  const cbase = new THREE.Mesh(new THREE.CylinderGeometry(.95, 1.05, .08, Q.seg), new THREE.MeshStandardMaterial({ color: 0x3f3426, roughness: .95 })); cbase.position.y = .04; cannon.add(cbase);
+  /* soldier (seen from behind): legs, torso, backpack, head + cap */
+  [-1, 1].forEach(sg => { const l = new THREE.Mesh(new THREE.CylinderGeometry(.1, .09, .75, 10), pantM); l.position.set(sg * .13, .45, 0); cannon.add(l); const b = new THREE.Mesh(new THREE.BoxGeometry(.19, .1, .3), blackM); b.position.set(sg * .13, .1, -.04); cannon.add(b); });
+  const torso = new THREE.Mesh(new THREE.CylinderGeometry(.26, .23, .62, 14), clothM); torso.scale.z = .78; torso.position.y = 1.1; cannon.add(torso);
+  { const bag = new THREE.Mesh(new THREE.BoxGeometry(.48, .52, .24), bagM); bag.position.set(0, 1.12, .27); cannon.add(bag); const flap = new THREE.Mesh(new THREE.BoxGeometry(.5, .14, .27), bagM); flap.position.set(0, 1.36, .27); cannon.add(flap);
+    [-1, 1].forEach(sg => { const po = new THREE.Mesh(new THREE.BoxGeometry(.1, .24, .16), bagM); po.position.set(sg * .3, 1.0, .26); cannon.add(po); }); const roll = new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .5, 10), pantM); roll.rotation.z = Math.PI / 2; roll.position.set(0, .8, .3); cannon.add(roll); }
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.19, 16, 12), skinM); head.position.y = 1.62; cannon.add(head);
+  { const hair = new THREE.Mesh(new THREE.SphereGeometry(.185, 14, 10), hairM); hair.position.set(0, 1.6, .035); cannon.add(hair); const dome = new THREE.Mesh(new THREE.SphereGeometry(.21, 16, 10, 0, Math.PI * 2, 0, Math.PI * .5), capM); dome.position.y = 1.66; cannon.add(dome); const brim = new THREE.Mesh(new THREE.CylinderGeometry(.17, .17, .015, 16), capM); brim.scale.set(1, 1, 1.05); brim.position.set(0, 1.67, -.17); brim.rotation.x = -.15; cannon.add(brim); }
+  const armU = [0, 1].map(() => new THREE.Mesh(new THREE.CylinderGeometry(.065, .06, 1, 8), clothM)), armL = [0, 1].map(() => new THREE.Mesh(new THREE.CylinderGeometry(.06, .05, 1, 8), clothM)), hands = [0, 1].map(() => new THREE.Mesh(new THREE.SphereGeometry(.07, 10, 8), skinM)), elb = [0, 1].map(() => new THREE.Mesh(new THREE.SphereGeometry(.065, 8, 6), clothM));
+  [...armU, ...armL, ...hands, ...elb].forEach(m => cannon.add(m));
+  /* bazooka: olive tube + yellow band + bronze rings + scope + grips (pivot = rear end on the shoulder) */
+  const pivot = new THREE.Group(); pivot.position.set(.4, 1.2, -.1); cannon.add(pivot);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, 2.1, Q.seg), tubeM); barrel.position.y = 1.05; pivot.add(barrel);
+  const muzR = new THREE.Mesh(new THREE.CylinderGeometry(.27, .27, .2, Q.seg), bronzeM); muzR.position.y = 2.15; pivot.add(muzR);
+  const midR = new THREE.Mesh(new THREE.CylinderGeometry(.232, .232, .22, Q.seg), yelM); midR.position.y = 1.0; pivot.add(midR);
+  { const fl = new THREE.Mesh(new THREE.CylinderGeometry(.22, .34, .36, Q.seg, 1, true), bronzeM); fl.material.side = THREE.DoubleSide; fl.position.y = -.1; pivot.add(fl); const rr = new THREE.Mesh(new THREE.CylinderGeometry(.25, .25, .08, Q.seg), bronzeM); rr.position.y = .14; pivot.add(rr);
+    const sc = new THREE.Group(); sc.position.set(.3, .95, 0); pivot.add(sc); const sb = new THREE.Mesh(new THREE.CylinderGeometry(.07, .07, .5, 12), blackM); sc.add(sb); const sl = new THREE.Mesh(new THREE.CylinderGeometry(.1, .08, .12, 12), blackM); sl.position.y = .28; sc.add(sl); const sm = new THREE.Mesh(new THREE.BoxGeometry(.1, .08, .3), blackM); sm.position.set(-.1, -.05, 0); sc.add(sm);
+    const g1 = new THREE.Mesh(new THREE.BoxGeometry(.07, .3, .07), blackM); g1.position.set(-.2, .5, 0); g1.rotation.z = .15; pivot.add(g1); const g2 = new THREE.Mesh(new THREE.BoxGeometry(.07, .22, .07), blackM); g2.position.set(-.2, 1.05, 0); pivot.add(g2); }
+  const cPos = groundPoint(.5, .93, 0); cannon.position.copy(cPos); cannon.scale.setScalar(.55); gGroup.add(cannon);
+  /* arms follow the tube: 2-bone IK from fixed shoulders to hands on the grips */
+  const _h1 = new V3(), _h2 = new V3(), _S1 = new V3(.3, 1.32, -.02), _S2 = new V3(-.3, 1.32, -.02), _t = new V3(), _P1 = new V3(.6, -1, .3), _P2 = new V3(-.6, -1, .3);
+  function limbC(a, b, seg) { _t.subVectors(b, a); const l = _t.length() || .001; seg.position.copy(a).addScaledVector(_t, .5); seg.scale.set(1, l, 1); seg.quaternion.setFromUnitVectors(upV0, _t.normalize()); }
+  function ikC(S, T, l1, l2, pole) { _t.subVectors(T, S); const d = clamp(_t.length(), .05, l1 + l2 - .005), dir = _t.clone().normalize(), a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a)), sd = pole.clone().addScaledVector(dir, -pole.dot(dir)).normalize(); return S.clone().addScaledVector(dir, a).addScaledVector(sd, h); }
+  function poseArms() {
+    cannon.updateMatrixWorld(true); pivot.localToWorld(_h1.set(-.22, .5, .02)); cannon.worldToLocal(_h1); pivot.localToWorld(_h2.set(-.2, .95, .02)); cannon.worldToLocal(_h2);
+    [[_S1, _h1, _P1, 0], [_S2, _h2, _P2, 1]].forEach(a => { const E = ikC(a[0], a[1], .5, .5, a[2]); limbC(a[0], E, armU[a[3]]); limbC(E, a[1], armL[a[3]]); elb[a[3]].position.copy(E); hands[a[3]].position.copy(a[1]); });
+  }
+  const upV0 = new V3(0, 1, 0); poseArms();
+  /* distant mountains + pines (inside gGroup so they scroll away during the UR ascent) */
+  try {
+    const mt = new THREE.Mesh(new THREE.PlaneGeometry(700, 60), new THREE.MeshBasicMaterial({ map: ridgeTexC(), transparent: true, depthWrite: false, fog: false })); mt.position.set(40, 20, -220); mt.renderOrder = -16; mt.frustumCulled = false; gGroup.add(mt);
+    const pt = pineTex(); [[-6.5, -14, 9], [-9.5, -22, 11], [-12, -34, 13], [-4.8, -40, 8], [9, -38, 7], [12.5, -46, 9]].forEach(a => { const m = new THREE.Mesh(new THREE.PlaneGeometry(a[2] * .5, a[2]), new THREE.MeshBasicMaterial({ map: pt, alphaTest: .5, side: THREE.DoubleSide, fog: false })); m.position.set(a[0], a[2] / 2, a[1]); gGroup.add(m); });
+  } catch (e) { errors.push('노을 배경 생성 실패(기본 배경으로 계속): ' + (e.message || e)); }
   const upV = new V3(0, 1, 0), qT = new THREE.Quaternion();
 
   const state = { recoil: 0, lastF: -9 };
@@ -178,7 +254,7 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));vec3 base=mix(v
   let M = [], reticle = null, shell = null, shadow = null, crater = null;
   if (!UR) {
     const ctex2 = crackTex();
-    const sh = new THREE.Mesh(new THREE.SphereGeometry(.14, 12, 8), new THREE.MeshBasicMaterial({ color: 0xfff2cc })); sh.visible = false; scene.add(sh); shell = sh;
+    const sh = makeRocketModel(); sh.scale.setScalar(.2); sh.visible = false; scene.add(sh); shell = sh; shell.userData.pv = new V3();
     M = tl.ms.map(m => {
       const T = groundPoint(m.lx, m.ly, 0), c = m.c, S = T.clone().add(new V3((m.sx - m.lx) * 16, 17, -8)), P1 = S.clone().lerp(T, .2).add(new V3(0, 2, 0));
       const met = makeMeteor(c);
@@ -194,7 +270,7 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));vec3 base=mix(v
   let PLs = [], rocket = null, flameO = null, flameI = null, earth = null, streaks = null, clouds = [], frags = [], boom = null;
   const urS = { A: 0, fired: false, spaceFx: false, fin: false, hits: 0, px: 0, py: 0 };
   if (UR) {
-    rocket = makeMeteor(GR.UR); rocket.visible = true; rocket.scale.setScalar(.28);
+    rocket = makeMeteor(GR.UR); rocket.visible = true; rocket.scale.setScalar(.28); { const rk = makeRocketModel(); rocket.userData.rock.visible = false; rocket.add(rk); rocket.userData.rock = rk; }
     flameO = new THREE.Mesh(new THREE.ConeGeometry(.5, 3.2, 14), new THREE.MeshBasicMaterial({ color: 0xff8a2a, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending })); flameO.rotation.x = Math.PI; scene.add(flameO);
     flameI = new THREE.Mesh(new THREE.ConeGeometry(.26, 2.1, 12), new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: .8, depthWrite: false, blending: THREE.AdditiveBlending })); flameI.rotation.x = Math.PI; scene.add(flameI);
     earth = new THREE.Mesh(new THREE.SphereGeometry(70, 48, 32), new THREE.ShaderMaterial({
@@ -232,9 +308,9 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));vec3 base=mix(v
     const rc = t < state.lastF ? 0 : Math.exp(-(t - state.lastF) * 7) * Math.cos((t - state.lastF) * 18) * .22; barrel.position.y = 1.05 + rc * .3; muzR.position.y = 2.15 + rc * .3;
     M.forEach((R, i) => {
       const m = R.m, c = m.c, T = R.T;
-      if (t >= m.tf && !R.fired) { R.fired = true; state.lastF = t; burst(barrelTip, 16, [col('#FFB347'), col('#ffffff'), col('#FFD27A')], 5, 3, .45, .25); puffs(barrelTip, 5, col('#9AA3B2'), .7, .8, 1.2); flashL.position.copy(barrelTip); flashL.intensity = 40; flashL.color.set(0xffc080); kick = Math.max(kick, .35); out.flash = Math.max(out.flash, .14); }
+      if (t >= m.tf && !R.fired) { R.fired = true; state.lastF = t; burst(barrelTip, 16, [col('#FFB347'), col('#ffffff'), col('#FFD27A')], 5, 3, .45, .25); puffs(barrelTip, 5, col('#F4E4D2'), .7, .8, 1.2); flashL.position.copy(barrelTip); flashL.intensity = 40; flashL.color.set(0xffc080); kick = Math.max(kick, .35); out.flash = Math.max(out.flash, .14); }
       /* shell flight */
-      if (t >= m.tf && t < m.tm) { const q = easeO3((t - m.tf) / (m.tm - m.tf)); tmp.copy(barrelTip).add(new V3(0, 16, -6)); const p1 = barrelTip.clone().add(new V3((T.x - barrelTip.x) * .05, 5, -1)); bez(barrelTip, p1, tmp, q, shell.position); shell.visible = true; trail.emit(shell.position.x, shell.position.y, shell.position.z, 0, 0, 0, .28, .55, col('#FFB347')); } else if (t >= m.tm && shell.visible && i == M.length - 1) shell.visible = false;
+      if (t >= m.tf && t < m.tm) { const q = easeO3((t - m.tf) / (m.tm - m.tf)); tmp.copy(barrelTip).add(new V3(0, 16, -6)); const p1 = barrelTip.clone().add(new V3((T.x - barrelTip.x) * .05, 5, -1)); bez(barrelTip, p1, tmp, q, shell.position); { const pv = shell.userData.pv, dv = tmp2.copy(shell.position).sub(pv); if (shell.visible && dv.lengthSq() > 1e-8) { shell.quaternion.setFromUnitVectors(upV, dv.normalize()); } pv.copy(shell.position); } smoke.emit(shell.position.x, shell.position.y, shell.position.z, rnd(-.1, .1), .15, rnd(-.1, .1), .9, .42, col('#F4E4D2')); shell.visible = true; trail.emit(shell.position.x, shell.position.y, shell.position.z, 0, 0, 0, .28, .55, col('#FFB347')); } else if (t >= m.tm && shell.visible && i == M.length - 1) shell.visible = false;
       /* reticle */
       const rv = t >= m.tf && t < m.ti;
       if (rv) { const rq = clamp((t - m.tf) / (m.ti - m.tf), 0, 1), rr = c.R3 * 2.4 * (1.7 - .7 * easeIO(rq)), ra = (.3 + .35 * Math.abs(Math.sin(t * (7 + rq * 12)))) * clamp((t - m.tf) / .2, 0, 1); R.ret.visible = R.ret2.visible = true; R.ret.scale.set(rr, rr, rr); R.ret2.scale.set(rr, rr, rr); R.ret.material.opacity = ra; R.ret2.material.opacity = ra * .7; R.ret.rotation.z = t * .6; } else R.ret.visible = R.ret2.visible = false;
@@ -273,13 +349,13 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));vec3 base=mix(v
     const ppx = urS.px + Math.sin(t * 1.3) * .35 + Math.sin(t * 2.9) * .18, base = planePoint(.5, .54, 0), launchY = lerp(cannon.position.y + 1.5, base.y, easeIO(t / 1.3));
     px = ppx; py = t < 1.3 ? launchY : base.y + Math.sin(t * 2.2) * .12;
     const pal = t < T.tF - .1 ? 1 : 1 - clamp((t - T.tF + .1) / .3, 0, 1);
-    rocket.visible = pal > 0; rocket.position.set(px, py, 0); rocket.scale.setScalar(.28 * (1 + .05 * Math.sin(t * 20))); rocket.userData.rock.rotation.set(t * 3, t * 2, 0); rocket.userData.gl1.scale.setScalar(4.2); rocket.userData.gl2.scale.setScalar(7.5);
+    rocket.visible = pal > 0; rocket.position.set(px, py, 0); rocket.scale.setScalar(.28 * (1 + .05 * Math.sin(t * 20))); rocket.userData.rock.rotation.set(0, t * 6, 0); rocket.userData.gl1.scale.setScalar(4.2); rocket.userData.gl2.scale.setScalar(7.5);
     const heat = t > 1.4 && t < 3.3, fl = (1.2 + 1.4 * sp + (heat ? .5 : 0)) * pal;
     flameO.visible = flameI.visible = pal > 0; flameO.position.set(px, py - .3 - fl * .4, 0); flameO.scale.set(.45 * (1 + .1 * Math.sin(t * 40)), fl * .42, .45); flameI.position.set(px, py - .25 - fl * .25, 0); flameI.scale.set(.45 * (1 + .12 * Math.sin(t * 52)), fl * .34, .45);
     if (heat && Math.random() < .9) spark.emit(px + rnd(-.1, .1), py - .3, 0, rnd(-1, 1), -rnd(4, 9), 0, .5, .12, col(Math.random() < .5 ? '#FF8A2A' : '#FFE08A'));
     trail.emit(px, py - .3, 0, rnd(-.2, .2), -3 - sp * 6, 0, .5, .5, col('#FF8A2A'));
-    if (t < 2.4 && Math.random() < .5) smoke.emit(px, py - 1, 0, 0, -1.5, 0, .8, .5, col('#9AA3B2'));
-    if (t >= .05 && !urS.fired) { urS.fired = true; const tip = new V3(); pivot.updateMatrixWorld(true); barrel.localToWorld(tip.set(0, 1.25, 0)); burst(tip, 40, [col('#FFB347'), col('#ffffff'), col('#FFD27A')], 7, 4, .6, .3); puffs(tip, 8, col('#9AA3B2'), 1, 1.5, 2); out.flash = Math.max(out.flash, .35); kick = Math.max(kick, .8); flashL.position.copy(tip); flashL.intensity = 90; flashL.color.set(0xffc080); }
+    if (t < 2.4 && Math.random() < .5) smoke.emit(px, py - 1, 0, 0, -1.5, 0, .8, .5, col('#F4E4D2'));
+    if (t >= .05 && !urS.fired) { urS.fired = true; const tip = new V3(); pivot.updateMatrixWorld(true); barrel.localToWorld(tip.set(0, 1.25, 0)); burst(tip, 40, [col('#FFB347'), col('#ffffff'), col('#FFD27A')], 7, 4, .6, .3); puffs(tip, 8, col('#F4E4D2'), 1, 1.5, 2); out.flash = Math.max(out.flash, .35); kick = Math.max(kick, .8); flashL.position.copy(tip); flashL.intensity = 90; flashL.color.set(0xffc080); }
     if (t > .3 && t < 5.2) kick = Math.max(kick, (1.6 + 4.5 * sp * (t < 3.4 ? 1 : .5)) / 16);
     pivot.quaternion.slerp(new THREE.Quaternion(), 1 - Math.pow(.01, dt)); const rc = t < .4 ? Math.exp(-t * 7) * Math.cos(t * 18) * .25 : 0; barrel.position.y = 1.05 + rc * .3; muzR.position.y = 2.15 + rc * .3;
     /* earth limb */
@@ -322,6 +398,7 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));vec3 base=mix(v
     if (frames > 150 && fpsAvg > 36 && dpr > 1 && frames % 90 == 0) { dpr = Math.max(1, dpr * .85); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); uni(); downs++; }
     flashL.intensity *= Math.pow(.002, dt); out.flash = 0; out.zoom = 0; kick *= Math.pow(.02, dt);
     if (UR) updateUR(dt); else updateNormal(dt);
+    poseArms();
     zoom += (out.zoom - zoom) * Math.min(1, dt * 8);
     /* camera: subtle parallax + impact kick (kept small) */
     const sh = kick * .12, cx = px * 0 + Math.sin(t * .23) * .05 + Math.sin(t * 31) * sh * .6, cy = CAM.y + Math.sin(t * .31) * .03 + Math.sin(t * 27 + 1) * sh * .6;
