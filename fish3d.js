@@ -343,6 +343,112 @@ function makeFish(kind, tier, env) {
 /* ------------------------------------------------------------------ */
 /* the scene                                                            */
 /* ------------------------------------------------------------------ */
+/* ------------------------------------------------------------------ */
+/* deluxe pier set + horizon (procedural, no external assets)           */
+/* ------------------------------------------------------------------ */
+function plankTex() {
+  const W = 512, H = 64, c = cv2(W, H), g = c.getContext('2d'), b = cv2(W, H), bg = b.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#7a5434'); gr.addColorStop(.5, '#8a6139'); gr.addColorStop(1, '#6e4a2c');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H); bg.fillStyle = '#808080'; bg.fillRect(0, 0, W, H);
+  for (let i = 0; i < 90; i++) { const y = rnd(0, H), a = rnd(.05, .26), dark = Math.random() < .6, l = rnd(60, 300), x0 = rnd(-40, W);
+    g.strokeStyle = dark ? 'rgba(35,20,8,' + a + ')' : 'rgba(190,140,90,' + a * .8 + ')'; g.lineWidth = rnd(.5, 1.8);
+    g.beginPath(); g.moveTo(x0, y); g.bezierCurveTo(x0 + l * .3, y + rnd(-3, 3), x0 + l * .7, y + rnd(-3, 3), x0 + l, y + rnd(-1, 1)); g.stroke();
+    bg.strokeStyle = dark ? 'rgba(0,0,0,' + a * 1.6 + ')' : 'rgba(255,255,255,' + a + ')'; bg.lineWidth = g.lineWidth; bg.beginPath(); bg.moveTo(x0, y); bg.bezierCurveTo(x0 + l * .3, y + rnd(-3, 3), x0 + l * .7, y + rnd(-3, 3), x0 + l, y); bg.stroke(); }
+  for (let i = 0; i < 3; i++) { const x = rnd(40, W - 40), y = rnd(14, H - 14);
+    for (let r = 4; r >= 1; r--) { g.strokeStyle = 'rgba(30,16,6,' + (.18 + (4 - r) * .1) + ')'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x, y, r * 4.5, r * 2.6, 0, 0, 6.283); g.stroke(); }
+    bg.fillStyle = 'rgba(0,0,0,.55)'; bg.beginPath(); bg.ellipse(x, y, 7, 4, 0, 0, 6.283); bg.fill(); }
+  g.fillStyle = 'rgba(205,215,225,.10)'; for (let i = 0; i < 14; i++) g.fillRect(rnd(0, W), rnd(0, H), rnd(20, 90), rnd(2, 7)); /* sun-bleached/wet patches */
+  g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, 0, W, 2); g.fillRect(0, H - 2, W, 2);
+  const t = tex(c, true), tb = tex(b, false); t.wrapS = t.wrapT = tb.wrapS = tb.wrapT = THREE.RepeatWrapping; return { map: t, bump: tb };
+}
+function ridgeTex(kind) {
+  const W = 2048, H = 256, c = cv2(W, H), g = c.getContext('2d'), far = kind == 'far';
+  const ph = [rnd(0, 6), rnd(0, 6), rnd(0, 6), rnd(0, 6)];
+  const hgt = x => { const u = x / W * 6.283; let h = far ? .5 + .22 * Math.sin(u * 2 + ph[0]) + .12 * Math.sin(u * 5 + ph[1]) + .06 * Math.sin(u * 13 + ph[2]) + .025 * Math.sin(u * 31 + ph[3]) : .34 + .1 * Math.sin(u * 3 + ph[0]) + .06 * Math.sin(u * 8 + ph[1]) + .03 * Math.sin(u * 19 + ph[2]);
+    const s = (x / W - (far ? .52 : .57)); h -= far ? .34 * Math.exp(-s * s * 90) : .22 * Math.exp(-s * s * 60); /* valley where the sun sets */ return h; };
+  const fill = g.createLinearGradient(0, 0, 0, H);
+  if (far) { fill.addColorStop(0, '#6c5a86'); fill.addColorStop(.55, '#a8738a'); fill.addColorStop(1, '#f0a070'); }
+  else { fill.addColorStop(0, '#16222c'); fill.addColorStop(.6, '#2a3a40'); fill.addColorStop(1, '#8a6a58'); }
+  g.fillStyle = fill; g.beginPath(); g.moveTo(0, H);
+  for (let x = 0; x <= W; x += 2) { let y = H * (1 - hgt(x)); if (!far) y -= Math.abs(Math.sin(x * 1.7)) * 3 + (Math.sin(x * .41) > .3 ? 4 : 0); g.lineTo(x, y); }
+  g.lineTo(W, H); g.closePath(); g.fill();
+  g.globalCompositeOperation = 'source-atop'; g.strokeStyle = far ? 'rgba(255,170,120,.55)' : 'rgba(255,150,90,.45)'; g.lineWidth = 2; g.beginPath();
+  for (let x = 0; x <= W; x += 2) { let y = H * (1 - hgt(x)) + 1; if (!far) y -= Math.abs(Math.sin(x * 1.7)) * 3 + (Math.sin(x * .41) > .3 ? 4 : 0); x ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke();
+  g.globalCompositeOperation = 'source-over';
+  const t = tex(c, true); t.wrapS = THREE.ClampToEdgeWrapping; return t;
+}
+function buildHorizon(scene) {
+  [['far', -250, 300, 36, 6], ['near', -190, 240, 30, 3]].forEach(L => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(L[2] * 2.2, L[3]), new THREE.MeshBasicMaterial({ map: ridgeTex(L[0]), transparent: true, depthWrite: false, fog: false }));
+    m.position.set(L[0] == 'far' ? 20 : -10, -8 + L[3] / 2, L[1]); m.renderOrder = L[0] == 'far' ? -16 : -15; m.frustumCulled = false; scene.add(m);
+  });
+}
+function buildPierDeluxe(o) {
+  const { scene, pier, X1, DECK, PZ, env, Q } = o, T = THREE;
+  const pk = plankTex();
+  const mk = (c, r, m, extra) => { const x = new T.MeshStandardMaterial(Object.assign({ color: c, roughness: r, metalness: m, envMap: env || null, envMapIntensity: .6 }, extra || {})); x.fog = false; return x; };
+  const wood = mk(0xffffff, .72, 0, { map: pk.map, bumpMap: pk.bump, bumpScale: 1.2 });
+  const darkWood = mk(0x8a6a58, .85, 0, { map: pk.map, bumpMap: pk.bump, bumpScale: 1.4 });
+  const iron = mk(0x2a2d31, .45, .85), brass = mk(0xc99a4a, .35, .8), rope = mk(0xb89560, .9, 0), rubber = mk(0x16181a, .8, 0);
+  const sh = (m, c) => { m.castShadow = true; m.receiveShadow = true; return m; };
+  /* deck: staggered instanced boards (1 draw call) + nails (1 draw call) */
+  const boards = [], nails = []; const rows = 6, bw = .2, gap = .018, z0 = PZ - (rows * (bw + gap)) / 2 + bw / 2, xEnd = X1 - 10;
+  for (let r = 0; r < rows; r++) { let x = X1 + .02 - (r % 2) * rnd(.2, .6); while (x > xEnd) { const l = rnd(.9, 1.7); boards.push({ x: x - l / 2, z: z0 + r * (bw + gap), l: l - .02, h: .075 + rnd(-.004, .004), rz: rnd(-.004, .004) }); nails.push([x - .06, z0 + r * (bw + gap)], [x - l + .08, z0 + r * (bw + gap)]); x -= l; } }
+  const bm = new T.InstancedMesh(new T.BoxGeometry(1, 1, 1), wood, boards.length), nm = new T.InstancedMesh(new T.CylinderGeometry(.011, .011, .01, 6), iron, nails.length);
+  const dm = new T.Object3D(), col = new T.Color();
+  boards.forEach((b, i) => { dm.position.set(b.x, DECK - b.h / 2 + rnd(-.003, .003), b.z); dm.rotation.set(0, b.rz, 0); dm.scale.set(b.l, b.h, bw); dm.updateMatrix(); bm.setMatrixAt(i, dm.matrix); const v = .78 + Math.random() * .3; bm.setColorAt(i, col.setRGB(v, v * .96, v * .92)); });
+  nails.forEach((n, i) => { dm.position.set(n[0], DECK + .002, n[1] + rnd(-.04, .04)); dm.rotation.set(0, 0, 0); dm.scale.set(1, 1, 1); dm.updateMatrix(); nm.setMatrixAt(i, dm.matrix); });
+  sh(bm); nm.castShadow = false; pier.add(bm); pier.add(nm); bm.frustumCulled = false; nm.frustumCulled = false;
+  /* rim boards + corner posts */
+  const rim = sh(new T.Mesh(new T.BoxGeometry(12, .16, .1), darkWood)); rim.position.set(X1 - 5.9, DECK - .1, PZ + rows * (bw + gap) / 2 + .03); pier.add(rim);
+  const rim2 = sh(new T.Mesh(new T.BoxGeometry(12, .16, .1), darkWood)); rim2.position.set(X1 - 5.9, DECK - .1, PZ - rows * (bw + gap) / 2 - .03); pier.add(rim2);
+  const fz = PZ + rows * (bw + gap) / 2 + .03;
+  /* tall lantern post at the back of the pier tip, arm toward the sea */
+  const pz = PZ - rows * (bw + gap) / 2 + .1, px0 = X1 - .16, PH = 1.75;
+  const post = sh(new T.Mesh(new T.BoxGeometry(.15, PH, .15), darkWood)); post.position.set(px0, DECK + PH / 2, pz); pier.add(post);
+  const arm = sh(new T.Mesh(new T.BoxGeometry(.62, .09, .09), darkWood)); arm.position.set(px0 + .28, DECK + PH - .06, pz); pier.add(arm);
+  const brace = sh(new T.Mesh(new T.BoxGeometry(.42, .06, .06), darkWood)); brace.position.set(px0 + .15, DECK + PH - .28, pz); brace.rotation.z = Math.PI / 4; pier.add(brace);
+  for (let i = 0; i < 4; i++) { const r = new T.Mesh(new T.TorusGeometry(.098, .017, 6, 14), rope); r.rotation.x = Math.PI / 2; r.position.set(px0, DECK + PH - .5 - i * .045, pz); r.scale.set(1, 1, 1); pier.add(r); }
+  [[.07, .5], [-.07, .5], [.07, -.5]].forEach(p => { const b = new T.Mesh(new T.CylinderGeometry(.016, .016, .02, 8), iron); b.rotation.x = Math.PI / 2; b.position.set(px0 + p[0], DECK + .5 + p[1] * .6, pz + .077); pier.add(b); });
+  /* lantern */
+  const lx = px0 + .52, ly = DECK + PH - .3, lg = new T.Group(); lg.position.set(lx, ly, pz); pier.add(lg);
+  const chain = new T.Mesh(new T.CylinderGeometry(.006, .006, .12, 5), iron); chain.position.y = .17; lg.add(chain);
+  const cap = new T.Mesh(new T.ConeGeometry(.08, .07, 8), iron); cap.position.y = .105; lg.add(cap);
+  const glassM = new T.MeshStandardMaterial({ color: 0xffb54a, emissive: 0xff8a2a, emissiveIntensity: 2.4, roughness: .25, transparent: true, opacity: .92 }); glassM.fog = false;
+  const gl = new T.Mesh(new T.CylinderGeometry(.052, .06, .15, 10), glassM); lg.add(gl);
+  const bs = new T.Mesh(new T.CylinderGeometry(.065, .07, .03, 10), iron); bs.position.y = -.09; lg.add(bs);
+  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4, bar = new T.Mesh(new T.BoxGeometry(.008, .15, .008), iron); bar.position.set(Math.cos(a) * .058, 0, Math.sin(a) * .058); lg.add(bar); }
+  const glow = new T.Sprite(new T.SpriteMaterial({ map: spriteTex('dot'), color: 0xffa34a, transparent: true, opacity: .75, depthWrite: false, blending: T.AdditiveBlending })); glow.scale.set(.9, .9, 1); lg.add(glow);
+  let pl = null; if (Q.shadow) { pl = new T.PointLight(0xffa24a, 5, 3.6, 2); pl.position.set(0, 0, .05); lg.add(pl); }
+  /* life ring on the post (front face) */
+  for (let i = 0; i < 8; i++) { const a = new T.Mesh(new T.TorusGeometry(.17, .048, 8, 6, Math.PI / 4), mk(i % 2 ? 0xf2f0e8 : 0xd8381c, .5, 0)); a.rotation.z = i * Math.PI / 4; a.position.set(px0, DECK + 1.0, pz + .17); pier.add(a); }
+  const rb = new T.Mesh(new T.TorusGeometry(.2, .01, 5, 24), rope); rb.position.set(px0, DECK + 1.0, pz + .17); pier.add(rb);
+  /* mooring bollard (front tip) + rope wraps */
+  const bol = sh(new T.Mesh(new T.CylinderGeometry(.06, .075, .2, 14), iron)); bol.position.set(X1 - .14, DECK + .1, fz - .1); pier.add(bol);
+  const bolTop = new T.Mesh(new T.SphereGeometry(.07, 14, 8, 0, 6.283, 0, 1.4), iron); bolTop.position.set(X1 - .14, DECK + .2, fz - .1); pier.add(bolTop);
+  for (let i = 0; i < 4; i++) { const r = new T.Mesh(new T.TorusGeometry(.078, .014, 6, 16), rope); r.rotation.x = Math.PI / 2; r.position.set(X1 - .14, DECK + .05 + i * .03, fz - .1); pier.add(r); }
+  /* coiled rope on the deck */
+  for (let i = 0; i < 3; i++) { const r = new T.Mesh(new T.TorusGeometry(.12 - i * .028, .022, 6, 20), rope); r.rotation.x = Math.PI / 2; r.position.set(X1 - .55, DECK + .02 + i * .02, PZ + .12); pier.add(r); }
+  /* crate */
+  const cr = new T.Group(); cr.position.set(X1 - .5, DECK, pz + .45); cr.rotation.y = .25; pier.add(cr);
+  const cb = sh(new T.Mesh(new T.BoxGeometry(.3, .26, .3), wood)); cb.position.y = .13; cr.add(cb);
+  [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(s => { const e = sh(new T.Mesh(new T.BoxGeometry(.035, .27, .035), darkWood)); e.position.set(s[0] * .15, .135, s[1] * .15); cr.add(e); });
+  [.02, .25].forEach(y => [-1, 1].forEach(s => { const e = new T.Mesh(new T.BoxGeometry(.31, .03, .03), darkWood); e.position.set(0, y, s * .15); cr.add(e); const e2 = new T.Mesh(new T.BoxGeometry(.03, .03, .31), darkWood); e2.position.set(s * .15, y, 0); cr.add(e2); }));
+  const dg = sh(new T.Mesh(new T.BoxGeometry(.38, .028, .028), darkWood)); dg.position.set(0, .13, .152); dg.rotation.z = Math.atan2(.22, .3); cr.add(dg);
+  /* galvanized bucket with handle */
+  const gal = mk(0xa9b4ba, .38, .85), bk = new T.Group(); bk.position.set(X1 - 1.0, DECK, fz - .2); pier.add(bk);
+  const bb = sh(new T.Mesh(new T.CylinderGeometry(.12, .09, .22, 18, 1, true), gal)); bb.position.y = .11; gal.side = T.DoubleSide; bk.add(bb);
+  const bbot = new T.Mesh(new T.CylinderGeometry(.09, .09, .01, 18), gal); bbot.position.y = .005; bk.add(bbot);
+  [.0, .22].forEach(y => { const r = new T.Mesh(new T.TorusGeometry(y ? .12 : .09, .008, 6, 18), gal); r.rotation.x = Math.PI / 2; r.position.y = y + .004; bk.add(r); });
+  const hd = new T.Mesh(new T.TorusGeometry(.115, .005, 5, 16, Math.PI), iron); hd.position.y = .22; hd.rotation.z = 0; bk.add(hd);
+  /* hanging tire fenders on the front rim (rope-hung) */
+  [X1 - .35, X1 - 1.35].forEach((x, i) => { const tg = new T.Group(); tg.position.set(x, DECK - .3, fz + .1); pier.add(tg);
+    const tr = sh(new T.Mesh(new T.TorusGeometry(.17, .075, 12, 24), rubber)); tg.add(tr);
+    const tin = new T.Mesh(new T.TorusGeometry(.17, .045, 8, 24), mk(0x0c0d0e, .95, 0)); tin.position.z = .035; tg.add(tin);
+    const rp = new T.Mesh(new T.CylinderGeometry(.01, .01, .3, 5), rope); rp.position.set(0, .3, -.05); tg.add(rp); });
+  return { update(t) { const f = .88 + Math.sin(t * 9.1) * .05 + Math.sin(t * 23.7) * .04 + Math.sin(t * 3.3) * .03; glow.material.opacity = .62 * f; glassM.emissiveIntensity = 2.4 * f; if (pl) pl.intensity = 5 * f; } };
+}
+
 export function createScene(opt) {
   const tier = opt.tier == null ? pickTier() : opt.tier, Q = TIERS[tier];
   const errors = []; const onErr = opt.onError || (() => { });
@@ -492,7 +598,7 @@ void main(){float dist=length(cameraPosition-vW);
   /* ---- lights + environment ---- */
   const hemi = new THREE.HemisphereLight(0x9ec6e8, 0x0b2a3a, .75); scene.add(hemi);
   const sunL = new THREE.DirectionalLight(0xffb47c, 2.3); sunL.position.set(5, 3.5, -3); scene.add(sunL); scene.add(sunL.target);
-  const fillL = new THREE.DirectionalLight(0x6fcfff, 1.1); fillL.position.set(-2, 6, 4); scene.add(fillL);
+  const fillL = new THREE.DirectionalLight(0x6fcfff, 1.1); fillL.position.set(-2, 6, 4); scene.add(fillL); const rimL = new THREE.DirectionalLight(0xff9a5a, 1.0); rimL.position.set(1.5, 1.2, -8); scene.add(rimL); /* low sun behind the scene: warm backlight on the pier */
   if (Q.shadow) {
     sunL.castShadow = true; sunL.shadow.mapSize.set(Q.shadow, Q.shadow);
     const sc = sunL.shadow.camera; sc.left = -3; sc.right = 3; sc.top = 3; sc.bottom = -3; sc.near = .5; sc.far = 20; sc.updateProjectionMatrix(); sunL.shadow.bias = -.0006;
@@ -511,14 +617,13 @@ void main(){float dist=length(cameraPosition-vW);
 
   /* ---- pier + props ---- */
   const woodT = woodTexture(); woodT.wrapS = woodT.wrapT = THREE.RepeatWrapping;
-  const pierX1 = planePoint(.23, .5, CAM.pierZ).x, DECK = .36;
+  const pierX1 = planePoint(.33, .5, CAM.pierZ).x, DECK = .36;
   const pier = new THREE.Group(); scene.add(pier);
   const woodM = [0, 1, 2].map(i => { const m = new THREE.MeshStandardMaterial({ map: woodT, roughness: .85, color: new THREE.Color().setHSL(.07, .35, .72 + i * .08) }); m.fog = false; return m; });
-  { const len = pierX1 + 8; for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(len, .07, .22), woodM[i % 3]); b.position.set(pierX1 - len / 2, DECK - .035, CAM.pierZ - .55 + i * .23); b.castShadow = true; b.receiveShadow = true; pier.add(b); } }
+  let pdx = null; try { pdx = buildPierDeluxe({ scene, pier, X1: pierX1, DECK, PZ: CAM.pierZ, env: envTex, Q }); buildHorizon(scene); } catch (e) { errors.push('부두/원경 디테일 생성 실패(기본 부두로 계속): ' + (e.message || e)); const len = pierX1 + 8; for (let i = 0; i < 6; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(len, .07, .22), woodM[i % 3]); b.position.set(pierX1 - len / 2, DECK - .035, CAM.pierZ - .55 + i * .23); pier.add(b); } }
   const postM = new THREE.MeshStandardMaterial({ color: 0x3a2818, roughness: .95 });
   [pierX1 - .25, pierX1 - 2.3, pierX1 - 4.4].forEach(x => { [CAM.pierZ - .5, CAM.pierZ + .5].forEach(z => { const p = new THREE.Mesh(new THREE.CylinderGeometry(.07, .08, 3.3, 10), postM); p.position.set(x, DECK - 1.65, z); p.castShadow = true; pier.add(p); }); });
   const beam = new THREE.Mesh(new THREE.BoxGeometry(5, .09, .09), postM); beam.position.set(pierX1 - 2.3, -.55, CAM.pierZ + .5); pier.add(beam);
-  const bucket = new THREE.Mesh(new THREE.CylinderGeometry(.12, .09, .2, 14), new THREE.MeshStandardMaterial({ color: 0x4f7f9a, roughness: .5, metalness: .3 })); bucket.material.fog = false; bucket.position.set(pierX1 - 3.3, DECK + .1, CAM.pierZ + .15); bucket.castShadow = true; pier.add(bucket);
 
   /* ---- angler ---- */
   const skin = new THREE.MeshStandardMaterial({ color: 0xe8b48a, roughness: .7 }), jacket = new THREE.MeshStandardMaterial({ color: 0x2f4f6e, roughness: .75 }),
@@ -617,7 +722,7 @@ void main(){float dist=length(cameraPosition-vW);
   function splash(x, y, z, n, v, up) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, r = Math.pow(Math.random(), .6) * v; spray.emit(x + Math.cos(a) * .03, y, z + Math.sin(a) * .03, Math.cos(a) * r * .5, up * (.5 + Math.random() * .7), Math.sin(a) * r * .3, rnd(.5, 1.1), rnd(.025, .06)); } }
 
   function update(st, time, dt) {
-    t = time; uTime.value = t; frames++;
+    t = time; uTime.value = t; frames++; if (pdx) pdx.update(t);
     /* adaptive resolution: if frames are consistently slow, lower pixel ratio once or twice */
     if (frames > 60) fpsAvg = fpsAvg * .97 + Math.min(dt * 1000, 60) * .03; /* skip first frames + clamp hitches so a shader-compile stall can't trigger downscale */
     if (frames > 150 && fpsAvg > 36 && dpr > 1 && frames % 90 == 0) { dpr = Math.max(1, dpr * .85); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); const us = uScale(); [dust, spray, bubbles].forEach(p => p.uni.uScale.value = us); lowCount++; }
