@@ -38,13 +38,15 @@ export function pickTier() {
   } catch (e) { /* storage may be blocked */ }
   const mob = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
   const mem = navigator.deviceMemory || (mob ? 3 : 8), cores = navigator.hardwareConcurrency || 4;
-  if (mem <= 2 || cores <= 4 && mob) return 0;
+  const ios = /iPhone|iPad/i.test(navigator.userAgent || '');
+  if (ios && cores >= 6) return 2; /* A15+ class iPhones report 6 cores; older/low-end report 2-4 */
+  if (mem <= 2 || cores <= 4 && mob && !ios) return 0;
   if (mob || mem <= 4) return 1;
   return 2;
 }
 const TIERS = [
   { dpr: 1, shadow: 0, ow: 40, od: 70, dust: 90, shafts: 3, weeds: 7, aa: false, pmrem: false, spray: 160 },
-  { dpr: 1.5, shadow: 1024, ow: 70, od: 130, dust: 200, shafts: 5, weeds: 12, aa: true, pmrem: true, spray: 320 },
+  { dpr: 1.75, shadow: 1024, ow: 70, od: 130, dust: 200, shafts: 5, weeds: 12, aa: true, pmrem: true, spray: 320 },
   { dpr: 2, shadow: 2048, ow: 110, od: 200, dust: 360, shafts: 7, weeds: 18, aa: true, pmrem: true, spray: 480 }
 ];
 
@@ -258,7 +260,7 @@ function bodyProfile(u, K) {
   return .34 * (.12 * u * u + .88 * p) * (1 + K.hump * Math.sin(Math.PI * u) * .5);
 }
 function bodyGeo(kind) {
-  const K = FISH_KIND[kind], SEG = 44, RAD = 22, pos = [], uv = [], idx = [];
+  const K = FISH_KIND[kind], SEG = 72, RAD = 32, pos = [], uv = [], idx = [];
   for (let i = 0; i <= SEG; i++) {
     const u = i / SEG, x = lerp(1.0, -.92, u), ry = bodyProfile(u, K), rz = ry * K.flat;
     for (let j = 0; j <= RAD; j++) {
@@ -293,7 +295,7 @@ function fishAssets(kind, tier, env) {
   const pf = finGeo([[0, 0], [-.1, .22, -.34, .2], [-.18, .04, -.14, 0], [0, 0]]); pf.rotateX(Math.PI / 2);
   A.pecR = pf.clone(); A.pecR.translate(.42, -.14, .16); A.pecL = pf.clone(); A.pecL.scale(1, 1, -1); A.pecL.translate(.42, -.14, -.16);
   A.anal = finGeo([[0, 0], [-.12, -.2, -.34, -.16], [-.2, -.03, -.3, 0], [0, 0]]); A.anal.translate(-.38, -.2, 0);
-  A.eye = new THREE.SphereGeometry(.06, 14, 10); A.pupil = new THREE.SphereGeometry(.035, 10, 8);
+  A.eye = new THREE.SphereGeometry(.07, 20, 14); A.pupil = new THREE.SphereGeometry(.04, 14, 10);
   if (K.whisk) {
     A.whisk = [1, -1].map(sg => new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new V3(.9, -.1, sg * .12), new V3(1.05, -.18, sg * .22), new V3(1.02, -.3, sg * .25), new V3(.95, -.38, sg * .2)]), 12, .012, 5, false));
   }
@@ -307,14 +309,16 @@ function bendPatch(mat, uni, fin) {
     sh.vertexShader = 'uniform float uTime;uniform float uAmp;uniform float uSpd;\n' + sh.vertexShader.replace('#include <begin_vertex>',
       '#include <begin_vertex>\n float bw=pow(clamp((.35-transformed.x)/1.35,0.,1.),1.5);\n transformed.z+=uAmp*bw*sin(uTime*uSpd-transformed.x*3.4);\n transformed.y+=uAmp*.25*bw*sin(uTime*uSpd*.5-transformed.x*2.);' +
       (fin ? '\n transformed.z+=sin(uTime*5.+transformed.x*7.+transformed.y*5.)*.02*uAmp*6.;' : ''));
+    if (!fin) sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
+      'float rimF=pow(1.-clamp(dot(normalize(normal),normalize(vViewPosition)),0.,1.),3.);\n outgoingLight+=vec3(.42,.68,.85)*rimF*.45;\n#include <opaque_fragment>');
   };
-  mat.customProgramCacheKey = () => 'bend' + (fin ? 'F' : 'B');
+  mat.customProgramCacheKey = () => 'bend2' + (fin ? 'F' : 'B');
 }
 function makeFish(kind, tier, env) {
   const K = FISH_KIND[kind], A = fishAssets(kind, tier, env), grp = new THREE.Group(), inner = new THREE.Group();
   grp.add(inner); grp.rotation.order = 'YZX';
   const uni = { uTime: { value: 0 }, uAmp: { value: .04 }, uSpd: { value: 6 } };
-  const bm = new THREE.MeshStandardMaterial({ map: A.skin.map, bumpMap: A.skin.bump, bumpScale: 1.6, roughness: .36, metalness: .22, envMap: env || null, envMapIntensity: .9 });
+  const bm = new THREE.MeshStandardMaterial({ map: A.skin.map, bumpMap: A.skin.bump, bumpScale: 1.1, roughness: .42, metalness: .08, envMap: env || null, envMapIntensity: 1.15 });
   if (kind == 'UR') { bm.emissive = new THREE.Color('#ff9a2a'); bm.emissiveIntensity = .14; }
   bendPatch(bm, uni, false);
   const fm = new THREE.MeshStandardMaterial({ map: A.finMap, side: THREE.DoubleSide, roughness: .6, metalness: 0, transparent: true, opacity: .9, envMap: env || null });
@@ -349,7 +353,7 @@ export function createScene(opt) {
   };
   let dpr = Math.min(Q.dpr, window.devicePixelRatio || 1);
   renderer.setPixelRatio(dpr); renderer.setClearColor(0x05101c, 1);
-  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.NoToneMapping;
+  renderer.outputColorSpace = THREE.SRGBColorSpace; { const tm = /[?&]tm=([012])/.exec(location.search); const k = tm ? +tm[1] : 1; renderer.toneMapping = k == 0 ? THREE.NoToneMapping : k == 1 ? THREE.ACESFilmicToneMapping : THREE.AgXToneMapping; renderer.toneMappingExposure = 1.05; }
   if (Q.shadow) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
   let W = opt.W, H = opt.H;
   renderer.setSize(W, H, false);
@@ -615,8 +619,8 @@ void main(){float dist=length(cameraPosition-vW);
   function update(st, time, dt) {
     t = time; uTime.value = t; frames++;
     /* adaptive resolution: if frames are consistently slow, lower pixel ratio once or twice */
-    fpsAvg = fpsAvg * .95 + dt * 1000 * .05;
-    if (frames > 30 && fpsAvg > 34 && dpr > .75 && frames % 45 == 0) { dpr = Math.max(.75, dpr * .8); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); const us = uScale(); [dust, spray, bubbles].forEach(p => p.uni.uScale.value = us); lowCount++; }
+    if (frames > 60) fpsAvg = fpsAvg * .97 + Math.min(dt * 1000, 60) * .03; /* skip first frames + clamp hitches so a shader-compile stall can't trigger downscale */
+    if (frames > 150 && fpsAvg > 36 && dpr > 1 && frames % 90 == 0) { dpr = Math.max(1, dpr * .85); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); const us = uScale(); [dust, spray, bubbles].forEach(p => p.uni.uScale.value = us); lowCount++; }
     kick *= Math.pow(.02, dt); zoom += ((st.zoom || 0) - zoom) * Math.min(1, dt * 6); big += ((st.big || 0) - big) * Math.min(1, dt * 3);
     /* camera: parallax + drift + a gentle reaction to the big fish (no shake) */
     const cx = px * .22 + Math.sin(t * .23) * .07, cy = CAM.y - py * .06 + Math.sin(t * .31) * .025 - big * .12 - kick * .02;
