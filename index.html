@@ -1671,6 +1671,8 @@ try{(await getDocs(query(collection(db,'leaderboard'),orderBy('bal','desc'),limi
 try{(await getDocs(query(collection(db,'leaderboard'),orderBy('exp','desc'),limit(200)))).docs.forEach(d=>{if(!seen.has(d.id))add(d)});ok=true}catch(e){console.error('rank(exp) 조회 실패',e)}
 if(!ok)throw new Error('leaderboard 조회 실패');
 if(user&&!seen.has(user.uid))seen.set(user.uid,{rf:window.rf!==false,n:window.ME||'나',L:window.lv().L,bal:+window.bal||0,eq:+window.eq,o:+window.opens||0,me:true});
+const miss=[...seen.entries()].filter(([k,v])=>v.bal==null&&!v.me).slice(0,60);window.__rkDbg={miss:miss.length,ok:0,err:''};
+await Promise.all(miss.map(async([k,v])=>{try{const r=await getDoc(doc(db,'users',k));if(r.exists()&&typeof r.data().bal==='number'){v.bal=+r.data().bal;window.__rkDbg.ok++}}catch(e){window.__rkDbg.err=(e&&e.code)||'error'}}));
 window.RANK=[...seen.values()].sort((a,b)=>(b.bal==null?-1:b.bal)-(a.bal==null?-1:a.bal)).slice(0,100);
 if(mine&&(mine.rf!==false)!==!!window.rf&&ready)save(true)}catch(e){console.error(e);window.RANK=[];toast('랭킹을 불러오지 못했습니다')}};
 setInterval(()=>save(false),800);
