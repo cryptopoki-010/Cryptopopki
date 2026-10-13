@@ -101,6 +101,34 @@ input[type=range]{width:100%;accent-color:var(--red);height:32px;margin:0}
 .fx{position:fixed;inset:0;z-index:50;background:#05070D;display:flex;justify-content:center}
 .fxi{position:relative;width:100%;max-width:480px;height:100%}.fxi canvas{display:block;touch-action:none}
 .sk{position:absolute;right:12px;top:calc(12px + env(safe-area-inset-top,0px));background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:6px 14px;font-weight:500;z-index:3}
+
+.fx3 .f3gl,.fx3 .f3ov{position:absolute;left:0;top:0;width:100%;height:100%;display:block}.fx3 .f3ov{pointer-events:none}
+.f3ui{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.f3ui>div{position:absolute}
+.f3red{inset:0;background:#ff281e;opacity:0}
+.f3vg{inset:0;background:radial-gradient(ellipse 85% 70% at 50% 52%,transparent 52%,rgba(2,6,16,.55) 100%)}
+.f3fl{inset:0;background:radial-gradient(circle at 50% 45%,#fff3c9,rgba(255,236,170,.6) 55%,rgba(255,236,170,.2));opacity:0;mix-blend-mode:screen}
+.f3b1{left:0;right:0;top:0;height:0;background:linear-gradient(#000 70%,rgba(0,0,0,0))}.f3b2{left:0;right:0;bottom:0;height:0;background:linear-gradient(rgba(0,0,0,0),#000 30%)}
+.f3tape{left:-3%;width:106%;top:0;display:none;overflow:hidden;border-radius:3px;
+ background:repeating-linear-gradient(-45deg,#ffd21a 0 18px,#15120a 18px 36px);
+ box-shadow:0 10px 18px rgba(0,0,0,.55),0 2px 0 rgba(0,0,0,.7),inset 0 2px 0 rgba(255,255,255,.55),inset 0 -3px 0 rgba(0,0,0,.45);will-change:transform}
+.f3tape:before{content:"";position:absolute;left:0;right:0;top:50%;height:58%;transform:translateY(-50%);background:linear-gradient(#26231b,#0d0b07);box-shadow:inset 0 2px 3px rgba(0,0,0,.8),0 0 0 1px rgba(255,210,26,.55)}
+.f3tape:after{content:"";position:absolute;inset:0;background:linear-gradient(rgba(255,255,255,.28),transparent 35%,transparent 70%,rgba(0,0,0,.35));pointer-events:none}
+.f3tr{position:absolute;left:0;top:50%;margin-top:-.62em;white-space:nowrap;font:900 13px/1.25 "Arial Black",Impact,sans-serif;letter-spacing:.14em;color:#ffd21a;text-shadow:0 1px 0 #000;z-index:1;will-change:transform}
+.f3tr i{font-style:normal;color:#ff4a3a;margin:0 .35em}
+.f3bub{display:none;padding:10px 16px 11px;border-radius:20px;background:linear-gradient(#ffffff,#e4ebf6);border:2.5px solid #0d1526;color:#0d1526;font-weight:800;font-size:15px;line-height:1.25;text-align:center;
+ box-shadow:0 12px 24px rgba(0,0,0,.45),0 3px 0 #0d1526,inset 0 2px 0 #fff,inset 0 -5px 0 rgba(30,60,120,.12);will-change:transform}
+.f3bub:after{content:"";position:absolute;left:var(--tx,40px);bottom:-10px;width:16px;height:16px;margin-left:-8px;background:#e4ebf6;border:2.5px solid #0d1526;border-top:0;border-left:0;transform:rotate(45deg) skew(8deg,8deg);border-radius:0 0 5px 0}
+.f3dbg{left:8px;bottom:8px;font:11px ui-monospace,monospace;color:#bfe;text-shadow:0 1px 2px #000}
+.f3load{position:absolute;inset:0;z-index:2;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(circle at 50% 40%,#16315a,#060b16);color:#cfe3ff;text-align:center;padding:24px}
+.f3sp{width:42px;height:42px;border-radius:50%;border:4px solid rgba(160,200,255,.25);border-top-color:#9fd0ff;animation:f3s 1s linear infinite}@keyframes f3s{to{transform:rotate(360deg)}}
+.f3lt{font-weight:600;letter-spacing:.02em}
+.f3load.err{background:#070b14;justify-content:flex-start;padding-top:calc(56px + env(safe-area-inset-top,0px));overflow:auto;align-items:stretch;text-align:left}
+.f3e b{display:block;font-size:17px;color:#ff9b8f;margin-bottom:6px}.f3e p{margin:0 0 10px;color:#f1f5fb;font-size:14px;line-height:1.45}
+.f3e pre{margin:0 0 14px;max-height:34vh;overflow:auto;background:#0d1424;border:1px solid #223153;border-radius:8px;padding:8px;font:11px/1.45 ui-monospace,monospace;color:#9db4d6;white-space:pre-wrap;word-break:break-all}
+.f3bt{display:flex;flex-wrap:wrap;gap:8px}.f3bt button{flex:1 1 auto;background:#244a86;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:10px 12px;font-weight:600;transition:transform .08s,background .15s}
+.f3bt button:hover{background:#2f5ca3}.f3bt button:active{transform:scale(.96)}
+.fx3 .sk{transition:transform .08s,background .15s,border-color .15s;backdrop-filter:blur(6px)}.fx3 .sk:hover{background:rgba(255,255,255,.26)}.fx3 .sk:active{transform:scale(.94);background:rgba(255,255,255,.34)}.fx3 .sk:focus-visible{outline:2px solid #9fd0ff;outline-offset:2px}
 .fb{position:absolute;inset:0;z-index:2;pointer-events:none;--c:#8FA3B8;--sp:2.4s;--w:6px}
 .fb::before{content:"";position:absolute;inset:0;padding:var(--w);background:repeating-linear-gradient(90deg,var(--c) 0 6px,transparent 6px 12px);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);animation:pu var(--sp) ease-in-out infinite}
 .fb::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 40px 6px var(--c);opacity:.45;animation:pu var(--sp) ease-in-out infinite}
@@ -681,6 +709,108 @@ function playFish(rs,done){stage(function(S){
    bubble(10,YW-H*.32,bw,38,lang=='en'?'It must be a HUGE catch!!':'엄청난 대어를 낚았나봐!!',pop,W*.1+3,YW-H*.1);
    var zt=t<f.tl?.035*fxIO((t-f.tb)/c.f):.035+.045*Math.sin(Math.PI*lu);S.zoom=Math.max(S.zoom,zt)});
  }}},done)}
+/* ===== fishing 3D (Three.js, local vendor build) — v1 ===== */
+var F3={p:null,mod:null,log:[],err:null,probe:null,state:'idle'};window.__fish3d=F3;
+function f3log(m){F3.log.push((performance.now()/1000).toFixed(2)+'s '+m);if(F3.log.length>80)F3.log.shift()}
+function f3head(u){return fetch(u,{cache:'no-store'}).then(function(r){return{u:u,status:r.status,type:r.headers.get('content-type')||'',ok:r.ok}}).catch(function(e){return{u:u,status:0,ok:false,err:String(e&&e.message||e)}})}
+function f3fail(title,cause,detail){var e=new Error(cause);e.f3title=title;e.f3detail=detail||'';return e}
+function load3D(){if(F3.p)return F3.p;F3.state='loading';
+ F3.p=(function(){
+  f3log('WebGL2 확인');var ok=false,why='';try{var c=document.createElement('canvas');ok=!!c.getContext('webgl2')}catch(e){why=String(e&&e.message||e)}
+  if(!ok)throw f3fail('WebGL2 미지원','이 브라우저/기기에서 WebGL2 컨텍스트를 만들 수 없습니다.'+(why?(' ('+why+')'):''),'하드웨어 가속이 꺼져 있거나 매우 오래된 기기일 수 있습니다. 시크릿 모드/저전력 모드에서는 제한될 수 있습니다.');
+  f3log('vendor/three.module.js 확인');
+  return Promise.all([f3head('vendor/three.module.js'),f3head('fish3d.js')]).then(function(h){
+   F3.probe=h;var a=h[0],b=h[1],det=h.map(function(x){return x.u+' → '+(x.err||('HTTP '+x.status+' '+x.type))}).join('\n');
+   if(!a.ok)throw f3fail('Three.js 파일을 찾을 수 없음','vendor/three.module.js 를 불러오지 못했습니다 ('+(a.err||('HTTP '+a.status))+').','Three.js r160 의 build/three.module.js 를 저장소의 vendor/ 폴더에 넣고 다시 배포해야 합니다.\n'+det);
+   if(!/javascript|ecmascript/i.test(a.type))throw f3fail('Three.js 파일 형식 오류','vendor/three.module.js 의 Content-Type 이 JavaScript 가 아닙니다 ('+a.type+').','배포 서버가 HTML 오류 페이지를 대신 돌려주고 있을 수 있습니다.\n'+det);
+   if(!b.ok)throw f3fail('3D 엔진 파일을 찾을 수 없음','fish3d.js 를 불러오지 못했습니다 ('+(b.err||('HTTP '+b.status))+').','fish3d.js 를 index.html 과 같은 위치에 배포했는지 확인하세요.\n'+det);
+   f3log('fish3d.js import');return import('./fish3d.js').catch(function(e){throw f3fail('3D 모듈 로드 실패','모듈을 불러오는 중 오류: '+String(e&&e.message||e),'Three.js 파일이 손상되었거나 버전이 맞지 않을 수 있습니다. /3d-check 페이지에서 자세한 점검을 할 수 있습니다.\n'+det+(e&&e.stack?('\n'+e.stack):''))})
+  }).then(function(m){F3.mod=m;F3.state='ready';f3log('ready r'+m.REVISION);return m})
+ })();
+ F3.p.catch(function(e){F3.err=e;F3.state='error';F3.p=null;console.error('[fish3d]',e)});
+ return F3.p}
+function fxFrame(rs,o){var R={UR:3,SR:2,R:1},b='R',d=document.createElement('div');rs.forEach(function(e){if(R[e.g]>R[b])b=e.g});d.className='fb '+b.toLowerCase();d.innerHTML=['a','b','c','d'].map(function(k){return '<svg class="cn '+k+'" viewBox="0 0 64 64"><use href="#orn"/></svg>'}).join('');o.firstChild.appendChild(d)}
+function playFish3D(rs,done){
+ if(red){done();return}
+ closeM();fxSk=false;var en=lang=='en';
+ var o=document.createElement('div');o.className='fx fx3';
+ o.innerHTML='<div class="fxi"><canvas class="f3gl"></canvas><canvas class="f3ov"></canvas><div class="f3ui"><div class="f3red"></div><div class="f3vg"></div><div class="f3fl"></div><div class="f3b1"></div><div class="f3b2"></div>'
+  +'<div class="f3tape t"><div class="f3tr"></div></div><div class="f3tape b"><div class="f3tr"></div></div><div class="f3bub"><span></span></div><div class="f3dbg"></div></div><div class="f3load"></div><button class="sk"></button></div>';
+ document.body.appendChild(o);
+ var box=o.firstChild,gl=box.querySelector('.f3gl'),ov=box.querySelector('.f3ov'),ui=box.querySelector('.f3ui'),ld=box.querySelector('.f3load'),sk=box.querySelector('.sk'),
+  dRed=ui.querySelector('.f3red'),dFl=ui.querySelector('.f3fl'),b1=ui.querySelector('.f3b1'),b2=ui.querySelector('.f3b2'),tT=ui.querySelector('.f3tape.t'),tB=ui.querySelector('.f3tape.b'),bub=ui.querySelector('.f3bub'),dbg=ui.querySelector('.f3dbg'),
+  trT=tT.firstChild,trB=tB.firstChild,oc=ov.getContext('2d'),ended=false,raf=0,sc=null,tl=null,flash=0,fired={},dpr=Math.min(2,window.devicePixelRatio||1),W=0,H=0,showDbg=/[?&]dbg=1/.test(location.search);
+ var txt='';for(var q=0;q<14;q++)txt+='DANGER <i>▲</i> ';trT.innerHTML=trB.innerHTML=txt;
+ sk.textContent=en?'Skip':'건너뛰기';
+ function kd(e){if(e.key==='Escape'){fxSk=true;end()}}
+ function end(){if(ended)return;ended=true;cancelAnimationFrame(raf);document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(e){}if(o.parentNode)document.body.removeChild(o);done()}
+ document.addEventListener('keydown',kd);sk.onclick=function(){fxSk=true;end()};sk.focus();
+ function stop(){cancelAnimationFrame(raf);raf=0}
+ function showLoad(msg){ld.className='f3load';ld.innerHTML='<div class="f3sp"></div><div class="f3lt"></div>';ld.lastChild.textContent=msg;ld.style.display='flex'}
+ function showErr(e){
+  stop();F3.err=e;var t=e.f3title||(en?'3D rendering failed':'3D 렌더링 실패'),c=e.message||String(e),det=(e.f3detail||'')+(e.f3detail?'\n':'')+(e.stack&&!e.f3title?e.stack:'')+'\n--- log ---\n'+F3.log.join('\n');
+  ld.className='f3load err';ld.style.display='flex';ld.innerHTML='<div class="f3e"><b></b><p></p><pre></pre><div class="f3bt"><button data-a="r"></button><button data-a="2"></button><button data-a="s"></button></div></div>';
+  var el=ld.firstChild;el.querySelector('b').textContent=t;el.querySelector('p').textContent=c;el.querySelector('pre').textContent=det;
+  var bs=el.querySelectorAll('button');bs[0].textContent=en?'Retry':'다시 시도';bs[1].textContent=en?'Play 2D version':'2D 버전으로 보기';bs[2].textContent=en?'Skip to result':'건너뛰고 결과 보기';
+  bs[0].onclick=function(){F3.err=null;go()};
+  bs[1].onclick=function(){if(ended)return;ended=true;document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(x){}document.body.removeChild(o);playFish(rs,done);var n=document.querySelector('.fx');if(n)fxFrame(rs,n)};
+  bs[2].onclick=function(){fxSk=true;end()};
+  console.error('[fish3d]',t,c,det)}
+ function size(){W=box.clientWidth;H=box.clientHeight;ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+'px';ov.style.height=H+'px'}
+ function onR(){if(!sc)return;size();sc.resize(W,H)}
+ window.addEventListener('resize',onR);
+ box.addEventListener('pointermove',function(e){if(!sc)return;var r=box.getBoundingClientRect();sc.setPointer((e.clientX-r.left)/r.width*2-1,(e.clientY-r.top)/r.height*2-1)});
+ gl.addEventListener('webglcontextlost',function(e){e.preventDefault();f3log('context lost');showErr(f3fail(en?'WebGL context lost':'WebGL 컨텍스트 손실','GPU 메모리 부족 또는 드라이버 재설정으로 3D 화면이 중단되었습니다.',''))});
+ function go(){
+  if(sc){try{sc.dispose()}catch(e){}sc=null}
+  showLoad(en?'Loading 3D engine…':'3D 엔진 불러오는 중…');
+  load3D().then(function(m){
+   if(ended)return;showLoad(en?'Building scene…':'3D 장면 구성 중…');
+   return new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r)})}).then(function(){
+    if(ended)return;size();tl=m.makeTimeline(rs);var bad=null;
+    try{sc=m.createScene({canvas:gl,W:W,H:H,rs:rs,timeline:tl,tier:m.pickTier(),onError:function(e){bad=bad||e}});sc.warmup()}
+    catch(e){throw f3fail(en?'Scene creation failed':'3D 장면 생성 실패',String(e&&e.message||e),(e&&e.stack)||'')}
+    var glsl=sc.errors.filter(function(x){return /^GLSL/.test(x)});if(bad||glsl.length)throw f3fail(en?'Shader error':'셰이더 오류',String((bad&&bad.message)||glsl[0]),sc.errors.join('\n'));
+    sc.errors.forEach(function(x){f3log('warn: '+x)});
+    ld.style.display='none';start(m)})
+  }).catch(function(e){if(!ended)showErr(e)})}
+ function start(m){
+  var t0=performance.now(),last=t0,dbgT=0,pbf=0;f3log('start tier '+sc.tier);F3.state='playing';
+  function C(x,a,b){return x<a?a:x>b?b:x}
+  function loop(now){
+   raf=requestAnimationFrame(loop);
+   try{
+   var dt=Math.min(.05,(now-last)/1000),t=(now-t0)/1000;last=now;var s=tl.at(t),zt=0,i,f,c;
+   for(i=0;i<tl.fs.length;i++){f=tl.fs[i];c=f.c;if(c.ur&&t>=f.tb-.3){var lu0=C((t-f.tl)/c.l,0,1);zt=Math.max(zt,t<f.tl?.035*fxIO((t-f.tb)/c.f):.035+.045*Math.sin(Math.PI*lu0))}}
+   s.zoom=zt;var out=sc.update(s,t,dt);sc.render();
+   /* overlay: bite mark + medals */
+   oc.setTransform(dpr,0,0,dpr,0,0);oc.clearRect(0,0,W,H);
+   for(i=0;i<tl.fs.length;i++){f=tl.fs[i];c=f.c;var sx=out.fish[i].sx,sy=out.fish[i].sy;
+    if(t>=f.tb&&t<f.tb+.55){var u2=(t-f.tb)/.55,sc2=fxSp(Math.min(1,u2*1.3))*(1-fxI2((u2-.7)/.3));oc.save();oc.translate(sx,sy-38-u2*8);oc.scale(sc2,sc2);oc.fillStyle=c.tn==1?'#FFD35A':'#FF6A5A';oc.shadowColor=oc.fillStyle;oc.shadowBlur=10;oc.font='800 28px sans-serif';oc.textAlign='center';oc.fillText('!',0,0);oc.restore()}
+    var mu=C((t-f.tl-c.l*.45)/(c.l*.7+.35),0,1);
+    if(mu>0){var jh=H*(c.ur?.26:.24+c.tn*.1),my=Math.max(40,fxL(sy-jh*.9,sy-jh*1.15,fxO3(mu))+Math.sin(t*3)*2.5);fxMedal(oc,sx,my,12+c.fl*10+c.tn*8,Math.cos(mu*Math.PI*4),fxBack(mu)*1.05,f.g)}
+    if(c.fl&&t>=f.tl&&!fired[i]){fired[i]=1;flash=Math.max(flash,c.fl)}}
+   flash*=Math.pow(.03,dt);dFl.style.opacity=flash>.01?Math.min(.9,flash):0;
+   /* cinematic bars */
+   var bh=H*.05*fxIO(t/.6);b1.style.height=b2.style.height=Math.round(bh+6)+'px';
+   /* UR extras: danger tapes, siren tint, speech bubble */
+   var showT=0,sl=0,rd=0,pop=0;
+   for(i=0;i<tl.fs.length;i++){f=tl.fs[i];c=f.c;if(!c.ur||t<f.tb-.3)continue;var end2=f.tl+c.l*.8,a0=C((t-(f.tb-.3))/.5,0,1),a=a0*(1-C((t-end2)/.5,0,1)),s2=fxO5(a0)*(1-C((t-end2)/.5,0,1));
+    if(a<=0)continue;showT=Math.max(showT,a);sl=Math.max(sl,s2);if(t<f.tl)rd=Math.max(rd,(.06+.08*Math.abs(Math.sin(t*5)))*a);
+    pop=Math.max(pop,fxSp(C((t-f.tb-.5)/.5,0,1))*(1-C((t-(f.tl+2.4))/.35,0,1)))}
+   dRed.style.opacity=rd;
+   if(showT>0){var h=Math.round(H*.048*1.15);tT.style.display=tB.style.display='block';tT.style.opacity=tB.style.opacity=showT;tT.style.height=tB.style.height=h+'px';
+    tT.style.transform='translateY('+(H*.05-(1-sl)*h*1.8)+'px) perspective(520px) rotateX(-14deg)';tB.style.transform='translateY('+(H*.95-h+(1-sl)*h*1.8)+'px) perspective(520px) rotateX(14deg)';
+    trT.style.transform='translateX('+(-((t*150)%190))+'px)';trB.style.transform='translateX('+(-190+((t*150)%190))+'px)'}else tT.style.display=tB.style.display='none';
+   if(pop>0.01){var bw=Math.min(W*.82,300);bub.style.display='block';bub.firstChild.textContent=en?'It must be a HUGE catch!!':'엄청난 대어를 낚았나봐!!';bub.style.width=bw+'px';
+    var bhh=bub.offsetHeight||40,tx=C(out.head.x-10,26,bw-40);bub.style.setProperty('--tx',tx+'px');bub.style.left='10px';bub.style.top=Math.max(H*.08,out.head.y-bhh-26)+'px';bub.style.transformOrigin=tx+'px 100%';bub.style.transform='scale('+pop+')'}else bub.style.display='none';
+   if(showDbg){dbgT+=dt;if(dbgT>.4){dbgT=0;var inf=sc.info();dbg.textContent='r'+inf.rev+' tier'+inf.tier+' dpr'+inf.dpr.toFixed(2)+' '+(1000/Math.max(1,inf.fpsMs)).toFixed(0)+'fps calls'+inf.drawCalls+' tri'+inf.triangles}}
+   F3.fps=sc.info().fpsMs;
+   if(t>tl.total)end()
+   }catch(e){stop();showErr(f3fail(en?'Runtime error in 3D scene':'3D 장면 실행 중 오류',String(e&&e.message||e),(e&&e.stack)||''))}
+  }
+  raf=requestAnimationFrame(loop)}
+ go()}
 /* ===== UR chain helper + wall breaker UR: the Titan charge ===== */
 var fxSk=false;
 function chainUR(N,U,rs,done){var last=rs[rs.length-1];if(last&&last.g=='UR'){var rest=rs.slice(0,-1);if(rest.length)N(rest,function(){if(fxSk)done();else U(last,done)});else U(last,done)}else N(rs,done)}
@@ -1120,7 +1250,7 @@ resize();hit.disabled=true;ovl('');drawSlots(0);cn.textContent='0 / '+CAP;
 window.__cc={acts:acts,spawn:function(g,cy){var o=newAct(g,cy);o.X=0;o.Z=Zr;o.Y=.3;o.st='stay';o.t=0;o.stay=5;o.ox=0;o.oz=Zr;return o},get acc(){return acc},set acc(v){acc=v},get state(){return state},get heart(){return heart},get caught(){return caught},hit:doHit,fin:finish,set time(v){time=v},get slots(){return slots},ring:function(){return acts.filter(function(a){return(a.st=='stay')&&inRing(a)})}};
 last=performance.now();rq=requestAnimationFrame(frame)}
 
-function play(rs,done,t){var ui=-1;if(rs.length>10){var RKk={UR:3,SR:2,R:1};rs=[rs.slice().sort(function(a,b){return RKk[b.g]-RKk[a.g]||b.v-a.v})[0]]}rs.forEach(function(e,k){if(ui<0&&e.g=='UR')ui=k});if(ui>=0)rs=rs.slice(0,ui+1);t=='w'?playWall(rs,done):t=='s'?playSkip(rs,done):t=='f'?playFish(rs,done):playCannon(rs,done);var o=document.querySelector('.fx');if(!o)return;
+function play(rs,done,t){var ui=-1;if(rs.length>10){var RKk={UR:3,SR:2,R:1};rs=[rs.slice().sort(function(a,b){return RKk[b.g]-RKk[a.g]||b.v-a.v})[0]]}rs.forEach(function(e,k){if(ui<0&&e.g=='UR')ui=k});if(ui>=0)rs=rs.slice(0,ui+1);t=='w'?playWall(rs,done):t=='s'?playSkip(rs,done):t=='f'?(/[?&]fish2d=1/.test(location.search)?playFish(rs,done):playFish3D(rs,done)):playCannon(rs,done);var o=document.querySelector('.fx');if(!o)return;
  var R={UR:3,SR:2,R:1},b='R',d=document.createElement('div');rs.forEach(function(e){if(R[e.g]>R[b])b=e.g});
  d.className='fb '+b.toLowerCase();d.innerHTML=['a','b','c','d'].map(function(k){return '<svg class="cn '+k+'" viewBox="0 0 64 64"><use href="#orn"/></svg>'}).join('');o.firstChild.appendChild(d)}
 /* ===== wall breaker v2 (theme w): curved, organic ===== */
