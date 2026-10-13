@@ -207,6 +207,11 @@ function hiBox(a, b, c, N, ex, nPu, nPv, depth) {
 function hiTorus(R, r, N, notches) {
   return hiSurface(N, R / r, (u, v, o) => { const ph = u * Math.PI * 2, th = v * Math.PI * 2, n = notches ? .5 + .5 * Math.cos(ph * notches) : 1, rr = r * (1 - .18 * (1 - _sstep(.15, .6, n)) * .0 - .22 * (1 - _sstep(.0, .35, n))); o.x = (R + rr * Math.cos(th)) * Math.cos(ph); o.y = rr * Math.sin(th); o.z = (R + rr * Math.cos(th)) * Math.sin(ph); o.k = .6 + .4 * _sstep(0, .35, n); });
 }
+/* superellipsoid plate with taper (tpx/tpz: widening of x/z toward +y), rounded by ex, recessed panel seams */
+function hiBoxT(a, b, c, N, ex, nPu, nPv, depth, tpx, tpz) {
+  const sg = x => x < 0 ? -1 : 1, cp = (w, m) => sg(Math.cos(w)) * Math.pow(Math.abs(Math.cos(w)), m), sp = (w, m) => sg(Math.sin(w)) * Math.pow(Math.abs(Math.sin(w)), m);
+  return hiSurface(N, 2.4, (u, v, o) => { const th = (v - .5) * Math.PI, ph = u * Math.PI * 2 - Math.PI, s = nPu ? panelSeam(u, v, nPu, nPv, .1, depth || .03) : { d: 1, k: 1 }, yy = sp(th, ex), fx = 1 + (tpx || 0) * yy, fz = 1 + (tpz || 0) * yy; o.x = a * cp(th, ex) * cp(ph, ex) * s.d * fx; o.y = b * yy * s.d; o.z = c * cp(th, ex) * sp(ph, ex) * s.d * fz; o.k = s.k; });
+}
 function heroTriBudget(tier) { const m = /[?&]hp=(\d+)/.exec(location.search); if (m) return Math.max(200, +m[1]); return [6000, 25000, 100000][tier] || 6000; }
 
 /* ---------------- scene ---------------- */
@@ -295,25 +300,50 @@ void main(){float d=abs(vW.z);float T=1.4;vec2 q=vW.xz/T;vec2 id=floor(q),f=frac
   if (!UR) {
     heroU = 26 * U0(); WWd = Math.max(66, Math.min(122, W * .2)) * U0(); WHd = H * .42 * U0();
     HX = planePoint(.2, .8, 0).x; WX = planePoint(.66, .8, 0).x;
-    const g = new THREE.Group(), hs = .4; g.position.set(HX, GY0, 0); g.scale.setScalar(hs); scene.add(g);
-    const ub = new THREE.Group(); g.add(ub);
-    /* every part = one indexed high-res surface (budget per part: HP triangles; tier 2 = 100k). mirrored parts share the same geometry */
-    const HP = heroTriBudget(tier), hgeo = {}, HG = (key, mk) => hgeo[key] || (hgeo[key] = mk()), vcm = m => { m.vertexColors = true; return m; };
-    [white, navy].forEach(vcm); let heroTris = 0;
-    const part = (key, mk, m) => { const ge = HG(key, mk); heroTris += ge.userData.tris; return new THREE.Mesh(ge, m); };
-    const S3 = (r, m, k) => part('s' + r + (k || ''), () => hiSphere(r, HP, k == 'p' ? 0 : 12, k == 'p' ? 0 : 6, .035), m);
-    const T3 = (rb, rt, m, k, nPu, nPv) => part('t' + k, () => hiTube(rb, rt, HP, nPu, nPv, .04), m);
-    const torso = T3(.42, .5, white, 'torso', 16, 9); torso.scale.y = 2.0; torso.position.y = 3.3; ub.add(torso);
-    const hd = S3(.72, navy, 'hd'); hd.position.y = 4.9; ub.add(hd);
-    const ring = part('ring', () => hiTorus(.5, .06, HP, 24), glowM); ring.position.y = 4.28; ring.rotation.x = Math.PI / 2; ub.add(ring);
-    [.2, -.2].forEach(zz => { const e = S3(.11, glowM, 'p'); e.position.set(.66, 5.0, zz); ub.add(e); });
-    const pelvis = S3(.46, white, 'pel'); pelvis.position.y = 2.3; ub.add(pelvis);
-    [-.12, .12].forEach(z => { const sj = S3(.3, white, 'sh'); sj.position.set(0, 4.3, z); ub.add(sj); });
-    const arms = [0, 1].map(() => [T3(.18, .2, white, 'ua', 12, 4), T3(.16, .18, white, 'la', 12, 4)]); arms.forEach(a => a.forEach(m => g.add(m)));
-    const joints = [0, 1].map(() => ({ e: S3(.24, white, 'el'), h: S3(.3, white, 'hand') })); joints.forEach(j2 => { g.add(j2.e); g.add(j2.h); });
-    const legs = [0, 1].map(() => ({ u: T3(.22, .27, white, 'ul', 14, 5), l: T3(.17, .22, white, 'll', 14, 5), k: S3(.26, white, 'kn'), f: part('foot', () => hiBox(.4, .15, .23, HP, .32, 10, 4, .03), navy) })); legs.forEach(L => { g.add(L.u); g.add(L.l); g.add(L.k); g.add(L.f); });
-    const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: 0x7fe7ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); aura.scale.set(9, 9, 1); aura.position.y = 3.6; g.add(aura);
-    hero = { g, ub, torso, hd, ring, legs, arms, joints, aura, lean: 0, hs, dy: 0, hand: new V3(), tris: heroTris };
+    const g = new THREE.Group(), hs = .33; g.position.set(HX, GY0, 0); g.scale.setScalar(hs); scene.add(g);
+    /* ===== armored power-suit soldier: silver armor + navy under-suit + cyan energy trim. every big part is one hi-res surface (HP tris); small parts get HP*.12 ===== */
+    const HP = heroTriBudget(tier), HS = Math.max(300, Math.round(HP * .12)), hgeo = {}; let heroTris = 0;
+    const armorM = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0xcfd8e6, roughness: .3, metalness: .55, emissive: 0x1a2a55, emissiveIntensity: .22 });
+    const trimM = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0x1f3a96, roughness: .28, metalness: .6, emissive: 0x1030a0, emissiveIntensity: .4 });
+    const suitM = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0x0c1330, roughness: .5, metalness: .35, emissive: 0x050a22, emissiveIntensity: .3 });
+    const glowB = new THREE.MeshBasicMaterial({ color: 0x8fefff });
+    const P = (key, mk, m) => { const ge = hgeo[key] || (hgeo[key] = mk()); heroTris += ge.userData.tris; return new THREE.Mesh(ge, m); };
+    const ub = new THREE.Group(); ub.position.y = 2.7; g.add(ub); const add = (m, x, y, z, sx, sy, sz, p) => { m.position.set(x, y, z); if (sx) m.scale.set(sx, sy, sz); (p || ub).add(m); return m; };
+    /* torso */
+    add(P('abd', () => hiTube(.4, .46, HS * 3, 14, 5, .04), suitM), 0, .55, 0, .85, 1.15, 1.35);
+    add(P('chest', () => hiBoxT(.64, .86, .92, HP, .5, 12, 5, .035, -.1, .2), armorM), 0, 1.95, 0);
+    add(P('pelvis', () => hiBoxT(.5, .34, .6, HS * 3, .45, 8, 3, .03, .05, .1), armorM), 0, -.05, 0);
+    [-1, 1].forEach(z => add(P('hipP', () => hiBoxT(.34, .3, .26, HS * 2, .5, 4, 3, .03), trimM), .0, -.1, z * .62));
+    add(P('neck', () => hiTube(.2, .24, HS, 8, 2, .03), suitM), 0, 2.95, 0, 1, .35, 1);
+    add(P('collar', () => hiTorus(.34, .09, HS * 2, 12), trimM), 0, 2.82, 0);
+    /* chest energy core */
+    const core = add(P('ccore', () => hiSphere(.16, HS * 2, 0, 0), glowB), .64, 2.0, 0, .45, 1, 1);
+    const cring = add(P('cring', () => hiTorus(.23, .045, HS * 2, 0), trimM), .62, 2.0, 0); cring.rotation.z = Math.PI / 2;
+    [-1, 1].forEach(z => { const st = add(P('cst', () => hiBoxT(.05, .5, .04, HS, .4, 0, 0), glowB), .62, 1.65, z * .42); });
+    /* helmet */
+    const hd = add(P('helm', () => hiSphere(.64, HP, 12, 6, .03), armorM), 0, 3.5, 0, 1.06, 1.1, .96);
+    add(P('visorT', () => hiBoxT(.2, .27, .52, HS * 3, .5, 0, 0), suitM), .5, 3.48, 0);
+    const visor = add(P('visor', () => hiBoxT(.12, .17, .43, HS * 3, .45, 0, 0), glowB), .6, 3.5, 0);
+    add(P('chin', () => hiBoxT(.28, .16, .42, HS * 2, .45, 4, 2, .02), armorM), .34, 3.0, 0);
+    add(P('crest', () => hiBoxT(.5, .09, .1, HS * 2, .4, 0, 0), trimM), -.05, 4.2, 0);
+    [-1, 1].forEach(z => { add(P('ear', () => hiSphere(.32, HS * 2, 8, 4, .04), trimM), -.05, 3.46, z * .66, .55, 1, 1); const er = add(P('earR', () => hiTorus(.2, .035, HS * 2, 0), glowB), -.05, 3.46, z * .78); er.rotation.x = Math.PI / 2; });
+    /* backpack + energy module */
+    add(P('pack', () => hiBoxT(.42, .9, .62, HP, .4, 8, 5, .035, 0, .06), armorM), -.9, 1.85, 0);
+    const pcore = add(P('pcore', () => hiSphere(.2, HS * 2, 0, 0), glowB), -1.34, 2.0, 0, .4, 1, 1);
+    const pring = add(P('pring', () => hiTorus(.3, .055, HS * 2, 16), trimM), -1.32, 2.0, 0); pring.rotation.z = Math.PI / 2;
+    const pring2 = add(P('pring2', () => hiTorus(.45, .03, HS * 2, 0), glowB), -1.3, 2.0, 0); pring2.rotation.z = Math.PI / 2;
+    [-1, 1].forEach(z => { add(P('tank', () => hiTube(.15, .15, HS * 3, 10, 4, .03), trimM), -.78, 2.55, z * .72, 1, 1.15, 1); add(P('tankG', () => hiSphere(.11, HS, 0, 0), glowB), -.78, 3.15, z * .72); });
+    add(P('bar', () => hiBoxT(.1, .08, .72, HS * 2, .4, 0, 0), trimM), -.5, 3.2, 0);
+    /* pauldrons */
+    [-1, 1].forEach(z => { add(P('paul', () => hiSphere(.62, HP, 10, 5, .04), armorM), 0, 2.62, z * 1.05, 1.0, .85, .95); const pr = add(P('paulR', () => hiTorus(.34, .04, HS * 2, 0), glowB), 0, 2.62, z * 1.55); pr.rotation.x = Math.PI / 2; add(P('shJ', () => hiSphere(.32, HS * 2, 0, 0), suitM), 0, 2.5, z * .98); });
+    /* arms (dynamic) */
+    const mkArm = () => ({ u: P('au', () => hiTube(.2, .22, HS * 3, 12, 4, .035), suitM), l: P('al', () => hiTube(.18, .2, HS * 3, 12, 4, .035), suitM), up: P('aup', () => hiBoxT(.3, .5, .3, HS * 4, .45, 8, 3, .03), armorM), fp: P('afp', () => hiBoxT(.31, .6, .31, HP, .45, 10, 4, .03, .12, .12), armorM), fg: P('afg', () => hiBoxT(.05, .45, .05, HS, .4, 0, 0), glowB), el: P('ael', () => hiSphere(.27, HS * 2, 8, 4, .03), trimM), gn: P('agn', () => hiBoxT(.4, .3, .32, HP, .4, 8, 3, .03), armorM), pm: P('apm', () => hiSphere(.2, HS * 2, 0, 0), glowB), fi: [0, 1, 2, 3].map(i => P('afi', () => hiTube(.05, .04, HS, 6, 0, 0), suitM)) });
+    const arms = [mkArm(), mkArm()]; arms.forEach(A => { [A.u, A.l, A.up, A.fp, A.fg, A.el, A.gn, A.pm].forEach(m => g.add(m)); A.fi.forEach(m => g.add(m)); });
+    /* legs (dynamic) */
+    const mkLeg = () => ({ u: P('lu', () => hiTube(.26, .3, HS * 3, 14, 4, .035), suitM), l: P('ll', () => hiTube(.2, .26, HS * 3, 14, 4, .035), suitM), tp: P('ltp', () => hiBoxT(.34, .6, .36, HP, .45, 10, 4, .03, .1, .1), armorM), kn: P('lkn', () => hiSphere(.33, HS * 3, 8, 4, .035), trimM), kg: P('lkg', () => hiSphere(.1, HS, 0, 0), glowB), sp: P('lsp', () => hiBoxT(.3, .62, .34, HP, .45, 10, 4, .03, -.1, .1), armorM), bt: P('lbt', () => hiBoxT(.46, .3, .4, HP, .4, 10, 3, .03), armorM), tc: P('ltc', () => hiBoxT(.26, .22, .38, HS * 3, .4, 6, 3, .025), trimM), so: P('lso', () => hiBoxT(.62, .07, .42, HS * 2, .35, 0, 0), suitM), ak: P('lak', () => hiSphere(.22, HS * 2, 0, 0), suitM) });
+    const legs = [mkLeg(), mkLeg()]; legs.forEach(L => Object.values(L).forEach(m => g.add(m)));
+    const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: 0x7fe7ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); aura.scale.set(9, 9, 1); aura.position.y = 3.8; g.add(aura);
+    hero = { g, ub, hd, visor, core, pcore, legs, arms, aura, lean: 0, tilt: 0, hs, dy: 0, hand: new V3(), tris: heroTris, glow: [core, visor, pcore] };
     const sh = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .4, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.set(HX, GY0 + .01, 0); sh.scale.setScalar(hs * 1.4); scene.add(sh);
     /* beam */
     const bg = new THREE.CylinderGeometry(1, 1, 1, 14); bg.rotateZ(Math.PI / 2);
@@ -358,17 +388,35 @@ void main(){float d=abs(vW.z);float T=1.4;vec2 q=vW.xz/T;vec2 id=floor(q),f=frac
 
   /* ---------------- update: normal ---------------- */
   let t = 0, frames = 0, fpsAvg = 16, downs = 0, camX = 0, winT = -1, pulse = 0, gvS = 0;
+  const _y = new V3(0, 1, 0), _d = new V3(), _o = new V3();
+  function alongTo(m, a, b, f, off) { _d.subVectors(b, a); const l = _d.length() || .001; _d.multiplyScalar(1 / l); m.position.copy(a).addScaledVector(_d, l * f); if (off) m.position.add(off); m.quaternion.setFromUnitVectors(_y, _d); m.scale.set(1, 1, 1); }
   function heroPose(pose, rec, tt) {
-    const h = hero, hs = h.hs, br = Math.sin(tt * 2.6) * .05, wv = Math.sin(tt * 9), hop = pose == 'win' ? Math.abs(Math.sin(tt * 6.5)) * .8 : 0;
-    h.dy += ((pose == 'fire' ? -.55 : pose == 'charge' ? -.3 : 0) - h.dy) * .25; const dy = h.dy + br;
-    h.g.position.set(HX, GY0 + hop * hs, 0); h.g.rotation.z = -h.lean; h.ub.position.y = dy;
-    const sd = new V3(0, 4.3 + dy, 0); let hA, hB;
-    if (pose == 'fire') { hA = new V3(3.4, 4.6 + dy, .15); hB = new V3(3.0, 4.35 + dy, -.15); } else if (pose == 'charge') { hA = new V3(1.8, 4.3 + dy, .15); hB = new V3(1.5, 4.1 + dy, -.15); } else if (pose == 'win') { hA = new V3(1.2, 6.2 + wv * .25, .2); hB = new V3(-1.2, 6.2 - wv * .25, -.2); } else { hA = new V3(.9, 2.8 + dy, .2); hB = new V3(-.7, 2.7 + dy, -.2); }
-    [hA, hB].forEach((hp, k) => { const e = sd.clone().lerp(hp, .5).add(new V3(0, -.5, k ? -.2 : .2)); limbTo(h.arms[k][0], sd, e); limbTo(h.arms[k][1], e, hp); h.joints[k].e.position.copy(e); h.joints[k].h.position.copy(hp); });
-    h.hand.copy(hA);
-    const fx = pose == 'fire' ? [1.7, -1.7] : pose == 'charge' ? [1.0, -1.1] : pose == 'win' ? [.35, -.35] : [.28, -.28];
-    h.legs.forEach((L, k) => { const z = k ? .28 : -.28, hip = new V3(0, 2.3 + dy, z), foot = new V3(fx[k], .15, z), E = ik2(hip, foot, 1.3, 1.3, new V3(1, .1, 0)); limbTo(L.u, hip, E); limbTo(L.l, E, foot); L.k.position.copy(E); L.f.position.set(foot.x + .2, .15, z); });
+    const h = hero, br = Math.sin(tt * 2.6) * .05, wv = Math.sin(tt * 9), hop = pose == 'win' ? Math.abs(Math.sin(tt * 6.5)) * .8 : 0;
+    h.dy += ((pose == 'fire' ? -.95 : pose == 'charge' ? -.5 : 0) - h.dy) * .25; const dy = h.dy + br;
+    const tg = pose == 'fire' ? .34 : pose == 'charge' ? .2 : pose == 'win' ? -.08 : .04; h.tilt += (tg - h.tilt) * .2;
+    h.g.position.set(HX, GY0 + hop * hs0(), 0); h.g.rotation.z = -h.lean; h.ub.position.set(0, 2.7 + dy, 0); h.ub.rotation.z = -h.tilt;
+    const ct = Math.cos(h.tilt), st = Math.sin(h.tilt), hip = new V3(0, 2.7 + dy, 0);
+    const shoulder = zz => new V3(hip.x + st * 2.52, hip.y + ct * 2.52, zz);   /* shoulder joint: hip + rotated (0, 2.52) */
+    let hA, hB;
+    if (pose == 'fire') { hA = new V3(4.0, 4.05, .2); hB = new V3(3.6, 3.78, -.2); } else if (pose == 'charge') { hA = new V3(2.7, 3.95, .22); hB = new V3(2.4, 3.7, -.22); } else if (pose == 'win') { hA = new V3(1.5, 7.3 + wv * .25, .5); hB = new V3(-1.5, 7.3 - wv * .25, -.5); } else { hA = new V3(1.1, 2.7, .95); hB = new V3(-.7, 2.6, -.95); }
+    h.arms.forEach((A, k) => {
+      const S = shoulder(k ? -.98 : .98), T = k ? hB : hA, L1 = 1.3, L2 = 1.3, dir = T.clone().sub(S), dl = dir.length(), dn = dir.clone().multiplyScalar(1 / (dl || 1));
+      const wr = S.clone().addScaledVector(dn, Math.min(dl - .55, L1 + L2 - .02)), E = ik2(S, wr, L1, L2, new V3(-.25, -1, k ? -.7 : .7)), fd = wr.clone().sub(E).normalize(), tip = wr.clone().addScaledVector(fd, .62);
+      limbTo(A.u, S, E); limbTo(A.l, E, wr);
+      alongTo(A.up, S, E, .5, null); alongTo(A.fp, E, wr, .48, null); _o.set(0, 0, k ? -.34 : .34); alongTo(A.fg, E, wr, .5, _o);
+      A.el.position.copy(E); alongTo(A.gn, wr, tip, .42, null); alongTo(A.pm, wr, tip, 1.02, null);
+      A.fi.forEach((fm, i) => { const sp = (i - 1.5) * .085; _o.set(0, sp * 2, sp * 2.4 * (k ? -1 : 1)); const bs = wr.clone().addScaledVector(fd, .5).add(_o); const te = bs.clone().addScaledVector(fd, .3).add(_o.clone().multiplyScalar(.4)); limbTo(fm, bs, te); fm.scale.x = 1; });
+      if (k == 0) h.hand.copy(tip);
+    });
+    const fx = pose == 'fire' ? [2.0, -2.3] : pose == 'charge' ? [1.2, -1.4] : pose == 'win' ? [.4, -.4] : [.32, -.32];
+    h.legs.forEach((L, k) => {
+      const z = k ? .34 : -.34, ank = new V3(fx[k], .62, z), hp = new V3(0, 2.7 + dy, z), K = ik2(hp, ank, 1.35, 1.35, new V3(1, .1, 0));
+      limbTo(L.u, hp, K); limbTo(L.l, K, ank); _o.set(.1, 0, 0); alongTo(L.tp, hp, K, .45, _o); alongTo(L.sp, K, ank, .5, _o);
+      L.kn.position.copy(K).add(_o.set(.1, 0, 0)); L.kg.position.copy(K).add(_o.set(.4, 0, 0)); L.ak.position.copy(ank);
+      L.bt.position.set(ank.x + .2, .3, z); L.bt.rotation.set(0, 0, 0); L.tc.position.set(ank.x + .6, .22, z); L.so.position.set(ank.x + .24, .035, z);
+    });
   }
+  function hs0() { return hero.hs; }
   function updateNormal(dt) {
     out.med.length = 0; out.txt.length = 0; out.dim = 0; out.flash = 0; out.zoom = 0;
     const sg = tl.sg; let cur = sg[0];
