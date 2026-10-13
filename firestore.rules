@@ -1,25 +1,47 @@
 rules_version = '2';
 service cloud.firestore {
-  match /databases/{database}/documents {
+  match /databases/{db}/documents {
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['bal','inv','invV','opens','urN','used','exp','eq','updatedAt'])
         && request.resource.data.bal is number
         && request.resource.data.bal >= 0
         && request.resource.data.bal < 10000000;
     }
-    match /users/{uid}/prefs/{p} {
+    // 배너 코인 선택 (유저별)
+    match /users/{uid}/prefs/banner {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['coins','updatedAt'])
         && request.resource.data.coins is list
         && request.resource.data.coins.size() <= 6;
     }
+    // 닉네임 + 랭킹 테두리 장착 (닉네임은 24시간에 한 번만 변경)
+    match /users/{uid}/prefs/profile {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['nick','nickAt','rf','updatedAt'])
+        && request.resource.data.rf is bool
+        && (!('nick' in request.resource.data)
+            || (request.resource.data.nick is string
+                && request.resource.data.nick.matches('^[가-힣A-Za-z0-9]{1,12}$')
+                && request.resource.data.nickAt is number))
+        && (resource == null
+            || !('nick' in resource.data)
+            || request.resource.data.get('nick', '') == resource.data.nick
+            || resource.data.nickAt + 86400000 <= request.time.toMillis() + 300000);
+    }
     match /leaderboard/{uid} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['n','L','exp','eq','opens','t']);
+        && request.resource.data.keys().hasOnly(['n','L','bal','exp','eq','opens','rf','t'])
+        && request.resource.data.n is string && request.resource.data.n.size() <= 20
+        && request.resource.data.L is number
+        && request.resource.data.exp is number && request.resource.data.exp >= 0
+        && (!('bal' in request.resource.data)
+            || (request.resource.data.bal is number
+                && request.resource.data.bal >= 0
+                && request.resource.data.bal < 10000000));
     }
   }
 }
