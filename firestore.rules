@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['bal','inv','invV','opens','urN','used','exp','eq','updatedAt'])
+        && request.resource.data.bal is number
+        && request.resource.data.bal >= 0
+        && request.resource.data.bal < 10000000;
+    }
+    match /users/{uid}/prefs/{p} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['coins','updatedAt'])
+        && request.resource.data.coins is list
+        && request.resource.data.coins.size() <= 6;
+    }
+    match /leaderboard/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['n','L','exp','eq','opens','t']);
+    }
+  }
+}
