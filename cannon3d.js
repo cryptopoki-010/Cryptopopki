@@ -138,6 +138,7 @@ function makeRocketModel() {
 
 /* ---------------- scene ---------------- */
 export function createCannonScene(opt) {
+  const sfx = (n, v, w) => { try { opt.onSfx && opt.onSfx(n, v == null ? 1 : v, w); } catch (e) { } };
   const tier = opt.tier == null ? pickTier() : opt.tier, Q = TIERS[tier], tl = opt.timeline, UR = tl.mode == 'ur', errors = [], onErr = opt.onError || (() => { });
   const renderer = new THREE.WebGLRenderer({ canvas: opt.canvas, antialias: Q.aa, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: !!opt.preserve });
   renderer.debug.onShaderError = (gl, prog) => { const m = 'GLSL 셰이더 컴파일/링크 오류: ' + (gl.getProgramInfoLog(prog) || '').slice(0, 400); errors.push(m); onErr(new Error(m)); };
@@ -308,7 +309,7 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));
     const rc = t < state.lastF ? 0 : Math.exp(-(t - state.lastF) * 7) * Math.cos((t - state.lastF) * 18) * .22; barrel.position.y = 1.05 + rc * .3; muzR.position.y = 2.15 + rc * .3;
     M.forEach((R, i) => {
       const m = R.m, c = m.c, T = R.T;
-      if (t >= m.tf && !R.fired) { R.fired = true; state.lastF = t; burst(barrelTip, 16, [col('#FFB347'), col('#ffffff'), col('#FFD27A')], 5, 3, .45, .25); puffs(barrelTip, 5, col('#F4E4D2'), .7, .8, 1.2); flashL.position.copy(barrelTip); flashL.intensity = 40; flashL.color.set(0xffc080); kick = Math.max(kick, .35); out.flash = Math.max(out.flash, .14); }
+      if (t >= m.tf && !R.fired) { R.fired = true; sfx('shot', 1); state.lastF = t; burst(barrelTip, 16, [col('#FFB347'), col('#ffffff'), col('#FFD27A')], 5, 3, .45, .25); puffs(barrelTip, 5, col('#F4E4D2'), .7, .8, 1.2); flashL.position.copy(barrelTip); flashL.intensity = 40; flashL.color.set(0xffc080); kick = Math.max(kick, .35); out.flash = Math.max(out.flash, .14); }
       /* shell flight */
       if (t >= m.tf && t < m.tm) { const q = easeO3((t - m.tf) / (m.tm - m.tf)); tmp.copy(barrelTip).add(new V3(0, 16, -6)); const p1 = barrelTip.clone().add(new V3((T.x - barrelTip.x) * .05, 5, -1)); bez(barrelTip, p1, tmp, q, shell.position); { const pv = shell.userData.pv, dv = tmp2.copy(shell.position).sub(pv); if (shell.visible && dv.lengthSq() > 1e-8) { shell.quaternion.setFromUnitVectors(upV, dv.normalize()); } pv.copy(shell.position); } smoke.emit(shell.position.x, shell.position.y, shell.position.z, rnd(-.1, .1), .15, rnd(-.1, .1), .9, .42, col('#F4E4D2')); shell.visible = true; trail.emit(shell.position.x, shell.position.y, shell.position.z, 0, 0, 0, .28, .55, col('#FFB347')); } else if (t >= m.tm && shell.visible && i == M.length - 1) shell.visible = false;
       /* reticle */
@@ -355,7 +356,7 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));
     if (heat && Math.random() < .9) spark.emit(px + rnd(-.1, .1), py - .3, 0, rnd(-1, 1), -rnd(4, 9), 0, .5, .12, col(Math.random() < .5 ? '#FF8A2A' : '#FFE08A'));
     trail.emit(px, py - .3, 0, rnd(-.2, .2), -3 - sp * 6, 0, .5, .5, col('#FF8A2A'));
     if (t < 2.4 && Math.random() < .5) smoke.emit(px, py - 1, 0, 0, -1.5, 0, .8, .5, col('#F4E4D2'));
-    if (t >= .05 && !urS.fired) { urS.fired = true; const tip = new V3(); pivot.updateMatrixWorld(true); barrel.localToWorld(tip.set(0, 1.25, 0)); burst(tip, 40, [col('#FFB347'), col('#ffffff'), col('#FFD27A')], 7, 4, .6, .3); puffs(tip, 8, col('#F4E4D2'), 1, 1.5, 2); out.flash = Math.max(out.flash, .35); kick = Math.max(kick, .8); flashL.position.copy(tip); flashL.intensity = 90; flashL.color.set(0xffc080); }
+    if (t >= .05 && !urS.fired) { urS.fired = true; sfx('shot', 2); const tip = new V3(); pivot.updateMatrixWorld(true); barrel.localToWorld(tip.set(0, 1.25, 0)); burst(tip, 40, [col('#FFB347'), col('#ffffff'), col('#FFD27A')], 7, 4, .6, .3); puffs(tip, 8, col('#F4E4D2'), 1, 1.5, 2); out.flash = Math.max(out.flash, .35); kick = Math.max(kick, .8); flashL.position.copy(tip); flashL.intensity = 90; flashL.color.set(0xffc080); }
     if (t > .3 && t < 5.2) kick = Math.max(kick, (1.6 + 4.5 * sp * (t < 3.4 ? 1 : .5)) / 16);
     pivot.quaternion.slerp(new THREE.Quaternion(), 1 - Math.pow(.01, dt)); const rc = t < .4 ? Math.exp(-t * 7) * Math.cos(t * 18) * .25 : 0; barrel.position.y = 1.05 + rc * .3; muzR.position.y = 2.15 + rc * .3;
     /* earth limb */
@@ -374,7 +375,7 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));
         R.body.material.emissiveIntensity = .06 + (u > .8 ? (u - .8) / .2 * .9 : 0);
       } else { g.visible = false; out.pl[n] = null; }
       if (t >= P.th && !R.done) {
-        R.done = true; const rad = P.r * 6.2; out.flash = Math.max(out.flash, .75); kick = Math.max(kick, 1); out.zoom = Math.max(out.zoom, .05);
+        R.done = true; sfx('boom', Math.min(2, .8 + P.r * 1.5)); const rad = P.r * 6.2; out.flash = Math.max(out.flash, .75); kick = Math.max(kick, 1); out.zoom = Math.max(out.zoom, .05);
         addRing(rp, rad * .3, rad * 3, .9, P.c[0], t, false); addRing(rp, rad * .2, rad * 4.2, 1.2, '#ffffff', t, false, .08); addRing(rp, rad * .2, rad * 2.2, .7, '#FFB36B', t, false, .05);
         burst(rp, 90, [col(P.c[0]), col(P.c[1]), col('#FFE9A8'), col('#ffffff')], 12, 0, 1.2, .26);
         frags.forEach((f, k) => { const a = Math.random() * 6.283, sp2 = rnd(2, 7); f.m.visible = true; f.m.position.set(px + Math.cos(a) * rad * .3, py + Math.sin(a) * rad * .3, 0); f.v.set(Math.cos(a) * sp2, Math.sin(a) * sp2, rnd(-1, 1)); f.w.set(rnd(-4, 4), rnd(-4, 4), rnd(-4, 4)); f.l = rnd(1.4, 2.2); f.m.scale.setScalar(rad * rnd(.1, .22)); f.m.material.color.set(P.c[k % 2]); });

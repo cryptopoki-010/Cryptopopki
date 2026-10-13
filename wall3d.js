@@ -216,6 +216,7 @@ function heroTriBudget(tier) { const m = /[?&]hp=(\d+)/.exec(location.search); i
 
 /* ---------------- scene ---------------- */
 export function createWallScene(opt) {
+  const sfx = (n, v, w) => { try { opt.onSfx && opt.onSfx(n, v == null ? 1 : v, w); } catch (e) { } };
   const tier = opt.tier == null ? pickTier() : opt.tier, Q = TIERS[tier], tl = opt.timeline, UR = tl.mode == 'ur', errors = [], onErr = opt.onError || (() => { });
   const renderer = new THREE.WebGLRenderer({ canvas: opt.canvas, antialias: Q.aa, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: !!opt.preserve });
   renderer.debug.onShaderError = (gl, prog) => { const m = 'GLSL 셰이더 컴파일/링크 오류: ' + (gl.getProgramInfoLog(prog) || '').slice(0, 400); errors.push(m); onErr(new Error(m)); };
@@ -422,6 +423,7 @@ void main(){float d=abs(vW.z);float T=1.4;vec2 q=vW.xz/T;vec2 id=floor(q),f=frac
     const sg = tl.sg; let cur = sg[0];
     sg.forEach((q, i) => { if (t >= q.a[0]) cur = q; if (t >= q.a[3] && !q.shat) shatter(q, i); if (t >= q.a[6] && !q.abs) absorb(q); });
     const s = cur, j = s.j, a = s.a, WMj = WM[j], bc = WMj.bc, so = wallObjs[sg.indexOf(s)];
+    if (t >= a[1] && !s.chS) { s.chS = 1; sfx('charge'); } if (t >= a[2] && !s.bmS) { s.bmS = 1; sfx('beam'); }
     wallObjs.forEach((w, i) => { w.grp.visible = false; });
     const slideP = clamp((t - a[0]) / (a[1] - a[0]), 0, 1), inFire = t >= a[2] && t < a[3], prog = clamp((t - a[2]) / (a[3] - a[2]), 0, 1), wallVis = !s.shat;
     let pose = 'idle', rec = 0;
@@ -462,6 +464,7 @@ void main(){float d=abs(vW.z);float T=1.4;vec2 q=vW.xz/T;vec2 id=floor(q),f=frac
     const tg = (s.j + (s.shat ? 1 : clamp(prog, 0, 1) * .92)) / 3; gvS += (tg - gvS) * (1 - Math.pow(.003, dt)); out.gv = gvS;
   }
   function shatter(q, idx) {
+    sfx('shatter', q.j);
     q.shat = 1; const j = q.j, wl = WM[j], mat = MATS[j], bl = wallObjs[idx] ? wallObjs[idx].blocks : [], pr = Q.shards / (bl.length + 10);
     bl.forEach(bk => {
       if (Math.random() > pr) return; const cx = WX + bk.cx, cy = GY0 + WHd / 2 + bk.cy;
@@ -474,7 +477,7 @@ void main(){float d=abs(vW.z);float T=1.4;vec2 q=vW.xz/T;vec2 id=floor(q),f=frac
     for (let k = 0; k < [7, 9, 10][j]; k++) puffs(WX + rnd(-.4, .4), GY0 + rnd(0, WHd * .8), 0, 1, ['#eaf8ff', '#aaa196', '#9a9aa6'][j], heroU * 1.3, 2, .8);
     addRing(WX, GY0 + .03, 0, heroU * .5, heroU * 5, .7, wl.bc, t, true);
   }
-  function absorb(q) { q.abs = 1; pulse = 1; out.flash = Math.max(out.flash, .2); zoomS.v = Math.max(zoomS.v, .012); addRing(HX + .2, GY0 + .5, .1, heroU * .5, heroU * 3.2, .6, '#ffffff', t, false); if (q.last) winT = q.a[6]; }
+  function absorb(q) { q.abs = 1; sfx('absorb'); pulse = 1; out.flash = Math.max(out.flash, .2); zoomS.v = Math.max(zoomS.v, .012); addRing(HX + .2, GY0 + .5, .1, heroU * .5, heroU * 3.2, .6, '#ffffff', t, false); if (q.last) winT = q.a[6]; }
 
   /* ---------------- update: UR ---------------- */
   function titanPose(tx, ty, pose, tt, lean, rA) {
@@ -493,13 +496,13 @@ void main(){float d=abs(vW.z);float T=1.4;vec2 q=vW.xz/T;vec2 id=floor(q),f=frac
     const tx = T.xAt(t), cxm = T.cAt(t), stop = T.stop, vs = (T.xAt(t + .02) - tx) / .02; let pose, ty = GY0, lean = 0, rA = 0;
     if (t < .9) { pose = 'drop'; ty = GY0 + (1 - (t / .9) * (t / .9)) * H * .95 * u0; } else if (t < 2.5) { pose = 'roar'; rA = Math.min(1, (t - .9) / .4) * (.7 + .3 * Math.sin(t * 14)); } else if (t < stop) { pose = 'dash'; lean = .3; } else if (t < stop + .5) { pose = 'skid'; lean = -.12 * Math.exp(-(t - stop) * 3); } else pose = 'win';
     const twx = x(tx);
-    if (t >= .9 && !urS.landed) { urS.landed = true; kickS.v = Math.max(kickS.v, 1); zoomS.v = Math.max(zoomS.v, .06); out.flash = Math.max(out.flash, .7); addRing(twx, GY0 + .03, 0, T.tu * u0 * 2, W * .5 * u0, 1, '#FFB36B', t, true); addRing(twx, GY0 + .03, 0, T.tu * u0 * 2, W * .8 * u0, 1.3, '#ffffff', t, true, .1); puffs(twx, GY0, 0, 10, '#CBB79A', T.tu * u0 * 2.2, 3, 1); burst(twx, GY0 + .1, 0, 50, ['#6b5a48', '#9c876e', '#FFB36B'], 7, 6, 1, .14); }
-    for (let k = 0; k < 3; k++) if (t >= T.rr2[k] && !urS.ring[k] && t < 2.5) { urS.ring[k] = 1; addRing(twx, GY0 + T.tu * u0 * 3, 0, T.tu * u0 * .5, W * .45 * u0, .9, '#FF7A3A', t, false); kickS.v = Math.max(kickS.v, .5); }
+    if (t >= .9 && !urS.landed) { urS.landed = true; sfx('stomp'); kickS.v = Math.max(kickS.v, 1); zoomS.v = Math.max(zoomS.v, .06); out.flash = Math.max(out.flash, .7); addRing(twx, GY0 + .03, 0, T.tu * u0 * 2, W * .5 * u0, 1, '#FFB36B', t, true); addRing(twx, GY0 + .03, 0, T.tu * u0 * 2, W * .8 * u0, 1.3, '#ffffff', t, true, .1); puffs(twx, GY0, 0, 10, '#CBB79A', T.tu * u0 * 2.2, 3, 1); burst(twx, GY0 + .1, 0, 50, ['#6b5a48', '#9c876e', '#FFB36B'], 7, 6, 1, .14); }
+    for (let k = 0; k < 3; k++) if (t >= T.rr2[k] && !urS.ring[k] && t < 2.5) { urS.ring[k] = 1; if (k == 0) sfx('roar'); addRing(twx, GY0 + T.tu * u0 * 3, 0, T.tu * u0 * .5, W * .45 * u0, .9, '#FF7A3A', t, false); kickS.v = Math.max(kickS.v, .5); }
     if (pose == 'roar') kickS.v = Math.max(kickS.v, (4 + rA * 3) / 16); out.dim = pose == 'roar' ? .22 : 0;
     titanPose(twx, ty, pose, t, lean, rA);
     if (pose == 'dash') { puffs(twx - T.tu * u0 * (.6 + Math.random()), GY0, 0, 2, '#CBB79A', T.tu * u0 * .7, 1, .4); spark.emit(twx - T.tu * u0 * 1.5, GY0 + rnd(0, H * .2 * u0), 0, -vs * u0 * rnd(.5, .9), rnd(-1, 1), 0, .35, .09, C(Math.random() < .5 ? '#FFB36B' : '#ffffff')); }
     /* walls */
-    urWalls.forEach((W2, i) => { const w = W2.w; if (w.hit >= 0 && t >= w.hit) { if (!W2.done) { W2.done = true; W2.box.visible = false; const wx = W2.box.position.x, vsx = (T.xAt(t + .02) - T.xAt(t)) / .02 * u0, mat = MATS[w.m];
+    urWalls.forEach((W2, i) => { const w = W2.w; if (w.hit >= 0 && t >= w.hit) { if (!W2.done) { W2.done = true; sfx('shatter', w.m); W2.box.visible = false; const wx = W2.box.position.x, vsx = (T.xAt(t + .02) - T.xAt(t)) / .02 * u0, mat = MATS[w.m];
       { const bl = W2.blocks, pr = Q.shards / (bl.length + 30); bl.forEach(bk => { if (Math.random() > pr) return; spawnShard(wx + bk.cx, GY0 + W2.hh / 2 + bk.cy, rnd(-.3, .3), bk.w * .96, bk.h * .96, W2.ww * rnd(.22, .45), vsx * .35 + rnd(2, 8), rnd(1, 8) + bk.cy * .5, rnd(-2, 2), mat.hex, mat); }); }
       burst(wx, GY0 + W2.hh * .45, 0, 60, [C(['#EAFBFF', '#8a8d99', '#aab6c6'][w.m]), C('#ffffff')], 8, 6, 1, .14); addRing(wx, GY0 + .03, 0, T.tu * u0 * .6, T.tu * u0 * 6, .8, w.m == 0 ? '#7FE7FF' : w.m == 1 ? '#C9A3FF' : '#FFD36B', t, true); out.flash = Math.max(out.flash, .35); kickS.v = Math.max(kickS.v, 9 / 16); zoomS.v = Math.max(zoomS.v, .02); for (let a = 0; a < 6; a++) puffs(wx + rnd(-W2.ww, W2.ww) * .5, GY0 + rnd(0, W2.hh * .8), 0, 1, w.m == 0 ? '#eaf8ff' : '#a9a196', T.tu * u0 * 1.8, 3, .8); } } });
     /* finale */

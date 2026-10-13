@@ -227,6 +227,7 @@ function buildBeach(o) {
 }
 
 export function createSkipScene(opt) {
+  const sfx = (n, v, w) => { try { opt.onSfx && opt.onSfx(n, v == null ? 1 : v, w); } catch (e) { } };
   const tier = opt.tier == null ? pickTier() : opt.tier, Q = TIERS[tier], errors = [], onErr = opt.onError || (() => { });
   const tlm = opt.timeline;
   const renderer = new THREE.WebGLRenderer({ canvas: opt.canvas, antialias: Q.aa, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: !!opt.preserve });
@@ -402,7 +403,7 @@ void main(){
     if (U) {
       if (t >= U.trB && t < U.trB + 2.7) { for (let k = 0; k < 2; k++) glow.emit(TX + rnd(-.2, .2), GY + rnd(.1, .9), ZT + rnd(-.2, .2), rnd(-.2, .2), rnd(1.4, 3.2), 0, rnd(.7, 1.3), rnd(.04, .08)); }
       if (t >= U.trB + 2.1 && !blastDone) {
-        blastDone = true; out.flash = .9; kick = 1; addRipple(TX + .8, ZT - 1.5, 2.4, t);
+        blastDone = true; sfx('blast'); out.flash = .9; kick = 1; addRipple(TX + .8, ZT - 1.5, 2.4, t);
         for (let k = 0; k < 70; k++) { const a = Math.random() * 6.283, v = rnd(2, 6); glow.emit(TX, GY + .5, ZT, Math.cos(a) * v, rnd(1, 5), Math.sin(a) * v * .5, rnd(.6, 1.2), rnd(.04, .09)); }
         for (let k = 0; k < 9; k++) spray.emit(TX + rnd(-.3, .3), GY + .05, ZT + rnd(-.3, .3), rnd(-1.4, 1.4), rnd(.2, .8), rnd(-.5, .5), rnd(.8, 1.3), rnd(.15, .3));
       }
@@ -415,9 +416,9 @@ void main(){
       const s = R.s, c = s.c; let sg = null;
       for (let j = 0; j < s.sg.length; j++) {
         const q = s.sg[j]; if (t >= q.t && t < q.t + q.d) sg = q;
-        if (j == 0 && t >= q.t && !R.rel) R.rel = handW.clone();
+        if (j == 0 && t >= q.t && !R.rel) { R.rel = handW.clone(); sfx('throw'); }
         if ((q.hit || q.sink) && t >= q.t && !R.fired[j]) {
-          R.fired[j] = true; const X = xAtZ(q.x1, R.z); if (q.hit) { s.hits++; s.lastHitT = q.t; }
+          R.fired[j] = true; sfx(q.sink ? 'sink' : 'skip', q.sink ? c.gl : (q.k || 0), c.gl); const X = xAtZ(q.x1, R.z); if (q.hit) { s.hits++; s.lastHitT = q.t; }
           const wr = (q.sink ? 1.6 : 1 + c.gl * .35) * (1 - (q.k || 0) * .03); addRipple(X, R.z, q.sink ? 1.5 : .9 + c.gl * .35, t);
           crown(X, R.z, q.sink ? 22 : 8 + c.gl * 8, q.sink ? 1.9 : 1.2 + (q.k == 0 ? .5 : 0), q.sink ? 3.2 : 2.2, c.col);
           if (c.gl) for (let k = 0; k < 6 + c.gl * 6; k++) glow.emit(X, .05, R.z, rnd(-1.4, 1.4), rnd(1.6, 3.8), rnd(-.4, .4), rnd(.4, .8), rnd(.03, .06));

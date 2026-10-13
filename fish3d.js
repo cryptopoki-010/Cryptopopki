@@ -450,6 +450,7 @@ function buildPierDeluxe(o) {
 }
 
 export function createScene(opt) {
+  const sfx = (n, v, w) => { try { opt.onSfx && opt.onSfx(n, v == null ? 1 : v, w); } catch (e) { } };
   const tier = opt.tier == null ? pickTier() : opt.tier, Q = TIERS[tier];
   const errors = []; const onErr = opt.onError || (() => { });
   const renderer = new THREE.WebGLRenderer({ canvas: opt.canvas, antialias: Q.aa, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: !!opt.preserve });
@@ -748,12 +749,13 @@ void main(){float dist=length(cameraPosition-vW);
       if (ph == 'hidden') { grp.visible = false; R.line.visible = R.hook.visible = R.bob.visible = false; return; }
       let bx = R.X0, by = waveH(R.X0, z0, t), fishVis = false, hookVis = false, bobVis = true, lineTo = null, sag = 0;
       if (ph == 'cast') {
+        if (!R.castS) { R.castS = 1; sfx('cast'); }
         const e = easeIO(u); bx = lerp(tipW.x, R.X0, e); by = lerp(tipW.y, waveH(R.X0, z0, t), e) + Math.sin(Math.PI * e) * .14 * H * U; const bz = lerp(tipW.z, z0, e);
         R.bob.position.set(bx, by, bz); R.bob.rotation.z = (1 - e) * 1.4; lineTo = R.bob.position; sag = .1;
       } else if (ph == 'wait') {
         by += Math.sin(t * 3 + f.ph) * .012; bx = R.X0 + Math.sin(t * .8 + f.ph) * .01;
         R.bob.position.set(bx, by, z0); R.bob.rotation.z = Math.sin(t * 2 + f.ph) * .06; lineTo = R.bob.position; sag = .2 * (1 - (st.tn || 0)) + .05;
-        if (!R.landed) { R.landed = true; addRipple(bx, z0, 1, t); splash(bx, by, z0, 9, .9, 1.6); }
+        if (!R.landed) { R.landed = true; sfx('land'); addRipple(bx, z0, 1, t); splash(bx, by, z0, 9, .9, 1.6); }
         R.ripT -= dt; if (R.ripT < 0) { R.ripT = rnd(1.1, 1.8); addRipple(bx, z0, .45, t); }
         const ap = (t - (f.tb - .8)) / .8;
         if (ap > 0) {
@@ -772,15 +774,15 @@ void main(){float dist=length(cameraPosition-vW);
         grp.position.set(fx + (vxp > 0 ? .0 : .0), fyy, z0); grp.rotation.set(0, R.yaw, pitch); grp.scale.setScalar(R.s);
         fish.uni.uAmp.value = .1 + .1 * tn; fish.uni.uSpd.value = 12 + tn * 8; fishVis = true; hookVis = true;
         R.lastX = fx; R.lastY = fyy;
-        if (!R.biteKick) { R.biteKick = true; kick = Math.max(kick, tn); addRipple(bx, z0, 1.2, t); splash(bx, by, z0, 12 + (c.ur ? 20 : 0), 1.2, 2); }
-        R.ripT -= dt; if (R.ripT < 0) { R.ripT = .32 / (.4 + tn); addRipple(bx, z0, .6 + tn * .5, t); splash(bx, by, z0, 2 + (c.ur ? 3 : 0), .8, 1.4); }
+        if (!R.biteKick) { R.biteKick = true; sfx('bite', tn); kick = Math.max(kick, tn); addRipple(bx, z0, 1.2, t); splash(bx, by, z0, 12 + (c.ur ? 20 : 0), 1.2, 2); }
+        R.ripT -= dt; if (R.ripT < 0) { R.ripT = .32 / (.4 + tn); sfx('reel', tn); addRipple(bx, z0, .6 + tn * .5, t); splash(bx, by, z0, 2 + (c.ur ? 3 : 0), .8, 1.4); }
         R.bubT -= dt; if (R.bubT < 0) { R.bubT = 1 / (8 + tn * 18); tmp2.set(1, -.02, 0).multiplyScalar(R.s); grp.updateMatrixWorld(); R.mouth.copy(tmp2).applyMatrix4(grp.matrixWorld); bubbles.emit(R.mouth.x, R.mouth.y, R.mouth.z, rnd(-.1, .1), rnd(.2, .5), rnd(-.05, .05), rnd(1.2, 2.4), rnd(.03, .08)); }
         dust.react(fx, fyy, z0, R.s * 2.4, 3.2 * (.5 + tn), dt);
         if (c.ur) ur = 1;
       } else { /* lift */
         const lu = u, jhPx = H * (c.ur ? .26 : .24 + tn * .1), jh = jhPx * U;
         if (lu > 1.18) { grp.visible = false; R.line.visible = R.hook.visible = R.bob.visible = false; return; }
-        if (!R.liftSplash) { R.liftSplash = true; const n = Math.round(c.n * (tier == 0 ? .5 : 1)); addRipple(R.lastX, z0, 1.6, t); splash(R.lastX, 0, z0, n, c.ur ? 2.6 : 1.6 + tn, c.ur ? 5.2 : 3.4); kick = Math.max(kick, tn); }
+        if (!R.liftSplash) { R.liftSplash = true; sfx('catch', c.ur ? 2 : 1); const n = Math.round(c.n * (tier == 0 ? .5 : 1)); addRipple(R.lastX, z0, 1.6, t); splash(R.lastX, 0, z0, n, c.ur ? 2.6 : 1.6 + tn, c.ur ? 5.2 : 3.4); kick = Math.max(kick, tn); }
         const endX = R.X0, jx = R.lastX, lx = jx + (endX - jx) * clamp(lu, 0, 1) + Math.sin(clamp(lu, 0, 1) * Math.PI) * 8 * U;
         const arc = jh * 4 * lu * (1 - lu), dep = R.lastY * (1 - easeO3(lu / .22)), fy = arc + dep;
         const dyv = jh * 4 * (1 - 2 * lu), dxv = Math.max(Math.abs(endX - jx), .3 * jh);
@@ -789,7 +791,7 @@ void main(){float dist=length(cameraPosition-vW);
         fish.uni.uAmp.value = .22; fish.uni.uSpd.value = 18; fishVis = true; bobVis = false; hookVis = false;
         grp.updateMatrixWorld(); tmp2.set(1, -.02, 0).multiplyScalar(R.s); R.mouth.copy(tmp2).applyMatrix4(grp.matrixWorld); lineTo = R.mouth; sag = .03;
         if (fy > 0 && c.ur && Math.random() < .8) spray.emit(lx + rnd(-.3, .3) * R.s, fy - R.s * .3, z0, rnd(-.3, .3), rnd(-.2, .4), 0, rnd(.8, 1.6), rnd(.03, .07));
-        if (lu >= 1 && !R.splashed) { R.splashed = true; addRipple(lx, z0, 1.1, t); splash(lx, 0, z0, 14 + (c.ur ? 18 : 0), 1.2, 2.4); }
+        if (lu >= 1 && !R.splashed) { R.splashed = true; sfx('splash', c.ur ? 2 : 1); addRipple(lx, z0, 1.1, t); splash(lx, 0, z0, 14 + (c.ur ? 18 : 0), 1.2, 2.4); }
         if (c.ur) ur = 1;
         if (lu < .22) dust.react(lx, fy, z0, R.s * 2.4, 5, dt);
       }
