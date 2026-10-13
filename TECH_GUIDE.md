@@ -187,3 +187,44 @@ service cloud.firestore {
 - 소유권은 저장하지 않고 **현재 랭킹 위치(RANK[0..2])로 실시간 판정** → 순위가 바뀌면 자동으로 사라지고, 본인이 마이페이지/랭킹을 열 때 `syncRf()`가 장착 플래그(`rf`)도 해제. 다른 유저 화면에서는 리더보드 문서의 `rf` + 현재 순위로 표시.
 - 저장 위치: `users/{uid}/prefs/profile` = `{nick, nickAt, rf, updatedAt}`, 리더보드 문서 `n`(=닉네임), `rf`. **firestore.rules를 반드시 새 파일로 교체해 게시해야 함**(prefs/profile 규칙, leaderboard에 `rf` 키 추가).
 - 닉네임 규칙: 한글/영문/숫자 1~12자, 특수기호·공백 불가, 비속어 필터(`BAD`, 숫자/반복문자 우회 정규화), 한 번 설정하면 24시간 뒤 재설정(클라이언트 + 규칙에서 `nickAt` 검증). 중복 닉네임은 허용.
+- 테두리 이미지 v2: 밝기 기반 알파(smoothstep로 헤이즈 제거)+채도 15% 낮춤+홀 중심 기준 반경 2.05배 원형 크롭(긴 술·가시 제거), 420px WebP. 밝은/어두운 테마 모두 검은 얼룩 없음. 프레임 크기 = 아바타 ×2(`RFH=.5`), 그림자 제거, opacity .94.
+- 닉네임 반영: `setNick`이 prefs/profile 저장 후 leaderboard 문서를 직접 갱신하고 로컬 `RANK`의 내 행도 즉시 교체, `loadRank`는 내 행을 항상 현재 `ME`로 표시.
+- 테두리 v3: 사용자가 제공한 누끼(PNG, 알파 포함) 3장으로 교체. 알파 하한 12% 컷, 홀 중심 기준 원형 크롭, 420px WebP.
+- 테두리 v4: 반경 크롭 제거, 이미지 전체(술·가시 포함)를 480px로 그대로 사용. 프레임별 홀 비율 `RFHS`로 아바타 크기를 맞춤(프레임 폭 = 아바타 ÷ (홀비율×1.1)).
+
+---
+## 17. 낚시 테마 3D 렌더링 (Three.js, 로컬 vendor) — v1
+
+**파일 구성 (같은 위치에 배포)**
+```
+index.html          게임 본체. playFish3D(): 로딩/오류 화면, DANGER 패널, 말풍선, 메달(오버레이 canvas)
+fish3d.js           3D 엔진(ES module). 하늘/바다/수중/물고기/낚시꾼/파티클 + 타임라인(makeTimeline)
+3d-check.html       배포 후 /3d-check 로 열어 점검(파일·WebGL2·셰이더·실제 렌더 프레임 확인)
+vendor/three.module.js   Three.js r160 (직접 넣어야 함 — vendor/README.txt 참고)
+```
+**동작 원리**
+- `play(rs,done,'f')` → `playFish3D`. 기존 `.fx > .fxi` 구조/`fxSk`/`done`/`.fb` 장식 프레임은 그대로 유지.
+- `load3D()` 가 ① WebGL2 ② `vendor/three.module.js`·`fish3d.js` 의 HTTP 상태/Content-Type ③ 모듈 import 를 순서대로 점검하고, 실패하면 **원인을 화면에 표시**(2D로 조용히 대체하지 않음). 버튼: 다시 시도 / 2D 버전으로 보기(사용자가 직접 선택) / 건너뛰고 결과 보기.
+- 타임라인(`CF`, `tb/tl/te`, 낚시 간격, UR 연출 타이밍)은 기존 2D와 동일한 값을 `makeTimeline` 에 그대로 옮김. 3D 장면은 `tl.at(t)` 의 상태(phase/장력)만 받아 그림.
+- 품질 tier 0/1/2 자동 선택(`?q=0|1|2` 또는 localStorage `cg_q` 로 고정), 프레임이 느리면 pixelRatio 자동 하향. `?dbg=1` 로 FPS/드로우콜 표시. `?fish2d=1` 은 기존 2D 버전 강제.
+- 디버그 훅: `window.__fish3d` (state / err / log / probe / fps).
+
+**알려진 한계 / 확인이 필요한 것**
+- 개발 환경에서 Three.js 를 받을 수 없어 실제 3D 렌더 결과(색감/구도/성능)는 아직 눈으로 검증되지 않음. 파일을 넣은 뒤 /3d-check 와 실기기 확인 필요.
+- 수면 파도는 방향성 사인파 합성(+해석적 노멀)이며 Gerstner 수평 변위는 없음. 굴절은 깊이색/산란 근사(실제 굴절 렌더타깃 아님).
+- 물고기/낚시꾼은 외부 모델 없이 코드로 만든 스타일라이즈드 절차적 모델.
+
+### 17-b. 물수제비 3D (skip3d.js)
+- `play(rs,done,'s')` → `playSkip3D` (같은 셸: 로딩/오류 화면, 재시도, 2D 버전 선택, 결과 건너뛰기). `?skip2d=1` 로 기존 2D 강제.
+- `skip3d.js` 와 `fish3d.js` 는 서로 독립된 파일(서로 import 하지 않음). 둘 다 `vendor/three.module.js` 만 필요하며, 공통 코드(하늘 GLSL/파티클/tier)는 각 파일에 복사되어 있음. 한쪽만 배포해도 해당 게임은 동작.
+- 타임라인은 기존 2D 와 동일(`CFS`, 바운스 K=3/6/22, 간격/감쇠/싱크). UR: 충전(오라·머리카락·충격파) → 던지기 → 연속 바운스 추적 카메라 → 빛기둥 + 메달.
+- 배포 구성: index.html, fish3d.js, skip3d.js, 3d-check.html, vendor/three.module.js, vercel.json
+- /3d-check 가 물수제비 장면(일반/UR 충전/UR 연속 바운스)도 렌더 점검함.
+
+## 18. 물수제비 / 바주카 운석 / 벽 부수기 3D (낚시와 동일 방식)
+
+- 엔진 모듈: `skip3d.js`, `cannon3d.js`, `wall3d.js` (각각 `./vendor/three.module.js` r160 을 import). 일반/UR 모두 같은 파일.
+- 로더 `f3engine` 가 vendor 와 엔진 파일의 HTTP 상태·Content-Type·WebGL2 를 확인하고, 실패하면 원인 패널(다시 시도 / 2D 버전으로 보기 / 건너뛰기)을 표시. 조용한 2D 대체 없음.
+- 강제 2D 플래그: `?fish2d=1` `?skip2d=1` `?cannon2d=1` `?wall2d=1`. 디버그: `?dbg=1`, 품질: `?q=0|1|2`.
+- 배포 파일: index.html, fish3d.js, skip3d.js, cannon3d.js, wall3d.js, 3d-check.html, vendor/three.module.js, vercel.json.
+- 점검: 배포 후 `/3d-check.html` — 4개 테마 일반/UR 장면의 셰이더 컴파일, 빈 화면 여부, fps 를 PASS/FAIL 로 표시.

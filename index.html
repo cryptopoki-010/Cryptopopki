@@ -106,6 +106,7 @@ input[type=range]{width:100%;accent-color:var(--red);height:32px;margin:0}
 .f3ui{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .f3ui>div{position:absolute}
 .f3red{inset:0;background:#ff281e;opacity:0}
+.f3dim{inset:0;background:#000;opacity:0}
 .f3vg{inset:0;background:radial-gradient(ellipse 85% 70% at 50% 52%,transparent 52%,rgba(2,6,16,.55) 100%)}
 .f3fl{inset:0;background:radial-gradient(circle at 50% 45%,#fff3c9,rgba(255,236,170,.6) 55%,rgba(255,236,170,.2));opacity:0;mix-blend-mode:screen}
 .f3b1{left:0;right:0;top:0;height:0;background:linear-gradient(#000 70%,rgba(0,0,0,0))}.f3b2{left:0;right:0;bottom:0;height:0;background:linear-gradient(rgba(0,0,0,0),#000 30%)}
@@ -714,21 +715,28 @@ var F3={p:null,mod:null,log:[],err:null,probe:null,state:'idle'};window.__fish3d
 function f3log(m){F3.log.push((performance.now()/1000).toFixed(2)+'s '+m);if(F3.log.length>80)F3.log.shift()}
 function f3head(u){return fetch(u,{cache:'no-store'}).then(function(r){return{u:u,status:r.status,type:r.headers.get('content-type')||'',ok:r.ok}}).catch(function(e){return{u:u,status:0,ok:false,err:String(e&&e.message||e)}})}
 function f3fail(title,cause,detail){var e=new Error(cause);e.f3title=title;e.f3detail=detail||'';return e}
-function load3D(){if(F3.p)return F3.p;F3.state='loading';
- F3.p=(function(){
+function f3pre(){if(F3.pre)return F3.pre;
+ F3.pre=(function(){
   f3log('WebGL2 확인');var ok=false,why='';try{var c=document.createElement('canvas');ok=!!c.getContext('webgl2')}catch(e){why=String(e&&e.message||e)}
   if(!ok)throw f3fail('WebGL2 미지원','이 브라우저/기기에서 WebGL2 컨텍스트를 만들 수 없습니다.'+(why?(' ('+why+')'):''),'하드웨어 가속이 꺼져 있거나 매우 오래된 기기일 수 있습니다. 시크릿 모드/저전력 모드에서는 제한될 수 있습니다.');
   f3log('vendor/three.module.js 확인');
-  return Promise.all([f3head('vendor/three.module.js'),f3head('fish3d.js')]).then(function(h){
-   F3.probe=h;var a=h[0],b=h[1],det=h.map(function(x){return x.u+' → '+(x.err||('HTTP '+x.status+' '+x.type))}).join('\n');
+  return f3head('vendor/three.module.js').then(function(a){
+   var det='vendor/three.module.js → '+(a.err||('HTTP '+a.status+' '+a.type));F3.probe=a;
    if(!a.ok)throw f3fail('Three.js 파일을 찾을 수 없음','vendor/three.module.js 를 불러오지 못했습니다 ('+(a.err||('HTTP '+a.status))+').','Three.js r160 의 build/three.module.js 를 저장소의 vendor/ 폴더에 넣고 다시 배포해야 합니다.\n'+det);
    if(!/javascript|ecmascript/i.test(a.type))throw f3fail('Three.js 파일 형식 오류','vendor/three.module.js 의 Content-Type 이 JavaScript 가 아닙니다 ('+a.type+').','배포 서버가 HTML 오류 페이지를 대신 돌려주고 있을 수 있습니다.\n'+det);
-   if(!b.ok)throw f3fail('3D 엔진 파일을 찾을 수 없음','fish3d.js 를 불러오지 못했습니다 ('+(b.err||('HTTP '+b.status))+').','fish3d.js 를 index.html 과 같은 위치에 배포했는지 확인하세요.\n'+det);
-   f3log('fish3d.js import');return import('./fish3d.js').catch(function(e){throw f3fail('3D 모듈 로드 실패','모듈을 불러오는 중 오류: '+String(e&&e.message||e),'Three.js 파일이 손상되었거나 버전이 맞지 않을 수 있습니다. /3d-check 페이지에서 자세한 점검을 할 수 있습니다.\n'+det+(e&&e.stack?('\n'+e.stack):''))})
-  }).then(function(m){F3.mod=m;F3.state='ready';f3log('ready r'+m.REVISION);return m})
+   return a})
  })();
- F3.p.catch(function(e){F3.err=e;F3.state='error';F3.p=null;console.error('[fish3d]',e)});
- return F3.p}
+ F3.pre.catch(function(e){F3.err=e;F3.state='error';F3.pre=null;console.error('[3d]',e)});return F3.pre}
+/* each minigame has its own standalone engine file: fish3d.js / skip3d.js */
+function f3engine(key,file){if(F3[key])return F3[key];F3.state='loading';
+ F3[key]=f3pre().then(function(){return f3head(file)}).then(function(b){
+  if(!b.ok)throw f3fail('3D 엔진 파일을 찾을 수 없음',file+' 를 불러오지 못했습니다 ('+(b.err||('HTTP '+b.status))+').',file+' 를 index.html 과 같은 위치에 배포했는지 확인하세요.');
+  if(!/javascript|ecmascript/i.test(b.type))throw f3fail('3D 엔진 파일 형식 오류',file+' 의 Content-Type 이 JavaScript 가 아닙니다 ('+b.type+').','');
+  f3log(file+' import');return import('./'+file).catch(function(e){throw f3fail('3D 모듈 로드 실패',file+' 를 불러오는 중 오류: '+String(e&&e.message||e),'Three.js 파일이 손상되었거나 버전이 맞지 않을 수 있습니다. /3d-check 페이지에서 자세한 점검을 할 수 있습니다.\n'+(e&&e.stack?e.stack:''))})
+ }).then(function(m){F3.state='ready';f3log(file+' ready r'+m.REVISION);return m});
+ F3[key].catch(function(e){F3.err=e;F3.state='error';F3[key]=null;console.error('[3d]',e)});return F3[key]}
+function load3D(){return f3engine('p','fish3d.js')}
+function loadSkip3D(){return f3engine('sp','skip3d.js')}
 function fxFrame(rs,o){var R={UR:3,SR:2,R:1},b='R',d=document.createElement('div');rs.forEach(function(e){if(R[e.g]>R[b])b=e.g});d.className='fb '+b.toLowerCase();d.innerHTML=['a','b','c','d'].map(function(k){return '<svg class="cn '+k+'" viewBox="0 0 64 64"><use href="#orn"/></svg>'}).join('');o.firstChild.appendChild(d)}
 function playFish3D(rs,done){
  if(red){done();return}
@@ -811,6 +819,158 @@ function playFish3D(rs,done){
   }
   raf=requestAnimationFrame(loop)}
  go()}
+/* ===== stone skipping 3D (Three.js, local vendor build) ===== */
+function playSkip3D(rs,done){
+ if(red){done();return}
+ closeM();fxSk=false;var en=lang=='en';
+ var o=document.createElement('div');o.className='fx fx3';
+ o.innerHTML='<div class="fxi"><canvas class="f3gl"></canvas><canvas class="f3ov"></canvas><div class="f3ui"><div class="f3dim"></div><div class="f3vg"></div><div class="f3fl"></div><div class="f3b1"></div><div class="f3b2"></div><div class="f3dbg"></div></div><div class="f3load"></div><button class="sk"></button></div>';
+ document.body.appendChild(o);
+ var box=o.firstChild,gl=box.querySelector('.f3gl'),ov=box.querySelector('.f3ov'),ui=box.querySelector('.f3ui'),ld=box.querySelector('.f3load'),sk=box.querySelector('.sk'),
+  dDim=ui.querySelector('.f3dim'),dFl=ui.querySelector('.f3fl'),b1=ui.querySelector('.f3b1'),b2=ui.querySelector('.f3b2'),dbg=ui.querySelector('.f3dbg'),
+  oc=ov.getContext('2d'),ended=false,raf=0,sc=null,tl=null,flash=0,dpr=Math.min(2,window.devicePixelRatio||1),W=0,H=0,showDbg=/[?&]dbg=1/.test(location.search);
+ sk.textContent=en?'Skip':'건너뛰기';
+ function kd(e){if(e.key==='Escape'){fxSk=true;end()}}
+ function end(){if(ended)return;ended=true;cancelAnimationFrame(raf);document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(e){}if(o.parentNode)document.body.removeChild(o);done()}
+ document.addEventListener('keydown',kd);sk.onclick=function(){fxSk=true;end()};sk.focus();
+ function stop(){cancelAnimationFrame(raf);raf=0}
+ function showLoad(msg){ld.className='f3load';ld.innerHTML='<div class="f3sp"></div><div class="f3lt"></div>';ld.lastChild.textContent=msg;ld.style.display='flex'}
+ function showErr(e){
+  stop();F3.err=e;var t=e.f3title||(en?'3D rendering failed':'3D 렌더링 실패'),c=e.message||String(e),det=(e.f3detail||'')+(e.f3detail?'\n':'')+(e.stack&&!e.f3title?e.stack:'')+'\n--- log ---\n'+F3.log.join('\n');
+  ld.className='f3load err';ld.style.display='flex';ld.innerHTML='<div class="f3e"><b></b><p></p><pre></pre><div class="f3bt"><button></button><button></button><button></button></div></div>';
+  var el=ld.firstChild;el.querySelector('b').textContent=t;el.querySelector('p').textContent=c;el.querySelector('pre').textContent=det;
+  var bs=el.querySelectorAll('button');bs[0].textContent=en?'Retry':'다시 시도';bs[1].textContent=en?'Play 2D version':'2D 버전으로 보기';bs[2].textContent=en?'Skip to result':'건너뛰고 결과 보기';
+  bs[0].onclick=function(){F3.err=null;go()};
+  bs[1].onclick=function(){if(ended)return;ended=true;document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(x){}document.body.removeChild(o);playSkip(rs,done);var n=document.querySelector('.fx');if(n)fxFrame(rs,n)};
+  bs[2].onclick=function(){fxSk=true;end()};
+  console.error('[skip3d]',t,c,det)}
+ function size(){W=box.clientWidth;H=box.clientHeight;ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+'px';ov.style.height=H+'px'}
+ function onR(){if(!sc)return;size();sc.resize(W,H)}
+ window.addEventListener('resize',onR);
+ box.addEventListener('pointermove',function(e){if(!sc)return;var r=box.getBoundingClientRect();sc.setPointer((e.clientX-r.left)/r.width*2-1,(e.clientY-r.top)/r.height*2-1)});
+ gl.addEventListener('webglcontextlost',function(e){e.preventDefault();f3log('context lost');showErr(f3fail(en?'WebGL context lost':'WebGL 컨텍스트 손실','GPU 메모리 부족 또는 드라이버 재설정으로 3D 화면이 중단되었습니다.',''))});
+ function go(){
+  if(sc){try{sc.dispose()}catch(e){}sc=null}
+  showLoad(en?'Loading 3D engine…':'3D 엔진 불러오는 중…');
+  loadSkip3D().then(function(m){
+   if(ended)return;showLoad(en?'Building scene…':'3D 장면 구성 중…');
+   return new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r)})}).then(function(){
+    if(ended)return;size();tl=m.makeSkipTimeline(rs);var bad=null;
+    try{sc=m.createSkipScene({canvas:gl,W:W,H:H,timeline:tl,tier:m.pickTier(),onError:function(e){bad=bad||e}});sc.warmup()}
+    catch(e){throw f3fail(en?'Scene creation failed':'3D 장면 생성 실패',String(e&&e.message||e),(e&&e.stack)||'')}
+    var glsl=sc.errors.filter(function(x){return /^GLSL/.test(x)});if(bad||glsl.length)throw f3fail(en?'Shader error':'셰이더 오류',String((bad&&bad.message)||glsl[0]),sc.errors.join('\n'));
+    sc.errors.forEach(function(x){f3log('warn: '+x)});
+    ld.style.display='none';start()})
+  }).catch(function(e){if(!ended)showErr(e)})}
+ function start(){
+  var t0=performance.now(),last=t0,dbgT=0;f3log('skip start tier '+sc.tier);F3.state='playing';
+  function C(x,a,b){return x<a?a:x>b?b:x}
+  function loop(now){
+   raf=requestAnimationFrame(loop);
+   try{
+    var dt=Math.min(.05,(now-last)/1000),t=(now-t0)/1000;last=now;var out=sc.update(t,dt),i,s;sc.render();
+    oc.setTransform(dpr,0,0,dpr,0,0);oc.clearRect(0,0,W,H);
+    for(i=0;i<tl.st.length;i++){s=tl.st[i];var md=out.med[i];
+     if(md){fxMedal(oc,md.sx,md.sy,md.r,Math.cos(md.pu*Math.PI*4+.6),fxBack(md.pu)*1.05,s.g)}}
+    if(out.ac){var pp=1+Math.max(0,1-out.ac.since/.2)*.35;oc.save();oc.translate(W/2,H*.16);oc.scale(pp,pp);oc.fillStyle=out.ac.col;oc.shadowColor=out.ac.col;oc.shadowBlur=14;oc.font='800 '+(30+out.ac.hits*2)+'px sans-serif';oc.textAlign='center';oc.fillText('×'+out.ac.hits,0,0);oc.restore()}
+    flash=Math.max(flash,out.flash);flash*=Math.pow(.03,dt);dFl.style.opacity=flash>.01?Math.min(.9,flash):0;dDim.style.opacity=out.dim;
+    var bh=H*.05*fxIO(t/.6);b1.style.height=b2.style.height=Math.round(bh+6)+'px';
+    if(showDbg){dbgT+=dt;if(dbgT>.4){dbgT=0;var inf=sc.info();dbg.textContent='r'+inf.rev+' tier'+inf.tier+' dpr'+inf.dpr.toFixed(2)+' '+(1000/Math.max(1,inf.fpsMs)).toFixed(0)+'fps calls'+inf.drawCalls}}
+    F3.fps=sc.info().fpsMs;
+    if(t>tl.total)end()
+   }catch(e){stop();showErr(f3fail(en?'Runtime error in 3D scene':'3D 장면 실행 중 오류',String(e&&e.message||e),(e&&e.stack)||''))}
+  }
+  raf=requestAnimationFrame(loop)}
+ go()}
+/* ===== generic 3D minigame runner (cannon / wall) ===== */
+function f3play(cfg,rs,done){
+ if(red){done();return}
+ closeM();fxSk=false;var en=lang=='en';
+ var o=document.createElement('div');o.className='fx fx3';
+ o.innerHTML='<div class="fxi"><canvas class="f3gl"></canvas><canvas class="f3ov"></canvas><div class="f3ui"><div class="f3dim"></div><div class="f3vg"></div><div class="f3fl"></div><div class="f3b1"></div><div class="f3b2"></div><div class="f3dbg"></div></div><div class="f3load"></div><button class="sk"></button></div>';
+ document.body.appendChild(o);
+ var box=o.firstChild,gl=box.querySelector('.f3gl'),ov=box.querySelector('.f3ov'),ui=box.querySelector('.f3ui'),ld=box.querySelector('.f3load'),sk=box.querySelector('.sk'),
+  dDim=ui.querySelector('.f3dim'),dFl=ui.querySelector('.f3fl'),b1=ui.querySelector('.f3b1'),b2=ui.querySelector('.f3b2'),dbg=ui.querySelector('.f3dbg'),
+  oc=ov.getContext('2d'),ended=false,raf=0,sc=null,tl=null,flash=0,dpr=Math.min(2,window.devicePixelRatio||1),W=0,H=0,showDbg=/[?&]dbg=1/.test(location.search);
+ sk.textContent=en?'Skip':'건너뛰기';
+ function kd(e){if(e.key==='Escape'){fxSk=true;end()}}
+ function cleanup(){cancelAnimationFrame(raf);document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(e){}}
+ function end(){if(ended)return;ended=true;cleanup();if(o.parentNode)document.body.removeChild(o);done()}
+ document.addEventListener('keydown',kd);sk.onclick=function(){fxSk=true;end()};sk.focus();
+ function stop(){cancelAnimationFrame(raf);raf=0}
+ function showLoad(msg){ld.className='f3load';ld.innerHTML='<div class="f3sp"></div><div class="f3lt"></div>';ld.lastChild.textContent=msg;ld.style.display='flex'}
+ function showErr(e){
+  stop();F3.err=e;var t=e.f3title||(en?'3D rendering failed':'3D 렌더링 실패'),c=e.message||String(e),det=(e.f3detail||'')+(e.f3detail?'\n':'')+(e.stack&&!e.f3title?e.stack:'')+'\n--- log ---\n'+F3.log.join('\n');
+  ld.className='f3load err';ld.style.display='flex';ld.innerHTML='<div class="f3e"><b></b><p></p><pre></pre><div class="f3bt"><button></button><button></button><button></button></div></div>';
+  var el=ld.firstChild;el.querySelector('b').textContent=t;el.querySelector('p').textContent=c;el.querySelector('pre').textContent=det;
+  var bs=el.querySelectorAll('button');bs[0].textContent=en?'Retry':'다시 시도';bs[1].textContent=en?'Play 2D version':'2D 버전으로 보기';bs[2].textContent=en?'Skip to result':'건너뛰고 결과 보기';
+  bs[0].onclick=function(){F3.err=null;go()};
+  bs[1].onclick=function(){if(ended)return;ended=true;cleanup();document.body.removeChild(o);cfg.fb(rs,done);var n=document.querySelector('.fx');if(n)fxFrame(rs,n)};
+  bs[2].onclick=function(){fxSk=true;end()};
+  console.error('[3d]',cfg.file,t,c,det)}
+ function size(){W=box.clientWidth;H=box.clientHeight;ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+'px';ov.style.height=H+'px'}
+ function onR(){if(!sc)return;size();sc.resize(W,H)}
+ window.addEventListener('resize',onR);
+ gl.addEventListener('webglcontextlost',function(e){e.preventDefault();f3log('context lost');showErr(f3fail(en?'WebGL context lost':'WebGL 컨텍스트 손실','GPU 메모리 부족 또는 드라이버 재설정으로 3D 화면이 중단되었습니다.',''))});
+ function go(){
+  if(sc){try{sc.dispose()}catch(e){}sc=null}
+  showLoad(en?'Loading 3D engine…':'3D 엔진 불러오는 중…');
+  f3engine(cfg.key,cfg.file).then(function(m){
+   if(ended)return;showLoad(en?'Building scene…':'3D 장면 구성 중…');
+   return new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r)})}).then(function(){
+    if(ended)return;size();tl=cfg.tl(m,rs,W,H);var bad=null;
+    try{sc=cfg.create(m,{canvas:gl,W:W,H:H,en:en,timeline:tl,tier:m.pickTier(),onError:function(e){bad=bad||e}});sc.warmup()}
+    catch(e){throw f3fail(en?'Scene creation failed':'3D 장면 생성 실패',String(e&&e.message||e),(e&&e.stack)||'')}
+    var glsl=sc.errors.filter(function(x){return /^GLSL/.test(x)});if(bad||glsl.length)throw f3fail(en?'Shader error':'셰이더 오류',String((bad&&bad.message)||glsl[0]),sc.errors.join('\n'));
+    sc.errors.forEach(function(x){f3log('warn: '+x)});
+    ld.style.display='none';start()})
+  }).catch(function(e){if(!ended)showErr(e)})}
+ function start(){
+  var t0=performance.now(),last=t0,dbgT=0;f3log(cfg.file+' start tier '+sc.tier);F3.state='playing';
+  function loop(now){
+   raf=requestAnimationFrame(loop);
+   try{
+    var dt=Math.min(.05,(now-last)/1000),t=(now-t0)/1000;last=now;var out=sc.update(t,dt);sc.render();
+    oc.setTransform(dpr,0,0,dpr,0,0);oc.clearRect(0,0,W,H);
+    cfg.draw(oc,out,t,dt,W,H,tl,en);
+    flash=Math.max(flash,out.flash||0);flash*=Math.pow(.03,dt);dFl.style.opacity=flash>.01?Math.min(.9,flash):0;dDim.style.opacity=out.dim||0;
+    var bh=H*.05*fxIO(t/.6);b1.style.height=b2.style.height=Math.round(bh+6)+'px';
+    if(showDbg){dbgT+=dt;if(dbgT>.4){dbgT=0;var inf=sc.info();dbg.textContent='r'+inf.rev+' tier'+inf.tier+' dpr'+inf.dpr.toFixed(2)+' '+(1000/Math.max(1,inf.fpsMs)).toFixed(0)+'fps calls'+inf.drawCalls}}
+    F3.fps=sc.info().fpsMs;
+    if(t>tl.total)end()
+   }catch(e){stop();showErr(f3fail(en?'Runtime error in 3D scene':'3D 장면 실행 중 오류',String(e&&e.message||e),(e&&e.stack)||''))}
+  }
+  raf=requestAnimationFrame(loop)}
+ go()}
+/* ---- bazooka (cannon) ---- */
+function f3txt(g,s,x,y,px,col,glow,al){g.save();g.globalAlpha=al==null?1:al;g.fillStyle=col;if(glow){g.shadowColor=glow;g.shadowBlur=12}g.font='900 '+Math.round(px)+'px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(s,x,y);g.restore()}
+function playCannon3N(rs,done){f3play({key:'cn',file:'cannon3d.js',fb:playCannonN,tl:function(m,r){return m.makeCannonTimeline(r)},create:function(m,o){return m.createCannonScene(o)},
+ draw:function(g,out,t,dt,W,H,tl){tl.ms.forEach(function(m,i){var md=out.med[i];if(md)fxMedal(g,md.sx,md.sy,md.r,Math.cos(md.pu*Math.PI*4),fxBack(md.pu)*1.05,md.g)})}},rs,done)}
+function playCannon3UR(r,done){var CAP=null;f3play({key:'cn',file:'cannon3d.js',fb:function(a,d){playCannonUR(a[0],d)},tl:function(m){CAP=m.CAPT;return m.makeCannonURTimeline()},create:function(m,o){return m.createCannonScene(o)},
+ draw:function(g,out,t,dt,W,H,tl,en){var k,PL=tl.PL,hh=H*.05+24,tF=tl.tF;
+  PL.forEach(function(P,n){var q=out.pl[n];if(q){var u=q.u,x=q.sx,y=q.sy,rad=q.rad;
+    if(u>.35){g.save();g.globalAlpha=.7*fxC((u-.35)/.2,0,1);g.strokeStyle='#FF5A4A';g.lineWidth=1.6;g.beginPath();g.arc(x,y,rad*(1.5-.4*u)+6,0,6.2832);g.stroke();g.beginPath();g.moveTo(x-rad*1.8,y);g.lineTo(x-rad*1.2,y);g.moveTo(x+rad*1.2,y);g.lineTo(x+rad*1.8,y);g.stroke();g.restore()}
+    var la=fxC(u/.15,0,1)*(1-fxC((u-.85)/.15,0,1));g.save();g.globalAlpha=la;g.fillStyle='#fff';g.font='800 '+Math.round(Math.min(18,W*.045))+'px sans-serif';g.textAlign='center';g.fillText(en?P.e:P.n,x,Math.max(H*.2,y-rad-14));g.restore()}
+   if(t>=P.th&&t<P.th+1.4){var cu=fxC((t-P.th)/1.4,0,1);g.save();g.globalAlpha=(1-fxC((cu-.6)/.4,0,1))*fxC(cu/.1,0,1);g.fillStyle='#FFE9A8';g.shadowColor='#FF7A1F';g.shadowBlur=10;g.font='900 '+Math.round(Math.min(26,W*.065))+'px sans-serif';g.textAlign='center';g.fillText(en?P.e+' DESTROYED':P.n+' 파괴!',W/2,H*.27-cu*10);g.restore()}});
+  CAP.forEach(function(c,i){var u=t-c,txt=[en?'ATMOSPHERE BREACH!':'대기권 돌파!',en?'STRATOSPHERE!':'성층권 돌파!',en?'ENTERING SPACE!':'우주 진입!'][i];if(u<0||u>1.5)return;var a=fxC(u/.2,0,1)*(1-fxC((u-1.1)/.4,0,1)),sc=.8+.25*fxSp(fxC(u/.5,0,1));g.save();g.globalAlpha=a;g.translate(W/2,H*.3);g.scale(sc,sc);g.textAlign='center';g.textBaseline='middle';g.font='900 '+Math.round(Math.min(W*.085,34))+'px sans-serif';g.lineWidth=5;g.strokeStyle='rgba(20,10,0,.7)';g.strokeText(txt,0,0);var gr=g.createLinearGradient(0,-16,0,16);gr.addColorStop(0,'#FFF6C0');gr.addColorStop(1,'#FF9A2A');g.fillStyle=gr;g.fillText(txt,0,0);g.restore()});
+  var md=out.med[0];if(md){var mu=md.pu;fxMedal(g,md.sx,md.sy,md.r,Math.cos(mu*Math.PI*5),fxBack(mu)*1.1,'UR');g.save();g.globalAlpha=fxC((t-tF-.6)/.5,0,1);g.fillStyle='#fff';g.shadowColor='#FFB020';g.shadowBlur=14;g.font='900 '+Math.round(Math.min(34,W*.085))+'px sans-serif';g.textAlign='center';g.fillText(en?'UR COIN!':'UR 코인 획득!',md.sx,md.sy+W*.27);g.restore()}
+  var hits=out.hits||0;g.save();g.textAlign='center';g.fillStyle='#fff';g.font='700 '+Math.max(12,Math.round(W*.034))+'px sans-serif';g.fillText((en?'UR · PLANET BREAKER  ':'UR · 행성 파괴  ')+hits+' / 7',W/2,hh);
+  for(k=0;k<7;k++){var lit=out.pl&&PL[k]&&t>=PL[k].th,xx=W/2+(k-3)*W*.085,yy=hh+W*.045;g.globalAlpha=lit?1:.35;g.fillStyle=lit?PL[k].c[0]:'rgba(255,255,255,.2)';g.beginPath();g.arc(xx,yy,W*.02,0,6.2832);g.fill();g.strokeStyle='#fff';g.lineWidth=1.2;g.stroke()}
+  g.globalAlpha=1;g.textAlign='right';g.font='700 '+Math.round(W*.03)+'px monospace';g.fillStyle='rgba(180,220,255,.85)';if(t<tF-.3){var A=out.alt||0,km=t<5?100*fxI2(fxC((t-.5)/4.5,0,1)):100+Math.pow(t-5,2.2)*4000;g.fillText('ALT '+Math.round(km).toString().replace(/\B(?=(\d{3})+(?!\d))/g,',')+' km',W-14,hh+W*.1)}g.restore()}},[r],done)}
+function playCannon3(rs,done){chainUR(playCannon3N,playCannon3UR,rs,done)}
+/* ---- wall breaker 3D ---- */
+function playWall3N(rs,done){f3play({key:'wl',file:'wall3d.js',fb:playWallN,tl:function(m,r){return m.makeWallTimeline(r)},create:function(m,o){return m.createWallScene(o)},
+ draw:function(g,out,t,dt,W,H,tl,en){var N=rs.length,u=Math.max(10,Math.min(W*.075,H*.05)),hh=H*.05+24,s=out.seg;
+  out.med.forEach(function(md){fxMedal(g,md.sx,md.sy,md.r,md.sp,md.sc,md.g)});
+  out.txt.forEach(function(x){f3txt(g,x.s,x.x,x.y,x.big||Math.min(20,W*.05),'#fff','#FFB020',x.a)});
+  if(s){var WN=[['유리','Glass'],['돌','Stone'],['강철','Steel']];fxGaugeHUD(g,W,u,hh,out.gv||0,t,(en?'Wall ':'')+(s.j+1)+(en?' · ':'차 벽 · ')+WN[s.j][en?1:0],0);
+   if(N>1){g.save();g.textAlign='right';g.fillStyle='rgba(255,255,255,.8)';g.font='700 '+Math.max(12,Math.round(u*.55))+'px sans-serif';g.fillText((s.ri+1)+' / '+N,W-14,hh);g.restore()}}}},rs,done)}
+function playWall3UR(r,done){f3play({key:'wl',file:'wall3d.js',fb:function(a,d){playWallUR(a[0],d)},tl:function(m,rr,W,H){return m.makeWallURTimeline(W,H)},create:function(m,o){return m.createWallScene(o)},
+ draw:function(g,out,t,dt,W,H,tl,en){var u=Math.max(10,Math.min(W*.075,H*.05)),hits=out.hits||0;
+  out.med.forEach(function(md){fxMedal(g,md.sx,md.sy,md.r,md.sp,md.sc,md.g)});
+  out.txt.forEach(function(x){f3txt(g,x.s,x.x,x.y,x.big||Math.min(26,W*.06),'#fff','#FFB020',x.a)});
+  fxGaugeHUD(g,W,u,H*.05+24,out.gv||0,t,en?'UR · TITAN CHARGE  '+hits+' / '+tl.NW:'UR · 타이탄 돌진  '+hits+' / '+tl.NW,0)}},[r],done)}
+function playWall3(rs,done){chainUR(playWall3N,playWall3UR,rs,done)}
 /* ===== UR chain helper + wall breaker UR: the Titan charge ===== */
 var fxSk=false;
 function chainUR(N,U,rs,done){var last=rs[rs.length-1];if(last&&last.g=='UR'){var rest=rs.slice(0,-1);if(rest.length)N(rest,function(){if(fxSk)done();else U(last,done)});else U(last,done)}else N(rs,done)}
@@ -1250,7 +1410,7 @@ resize();hit.disabled=true;ovl('');drawSlots(0);cn.textContent='0 / '+CAP;
 window.__cc={acts:acts,spawn:function(g,cy){var o=newAct(g,cy);o.X=0;o.Z=Zr;o.Y=.3;o.st='stay';o.t=0;o.stay=5;o.ox=0;o.oz=Zr;return o},get acc(){return acc},set acc(v){acc=v},get state(){return state},get heart(){return heart},get caught(){return caught},hit:doHit,fin:finish,set time(v){time=v},get slots(){return slots},ring:function(){return acts.filter(function(a){return(a.st=='stay')&&inRing(a)})}};
 last=performance.now();rq=requestAnimationFrame(frame)}
 
-function play(rs,done,t){var ui=-1;if(rs.length>10){var RKk={UR:3,SR:2,R:1};rs=[rs.slice().sort(function(a,b){return RKk[b.g]-RKk[a.g]||b.v-a.v})[0]]}rs.forEach(function(e,k){if(ui<0&&e.g=='UR')ui=k});if(ui>=0)rs=rs.slice(0,ui+1);t=='w'?playWall(rs,done):t=='s'?playSkip(rs,done):t=='f'?(/[?&]fish2d=1/.test(location.search)?playFish(rs,done):playFish3D(rs,done)):playCannon(rs,done);var o=document.querySelector('.fx');if(!o)return;
+function play(rs,done,t){var ui=-1;if(rs.length>10){var RKk={UR:3,SR:2,R:1};rs=[rs.slice().sort(function(a,b){return RKk[b.g]-RKk[a.g]||b.v-a.v})[0]]}rs.forEach(function(e,k){if(ui<0&&e.g=='UR')ui=k});if(ui>=0)rs=rs.slice(0,ui+1);t=='w'?(/[?&]wall2d=1/.test(location.search)?playWall(rs,done):playWall3(rs,done)):t=='s'?(/[?&]skip2d=1/.test(location.search)?playSkip(rs,done):playSkip3D(rs,done)):t=='f'?(/[?&]fish2d=1/.test(location.search)?playFish(rs,done):playFish3D(rs,done)):(/[?&]cannon2d=1/.test(location.search)?playCannon(rs,done):playCannon3(rs,done));var o=document.querySelector('.fx');if(!o)return;
  var R={UR:3,SR:2,R:1},b='R',d=document.createElement('div');rs.forEach(function(e){if(R[e.g]>R[b])b=e.g});
  d.className='fb '+b.toLowerCase();d.innerHTML=['a','b','c','d'].map(function(k){return '<svg class="cn '+k+'" viewBox="0 0 64 64"><use href="#orn"/></svg>'}).join('');o.firstChild.appendChild(d)}
 /* ===== wall breaker v2 (theme w): curved, organic ===== */
