@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>3D 진단 — CRYPTO GACHA</title>
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0b1220;color:#e6edf7;font:14px/1.5 system-ui,-apple-system,"Noto Sans KR",sans-serif;padding:16px;max-width:760px;margin:auto}
+h1{font-size:18px;margin:4px 0 2px}p.s{margin:0 0 14px;color:#8fa3bf;font-size:12px}
+.r{display:flex;gap:8px;padding:7px 10px;border-radius:8px;background:#121b2e;margin:5px 0;align-items:flex-start}
+.r b{min-width:46px;font-size:12px;padding:1px 6px;border-radius:5px;text-align:center}
+.PASS b{background:#14532d;color:#86efac}.FAIL b{background:#7f1d1d;color:#fecaca}.WARN b{background:#713f12;color:#fde68a}.RUN b{background:#1e3a8a;color:#bfdbfe}.INFO b{background:#334155;color:#cbd5e1}
+.r div{flex:1;word-break:break-word}.r small{display:block;color:#8fa3bf;font-family:ui-monospace,monospace;font-size:11px;white-space:pre-wrap}
+#sum{font-weight:700;padding:12px;border-radius:10px;margin:12px 0;background:#121b2e}
+button{background:#2b4b86;color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;margin:2px 4px 2px 0}
+#shots{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}#shots img{width:140px;border-radius:8px;border:1px solid #243452}
+#stage{width:180px;height:320px;border-radius:8px;border:1px solid #243452;display:block;margin:8px 0}
+</style></head><body>
+<h1>3D 진단 페이지</h1>
+<p class="s">배포된 사이트에서 Three.js 로컬 파일, WebGL2, 3D 장면 렌더링이 실제로 동작하는지 점검합니다. 결과는 아래 “리포트 복사”로 전달할 수 있습니다.</p>
+<div><button id="run">다시 실행</button><button id="q0">품질 0</button><button id="q1">품질 1</button><button id="q2">품질 2</button><button id="cp">리포트 복사</button></div>
+<div id="sum">실행 중…</div>
+<div id="list"></div>
+<canvas id="stage" width="360" height="640"></canvas>
+<div id="shots"></div>
+<script type="module">
+const list=document.getElementById('list'),sum=document.getElementById('sum'),shots=document.getElementById('shots'),stage=document.getElementById('stage');
+let results=[],tierOverride=null;
+window.__check={done:false,pass:null,results};
+function row(name,st,msg,detail){const d=document.createElement('div');d.className='r '+st;d.innerHTML='<b>'+st+'</b><div></div>';const c=d.lastChild;c.textContent=name+(msg?' — '+msg:'');if(detail){const s=document.createElement('small');s.textContent=detail;c.appendChild(s)}list.appendChild(d);results.push({name,st,msg:msg||'',detail:detail||''});return d}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const raf=()=>new Promise(r=>requestAnimationFrame(r));
+async function head(url){try{const r=await fetch(url,{cache:'no-store'});const t=await r.clone().arrayBuffer();return{url,ok:r.ok,status:r.status,type:r.headers.get('content-type')||'',cache:r.headers.get('cache-control')||'',size:t.byteLength,text:r.ok&&t.byteLength<3e6?new TextDecoder().decode(t.slice(0,3e6)):''}}catch(e){return{url,ok:false,status:0,err:String(e)}}}
+
+async function run(){
+  list.innerHTML='';shots.innerHTML='';results.length=0;window.__check.done=false;sum.textContent='실행 중…';
+  row('환경','INFO',location.origin+location.pathname,navigator.userAgent+'\nDPR '+devicePixelRatio+' · '+innerWidth+'×'+innerHeight+(navigator.deviceMemory?(' · mem '+navigator.deviceMemory+'GB'):'')+' · cores '+(navigator.hardwareConcurrency||'?'));
+  /* 1 local library file */
+  const th=await head('./vendor/three.module.js');
+  if(!th.ok){row('vendor/three.module.js 다운로드','FAIL','HTTP '+th.status+(th.err?(' '+th.err):''),'파일이 배포 결과물에 없습니다. Three.js r160의 build/three.module.js 를 저장소의 vendor/ 폴더에 넣고 다시 배포하세요.')}
+  else{
+    const m=/REVISION\s*=\s*['"](\d+)['"]/.exec(th.text);
+    const okType=/javascript|ecmascript/i.test(th.type);
+    row('vendor/three.module.js 다운로드',okType&&th.size>300000?'PASS':'FAIL','HTTP '+th.status+' · '+(th.size/1024).toFixed(0)+' KB · '+th.type,'cache-control: '+th.cache);
+    if(!m)row('Three.js 버전 식별','FAIL','REVISION 문자열을 찾지 못했습니다','이 파일이 three.module.js 가 아니거나(HTML 오류 페이지 등) 손상되었을 수 있습니다.');
+    else row('Three.js 버전 식별',m[1]==='160'?'PASS':'WARN','r'+m[1],m[1]==='160'?'':'r160 기준으로 작성·점검되었습니다. 다른 버전은 API 차이로 동작이 달라질 수 있습니다.');
+  }
+  const fj=await head('./fish3d.js');
+  row('fish3d.js 다운로드',fj.ok&&/javascript|ecmascript/i.test(fj.type)?'PASS':'FAIL','HTTP '+fj.status+' · '+(fj.size/1024).toFixed(0)+' KB · '+fj.type);
+  /* 2 WebGL2 */
+  let gl2=null,gpu='';
+  try{const c=document.createElement('canvas');gl2=c.getContext('webgl2');if(gl2){const e=gl2.getExtension('WEBGL_debug_renderer_info');gpu=e?gl2.getParameter(e.UNMASKED_RENDERER_WEBGL):'(렌더러 정보 숨김)'}}catch(e){}
+  row('WebGL2 컨텍스트',gl2?'PASS':'FAIL',gl2?gpu:'생성 실패','MAX_TEXTURE_SIZE '+(gl2?gl2.getParameter(gl2.MAX_TEXTURE_SIZE):'-')+(gpu&&/swiftshader|llvmpipe|software/i.test(gpu)?'\n※ 소프트웨어 렌더러입니다. 실기기 GPU 성능이 아닙니다.':''));
+  /* 3 import */
+  let M=null;
+  try{M=await import('./fish3d.js');row('fish3d.js 모듈 로드(Three.js import 포함)','PASS','Three.js r'+M.REVISION)}
+  catch(e){row('fish3d.js 모듈 로드(Three.js import 포함)','FAIL',String(e&&e.message||e),(e&&e.stack||'')+'\n브라우저는 import 실패 사유를 자세히 알려주지 않습니다. 위 파일 다운로드 결과(404/MIME)를 먼저 확인하세요.')}
+  if(!M||!gl2){finish();return}
+  /* 4 render */
+  const tier=tierOverride==null?M.pickTier():tierOverride;
+  const rs=[{g:'R'},{g:'SR'},{g:'UR'}];let tl,sc;const errs=[];
+  try{
+    tl=M.makeTimeline(rs);
+    sc=M.createScene({canvas:stage,W:360,H:640,rs,timeline:tl,tier,preserve:true,onError:e=>errs.push(String(e.message||e))});
+    sc.warmup();
+    row('장면 생성 · 셰이더 컴파일',(errs.length||sc.errors.some(x=>/^GLSL/.test(x)))?'FAIL':'PASS','품질 tier '+tier,(errs.concat(sc.errors)).join('\n')||'오류 없음');
+  }catch(e){row('장면 생성 · 셰이더 컴파일','FAIL',String(e&&e.message||e),e&&e.stack||'');finish();return}
+  const ur=tl.fs.find(f=>f.c.ur);
+  const segs=[['대기·낚시(R/SR)',0.1,2.6],['UR 대어와의 사투',ur.tb+1.2,2.4],['UR 점프',ur.tl+.5,2.4]];
+  const probe=document.createElement('canvas');probe.width=36;probe.height=64;const pg=probe.getContext('2d',{willReadFrequently:true});
+  for(const [nm,t0,len] of segs){
+    let t=t0,last=performance.now(),frames=0,worst=0,sumdt=0;const start=last;
+    try{
+      while(t<t0+len){await raf();const now=performance.now(),dt=Math.min(.05,(now-last)/1000);last=now;const real=dt;t+=dt;const s=tl.at(t);s.zoom=.03;sc.update(s,t,dt);sc.render();frames++;sumdt+=real;worst=Math.max(worst,real)}
+      const url=sc.canvas.toDataURL('image/jpeg',.72);const im=new Image();im.src=url;im.title=nm;shots.appendChild(im);
+      await new Promise(r=>{im.onload=r;im.onerror=r});pg.drawImage(im,0,0,36,64);
+      const px=pg.getImageData(0,0,36,64).data;let mean=0,min=255,max=0;for(let i=0;i<px.length;i+=4){const l=(px[i]+px[i+1]+px[i+2])/3;mean+=l;min=Math.min(min,l);max=Math.max(max,l)}mean/=px.length/4;
+      const top=[0,0,0],bot=[0,0,0];for(let y=0;y<64;y++)for(let x=0;x<36;x++){const i=(y*36+x)*4;const a=y<20?top:bot;for(let k=0;k<3;k++)a[k]+=px[i+k]}
+      const blank=(max-min)<24;
+      const fps=frames/(sumdt||1);
+      row('렌더 · '+nm,blank?'FAIL':(fps<20?'WARN':'PASS'),'평균 '+fps.toFixed(0)+' fps · 최악 프레임 '+(worst*1000).toFixed(0)+' ms · 휘도 '+mean.toFixed(0)+' ('+min.toFixed(0)+'–'+max.toFixed(0)+')',blank?'화면이 단색/빈 화면입니다. 렌더링이 되지 않았을 가능성이 높습니다.':JSON.stringify(sc.info()));
+    }catch(e){row('렌더 · '+nm,'FAIL',String(e&&e.message||e),e&&e.stack||'');break}
+  }
+  if(errs.length)row('런타임 셰이더/GL 오류','FAIL',errs.length+'건',errs.join('\n'));
+  try{sc.dispose()}catch(e){}
+  finish();
+}
+function finish(){
+  const f=results.filter(r=>r.st==='FAIL').length,w=results.filter(r=>r.st==='WARN').length;
+  sum.textContent=f?('실패 '+f+'건 — 3D 게임이 정상 동작하지 않을 수 있습니다.'):(w?'통과(경고 '+w+'건)':'모든 점검 통과');
+  sum.style.color=f?'#fecaca':w?'#fde68a':'#86efac';
+  window.__check.pass=!f;window.__check.done=true;
+}
+document.getElementById('run').onclick=run;
+[0,1,2].forEach(q=>document.getElementById('q'+q).onclick=()=>{tierOverride=q;run()});
+document.getElementById('cp').onclick=()=>{const t=results.map(r=>'['+r.st+'] '+r.name+(r.msg?' — '+r.msg:'')+(r.detail?'\n    '+r.detail.replace(/\n/g,'\n    '):'')).join('\n');navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>sum.textContent+=' (복사됨)').catch(()=>{prompt('복사하세요',t)})};
+run();
+</script></body></html>
