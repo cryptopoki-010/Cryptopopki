@@ -157,7 +157,7 @@ input[type=range]{width:100%;accent-color:var(--red);height:32px;margin:0}
 .r3 .mt{color:#B8C0CF}.r3 .mt b{color:#fff}.r3 .cd2{background:rgba(255,255,255,.12);color:#FFE08A;width:100%}
 @media (prefers-reduced-motion:reduce){.c3{animation:none;transform:rotateY(25deg)}.rays,.st3 s{animation:none}}
 .ch .bi{height:14px;width:auto;vertical-align:-3px;margin-right:3px}
-html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-highlight-color:transparent}</style></head><body>
+html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-highlight-color:transparent}#rk{max-height:62vh;overflow:auto}.rw.rk.me{background:rgba(255,255,255,.07);border-radius:8px}.rw.rk .fr{flex:none}</style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F6DC8B"/><stop offset=".5" stop-color="#D4A12E"/><stop offset="1" stop-color="#8F6414"/></linearGradient>
 <linearGradient id="sh" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
@@ -244,7 +244,7 @@ function theme(){var e=document.documentElement,d=e.dataset.theme?e.dataset.them
 /* temporary stubs, replaced in later stages */
 ['col','inv','my'].forEach(function(k){window['rv_'+k]=function(){$('v-'+k).innerHTML='<div class="pad"><div class="em">이 화면은 4단계에서 구현됩니다.</div></div>'}});
 /* ===== state ===== */
-var bal=1000,inv={},invV={},opens=0,urN=0,used={},exp=0,eq=-1,fbox=0,qty=1,cf='ALL',ME='gue***',RANK=[],ci,fo;
+var bal=1000,col={},inv={},invV={},opens=0,urN=0,used={},exp=0,eq=-1,fbox=0,qty=1,cf='ALL',ME='gue***',RANK=[],ci,fo;
 var need=function(L){return Math.round(100*Math.pow(1.5,L-1))};
 function lv(){var L=1,e=exp;while(e>=need(L)){e-=need(L);L++}return{L:L,c:e,n:need(L)}}
 var f2=function(v){return (+v).toLocaleString('ko-KR',{minimumFractionDigits:2,maximumFractionDigits:2})};
@@ -267,15 +267,14 @@ function closeM(){$('mo').hidden=true;document.body.style.overflow='';clearInter
 $('mx').onclick=$('mc').onclick=closeM;
 $('mo').addEventListener('click',function(e){if(e.target===$('mo'))closeM()});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('mo').hidden)closeM()});
+function esc(t){return String(t).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function rkr(){var b=$('rk');if(!b)return;if(!RANK.length||!RANK[0].L){b.innerHTML='<div class="em">아직 랭킹 데이터가 없습니다.<br>Google 로그인 후 참여하세요.</div>';return}
+b.innerHTML=RANK.map(function(r,i){var e=(r.eq>=0&&IT[r.eq])?r.eq:-1;return '<div class="rw rk'+(r.me?' me':'')+'"><span class="rn'+(i<3?' t':'')+'">'+(i+1)+'</span>'+fr(e,38)+'<div><b>'+esc(r.n)+(r.me?' (나)':'')+'</b><small>'+fm(r.o)+'회 뽑기</small></div><b style="color:var(--red)">Lv '+r.L+'</b></div>'}).join('')}
 function modal(k){var h;
 if(k=='sale'){h='<p class="mt">종료까지</p><div class="cd2" id="cd"></div>'+[2,3,8].map(function(i){var p=P[i];return '<div class="rw"><span class="th">'+gfx(p[3])+'</span><div><b>'+p[1]+'</b><small><s>'+p[2]+'</s> <b style="color:var(--red)">'+f1(p[2]*.7)+' USDT</b> · 30%</small></div><button class="op" onclick="buy('+i+',.7)">뽑기</button></div>'}).join('')+'<button class="bt" onclick="freeDraw()">무료 1회 뽑기</button>';sh('타임 세일',h);
  var z=function(n){return ('0'+n).slice(-2)},t=function(){var d=new Date(),s=3600-d.getMinutes()*60-d.getSeconds();$('cd').textContent=z(Math.floor(s/60))+':'+z(s%60)};t();ci=setInterval(t,1000);return}
 if(k=='ben'){h=[['첫 가입 보너스','+5 USDT','b'],['출석 체크','+1 USDT','a']].map(function(r){return '<div class="rw"><div><b>'+r[0]+'</b><small>'+r[1]+'</small></div><button class="op" '+(used[r[2]]?'disabled':'')+' onclick="claim(\''+r[2]+'\')">'+(used[r[2]]?'완료':'받기')+'</button></div>'}).join('')+'<div class="rw"><div><b>친구 초대 리베이트</b><small>초대 코드로 리베이트를 받으세요</small></div><button class="op" onclick="modal(\'ref\')">보기</button></div>';sh('혜택 받기',h);return}
-if(k=='rank'){h='<p class="mt">오픈 횟수 기준</p>';
- if(RANK.length)h+=RANK.map(function(r,i){return '<div class="rw"><span class="rn'+(i<3?' t':'')+'">'+(i+1)+'</span><div><b></b></div><b>'+fm(r[1])+'회</b></div>'}).join('');
- if(opens)h+='<div class="rw" style="border:0"><span class="rn">★</span><div><b>'+ME+'</b></div><b>'+fm(opens)+'회</b></div>';
- if(!RANK.length&&!opens)h+='<div class="em">아직 집계된 순위가 없습니다.</div>';
- sh('랭킹',h);var nb=document.querySelectorAll('#mb .rw>div>b');RANK.forEach(function(r,i){if(nb[i])nb[i].textContent=r[0]});return}
+if(k=='rank'){sh('랭킹','<p class="mt">전체 이용자 · 레벨순</p><div id="rk"><div class="em">불러오는 중...</div></div>');(window.loadRank?loadRank():Promise.resolve()).then(rkr);return}
 if(k=='ref'){h='<div class="pn" style="padding:12px;margin-bottom:10px"><b>① 친구 초대 무료 박스</b><small class="mt" style="display:block;margin:4px 0">친구가 가입하면 무료 박스 3개를 드려요. 획득 코인 가치 0.1 ~ 2 USDT</small><div class="rw" style="border:0"><div><small>보유 무료 박스</small><b>'+fbox+'개</b></div><button class="op" '+(fbox?'':'disabled')+' onclick="buy(16)">열기</button></div><button class="cl" style="height:34px;margin-top:2px;background:var(--soft);color:var(--ink)" onclick="reportInvite(1)">시연: 친구 초대 완료 처리</button></div>'+
  '<div class="pn" style="padding:12px"><b>② 친구 추천 리베이트</b><p class="mt" style="margin:6px 0">내 초대 코드</p><div class="cd2">CG-7K2Q9X</div><button class="bt" onclick="cp()">코드 복사</button><div class="rw" style="margin-top:8px"><div><b>초대 1~9명</b></div><b>리베이트 3%</b></div><div class="rw"><div><b>10~29명</b></div><b>4%</b></div><div class="rw" style="border:0"><div><b>30명 이상</b></div><b>5%</b></div><p class="mt" style="font-size:12px;margin:0">초대받은 친구의 뽑기 금액 기준입니다. (예시)</p></div>';
  sh('친구 초대 혜택',h);$('mt').dataset.k='ref'}}
@@ -302,7 +301,7 @@ function draw(i,k,q,free){var p=P[i],fb=i==16,c=(free||fb)?0:+(p[2]*k*q).toFixed
 if(fb){if(fbox<q){toast('무료 박스가 부족합니다');return}}else if(bal<c){toast('잔액이 부족합니다 (보유 '+f1(bal)+' USDT)');return}
 if(fb)fbox-=q;else bal=+(bal-c).toFixed(2);
 opens+=q;
-for(n=0;n<q;n++){g=roll(i);x=pick(g);v=rv(i,g,k);inv[x]=(inv[x]||0)+1;invV[x]=(invV[x]||0)+v;tv+=v;if(g=='UR')urN++;rs.push({g:g,x:x,v:v})}
+for(n=0;n<q;n++){g=roll(i);x=pick(g);v=rv(i,g,k);inv[x]=(inv[x]||0)+1;col[x]=1;invV[x]=(invV[x]||0)+v;tv+=v;if(g=='UR')urN++;rs.push({g:g,x:x,v:v})}
 var o=lv().L;exp+=EXPT[i]*q;var L2=lv();
 play(rs,function(){rs.forEach(function(e){if(e.g=='UR'||e.g=='SR')announce({nick:ME,item:IT[e.x][0],grade:e.g})});
  showResult(rs,{p:p,q:q,c:c,tv:tv,gain:EXPT[i]*q,up:L2.L>o,o:o,n:L2.L})},ANIM[i])}
@@ -478,11 +477,11 @@ requestAnimationFrame(tick);
 function fr(i,s){var g=i<0?'r':IT[i][1].toLowerCase().charAt(0),c=i<0?'var(--line)':IT[i][2];return '<span class="fr '+g+'" style="--c:'+c+';width:'+s+'px;height:'+s+'px;padding:'+(s>60?5:3)+'px"><span class="in"><svg viewBox="0 0 100 100"><use href="#coin"/></svg></span></span>'}
 function eqp(i){eq=(eq==i)?-1:+i;toast(eq<0?'테두리를 해제했습니다':'프로필 테두리를 장착했습니다');if(cvw=='col')rc();if(cvw=='my')rm()}
 /* ===== collection / inventory / profile views ===== */
-function rc(){var own=Object.keys(inv).length,L=IT.length;$('v-col').innerHTML='<div class="pad"><div class="vt">컬렉션<small>수집 '+own+'/'+L+'</small></div><div class="pbar"><i style="width:'+own/L*100+'%"></i></div><div class="chips">'+['ALL','UR','SR','R'].map(function(g){return '<button aria-pressed="'+(g==cf)+'" onclick="cf=\''+g+'\';rc()">'+(g=='ALL'?'전체':g)+'</button>'}).join('')+'</div><div class="g3">'+IT.map(function(t,i){return [t,i]}).filter(function(e){return cf=='ALL'||e[0][1]==cf}).map(function(e){var t=e[0],i=e[1],o=inv[i];return '<div class="ci'+(o?'':' lk')+(eq==i?' on':'')+'">'+tk(i)+'<b>'+(o?t[0]:'???')+'</b>'+chip(t[1])+(o?'<button class="op sm" onclick="eqp('+i+')">'+(eq==i?'장착중':'장착')+'</button>':'')+'</div>'}).join('')+'</div></div>';apply($('v-col'))}
+function rc(){var own=Object.keys(col).length,L=IT.length;$('v-col').innerHTML='<div class="pad"><div class="vt">컬렉션<small>수집 '+own+'/'+L+'</small></div><div class="pbar"><i style="width:'+own/L*100+'%"></i></div><div class="chips">'+['ALL','UR','SR','R'].map(function(g){return '<button aria-pressed="'+(g==cf)+'" onclick="cf=\''+g+'\';rc()">'+(g=='ALL'?'전체':g)+'</button>'}).join('')+'</div><div class="g3">'+IT.map(function(t,i){return [t,i]}).filter(function(e){return cf=='ALL'||e[0][1]==cf}).map(function(e){var t=e[0],i=e[1],o=col[i];return '<div class="ci'+(o?'':' lk')+(eq==i?' on':'')+'">'+tk(i)+'<b>'+(o?t[0]:'???')+'</b>'+chip(t[1])+(o?'<button class="op sm" onclick="eqp('+i+')">'+(eq==i?'장착중':'장착')+'</button>':'')+'</div>'}).join('')+'</div></div>';apply($('v-col'))}
 function ri(){var ks=Object.keys(inv),tot=0,n=0;ks.forEach(function(i){tot+=invV[i];n+=inv[i]});
 $('v-inv').innerHTML='<div class="pad"><div class="vt">보관함<small>'+n+'개 · 평가액 '+f2(tot)+' USDT</small></div>'+(ks.length?'<button class="op" style="width:100%;height:40px;margin-bottom:10px" onclick="sellAll()">전체 판매 · '+f2(tot)+' USDT</button>':'')+(ks.length?'<div class="pn">'+ks.map(function(i){var t=IT[i];return '<div class="rw"><span class="th">'+tk(i)+'</span><div><b>'+t[0]+'</b> '+chip(t[1])+'<small>×'+inv[i]+' · 개당 '+f2(invV[i]/inv[i])+' USDT</small></div><button class="op" onclick="sell('+i+')">판매</button></div>'}).join('')+'</div>':'<div class="em">보관 중인 컬렉터블이 없습니다.<br>가챠에서 첫 뽑기를 해보세요.<button class="bt" onclick="view(\'home\')">가챠 보러가기</button></div>')+'</div>';apply($('v-inv'))}
 function sell(i){if(!inv[i])return;var a=invV[i]/inv[i];inv[i]--;invV[i]-=a;if(!inv[i]){delete inv[i];delete invV[i]}bal=+(bal+a).toFixed(2);toast('판매 +'+f2(a)+' USDT');ri()}
-function rm(){var L=lv(),own=Object.keys(inv),n=0,k;for(k in inv)n+=inv[k];
+function rm(){var L=lv(),own=Object.keys(col),n=0,k;for(k in inv)n+=inv[k];
 $('v-my').innerHTML='<div class="pad"><div class="vt">마이페이지</div><div class="pn" style="display:flex;gap:14px;align-items:center;padding:14px">'+fr(eq,76)+'<div style="flex:1;min-width:0"><b>guest_4827</b><div style="display:flex;justify-content:space-between;margin:4px 0"><b style="color:var(--red)">Lv '+L.L+'</b><small style="color:var(--mute)">EXP '+f1(L.c)+' / '+f1(L.n)+'</small></div><div class="pbar"><i style="width:'+L.c/L.n*100+'%"></i></div></div></div>'+
 '<div class="pn" style="margin-top:10px"><div class="vt" style="font-size:15px;margin:10px 0 0">프로필 테두리<small>'+(eq<0?'기본':IT[eq][0])+'</small></div><div class="fl">'+(own.length?own.map(function(i){return '<button class="fpk'+(eq==i?' on':'')+'" aria-label="'+IT[i][0]+' 프레임" onclick="eqp('+i+')">'+fr(+i,52)+'</button>'}).join(''):'<small style="color:var(--mute)">컬렉션에서 아이템을 뽑으면 테두리로 장착할 수 있습니다.</small>')+'</div></div>'+
 '<div class="pn" style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;padding:14px"><div><small style="color:var(--mute)">보유 잔액</small><div style="font-size:24px;font-weight:700">'+f1(bal)+' <small style="font-size:13px">USDT</small></div></div><button class="op" onclick="bal+=10;toast(\'테스트 충전 +10 USDT\');rm()">충전</button></div><div class="st"><div><small>총 오픈</small><b>'+opens+'회</b></div><div><small>UR 획득</small><b>'+urN+'개</b></div><div><small>보유 수량</small><b>'+n+'개</b></div><div><small>수집률</small><b>'+Math.round(own.length/IT.length*100)+'%</b></div></div><div class="pn mn" style="margin-top:10px"><button onclick="theme()">화면 테마 전환<span>›</span></button><button onclick="toast(\'알림 설정 준비 중입니다\')">알림 설정<span>›</span></button><button onclick="toast(\'고객센터로 연결합니다\')">고객센터<span>›</span></button><button onclick="toast(\'로그아웃되었습니다\')">로그아웃<span>›</span></button></div></div>';apply($('v-my'))}
@@ -515,23 +514,24 @@ function doSellAll(){var tot=0;Object.keys(inv).forEach(function(i){tot+=invV[i]
 </script><script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signOut,onAuthStateChanged}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import{getFirestore,doc,getDoc,setDoc}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import{getFirestore,doc,getDoc,setDoc,collection,getDocs,query,orderBy,limit}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyCb4iTiqxc4ZrZX_gQicMO8t_zcUSea884",authDomain:"cryptopopki.firebaseapp.com",projectId:"cryptopopki",storageBucket:"cryptopopki.firebasestorage.app",messagingSenderId:"86462668135",appId:"1:86462668135:web:4ff382adc27ceae46723c2"});
 const auth=getAuth(app),db=getFirestore(app);let user=null,last='',ready=false;
-const snap=()=>JSON.parse(JSON.stringify({bal:window.bal,inv:window.inv,invV:window.invV,opens:window.opens,urN:window.urN,used:window.used,exp:window.exp,eq:window.eq}));
+const snap=()=>JSON.parse(JSON.stringify({bal:window.bal,inv:window.inv,invV:window.invV,opens:window.opens,urN:window.urN,col:window.col,used:window.used,exp:window.exp,eq:window.eq}));
 const btn=()=>document.getElementById('lgin');
 window.authBtn=async()=>{if(user){if(ready)await save(true);await signOut(auth);toast('로그아웃되었습니다');return}
 const p=new GoogleAuthProvider();try{await signInWithPopup(auth,p)}catch(e){if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')await signInWithRedirect(auth,p);else if(e.code!=='auth/popup-closed-by-user')toast('로그인 실패: '+e.code)}};
-async function save(force){if(!user||!ready)return;const d=snap(),j=JSON.stringify(d);if(!force&&j===last)return;try{await setDoc(doc(db,'users',user.uid),d);last=j}catch(e){console.error('save',e)}}
+async function save(force){if(!user||!ready)return;const d=snap(),j=JSON.stringify(d);if(!force&&j===last)return;try{await setDoc(doc(db,'users',user.uid),d);await setDoc(doc(db,'leaderboard',user.uid),{n:window.ME,L:window.lv().L,exp:+d.exp,eq:+d.eq,opens:+d.opens,t:Date.now()});last=j}catch(e){console.error('save',e)}}
 onAuthStateChanged(auth,async u=>{user=u;ready=false;const b=btn();
 if(!u){if(b)b.textContent='로그인';return}
 if(b)b.textContent='로그아웃';
-try{const r=await getDoc(doc(db,'users',u.uid));
-if(r.exists()){const d=r.data();window.bal=+d.bal;window.inv=d.inv||{};window.invV=d.invV||{};window.opens=d.opens||0;window.urN=d.urN||0;window.used=d.used||{};window.exp=d.exp||0;window.eq=(typeof d.eq==='number')?d.eq:-1;last=JSON.stringify(snap());toast('저장된 데이터를 불러왔습니다')}
+window.ME=((u.displayName||'user').slice(0,3))+'***';try{const r=await getDoc(doc(db,'users',u.uid));
+if(r.exists()){const d=r.data();window.bal=+d.bal;window.inv=d.inv||{};window.invV=d.invV||{};window.opens=d.opens||0;window.urN=d.urN||0;window.used=d.used||{};window.exp=d.exp||0;window.eq=(typeof d.eq==='number')?d.eq:-1;{const c=Object.assign({},d.col||{});Object.keys(window.inv).forEach(k=>c[k]=1);window.col=c}last=JSON.stringify(snap());toast('저장된 데이터를 불러왔습니다')}
 else{ready=true;await save(true);toast('환영합니다! 진행 상황이 자동 저장됩니다')}
 window.ME=((u.displayName||'user').slice(0,3))+'***';
 ready=true;try{tabs();grid()}catch(e){}}
 catch(e){console.error(e);toast('데이터 불러오기 실패: 규칙/DB 설정을 확인하세요')}});
+window.loadRank=async()=>{try{const r=await getDocs(query(collection(db,'leaderboard'),orderBy('exp','desc'),limit(100)));window.RANK=r.docs.map(d=>{const x=d.data();return{n:x.n||'user***',L:x.L||1,eq:(typeof x.eq==='number')?x.eq:-1,o:x.opens||0,me:!!user&&d.id===user.uid}})}catch(e){console.error(e);window.RANK=[];toast('랭킹을 불러오지 못했습니다')}};
 setInterval(()=>save(false),2500);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)save(false)});
 window.addEventListener('pagehide',()=>save(false));
