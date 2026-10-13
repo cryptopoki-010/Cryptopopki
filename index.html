@@ -178,12 +178,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-
 <header><a class="logo" href="#"><i>₿</i>CRYPTO GACHA</a><div class="hr"><button class="lang" id="lg" onclick="setLang()" aria-label="Language / 언어"><b>KO</b> / EN</button><button class="login" id="lgin" onclick="window.authBtn&&authBtn()">로그인</button></div></header>
 
 <div class="vw" id="v-home"><div class="pad">
-<div class="bnw"><div class="bn" id="bn" tabindex="0" aria-label="배너">
-<div class="sl s1 bnb" id="bnb" role="button" tabindex="0" aria-label="코인 시세 배너 (탭하여 코인 선택)"><div class="tx"><div class="iv"><span id="bsy">BTC/USDT</span><b id="bpx">--</b></div><p id="bch">불러오는 중…</p></div><svg class="ch" id="cs" viewBox="0 0 200 110" preserveAspectRatio="none" aria-hidden="true"></svg><div class="bcs" id="bcs"></div><svg class="bgear" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5zm8.4 4.3-1.6-.9a6.9 6.9 0 0 0 0-1.8l1.6-.9a.5.5 0 0 0 .2-.7l-1.6-2.8a.5.5 0 0 0-.7-.2l-1.6.9a7 7 0 0 0-1.5-.9l-.2-1.8a.5.5 0 0 0-.5-.4H9.9a.5.5 0 0 0-.5.4l-.2 1.8a7 7 0 0 0-1.5.9l-1.6-.9a.5.5 0 0 0-.7.2L3.8 9.4a.5.5 0 0 0 .2.7l1.6.9a6.9 6.9 0 0 0 0 1.8l-1.6.9a.5.5 0 0 0-.2.7l1.6 2.8c.1.2.4.3.7.2l1.6-.9c.5.4 1 .7 1.5.9l.2 1.8c0 .3.2.4.5.4h3.2c.3 0 .5-.1.5-.4l.2-1.8c.5-.2 1-.5 1.5-.9l1.6.9c.3.1.6 0 .7-.2l1.6-2.8a.5.5 0 0 0-.2-.7z" fill="currentColor"/></svg></div>
-<div class="sl s2"><div class="tx"><h2>열어보고,<br>행운을 찾으세요</h2><p>다음 크립토 컬렉터블</p></div><svg class="g" viewBox="0 0 200 200" style="--t:#FFE2B8;--l:#F7B86E;--r:#E08A3A;--a:#fff"><use href="#box"/></svg></div>
-<div class="sl s3"><div class="tx"><h2>첫 가입<br>1회 무료 뽑기</h2><p>등급별 확률 전체 공개</p></div><svg class="g" viewBox="0 0 200 200"><use href="#stack"/></svg></div>
-</div><button type="button" class="bna l" id="bpv" aria-label="이전 배너">‹</button><button type="button" class="bna r" id="bnx" aria-label="다음 배너">›</button></div>
-<div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
+<div class="wn" id="wn"></div>
 <div class="qk">
 <button onclick="modal('sale')"><em>무료</em><svg viewBox="0 0 48 48"><rect x="20" y="3" width="8" height="5" rx="2" fill="#C79A33"/><circle cx="24" cy="27" r="18" fill="url(#rg)"/><circle cx="24" cy="27" r="13" fill="#fff" opacity=".18"/><path d="M26 15l-8 14h6l-2 9 9-15h-6z" fill="#fff"/></svg>타임 세일</button>
 <button onclick="modal('ben')"><svg viewBox="0 0 48 48"><rect x="7" y="20" width="34" height="22" rx="3" fill="#D3372A"/><rect x="5" y="14" width="38" height="9" rx="3" fill="#E8584A"/><rect x="21" y="14" width="6" height="28" fill="#F6DC8B"/><path d="M24 14c-8-8-14 2-6 2zM24 14c8-8 14 2 6 2z" fill="#F6DC8B"/></svg>혜택 받기</button>
@@ -191,7 +186,12 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-
 <button onclick="modal('ref')"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="url(#rg)"/><path d="M22 14l-9 9 9 9v-5c8 0 11 2 13 7 0-9-4-14-13-15z" fill="#fff"/></svg>추천 리베이트</button>
 </div>
 
-<div class="wn" id="wn"></div>
+<div class="bnw"><div class="bn" id="bn" tabindex="0" aria-label="배너">
+<div class="sl s1 bnb" id="bnb" role="button" tabindex="0" aria-label="코인 시세 배너 (탭하여 코인 선택)"><div class="tx"><div class="iv"><span id="bsy">BTC/USDT</span><b id="bpx">--</b></div><p id="bch">불러오는 중…</p></div><svg class="ch" id="cs" viewBox="0 0 200 110" preserveAspectRatio="none" aria-hidden="true"></svg><div class="bcs" id="bcs"></div><svg class="bgear" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5zm8.4 4.3-1.6-.9a6.9 6.9 0 0 0 0-1.8l1.6-.9a.5.5 0 0 0 .2-.7l-1.6-2.8a.5.5 0 0 0-.7-.2l-1.6.9a7 7 0 0 0-1.5-.9l-.2-1.8a.5.5 0 0 0-.5-.4H9.9a.5.5 0 0 0-.5.4l-.2 1.8a7 7 0 0 0-1.5.9l-1.6-.9a.5.5 0 0 0-.7.2L3.8 9.4a.5.5 0 0 0 .2.7l1.6.9a6.9 6.9 0 0 0 0 1.8l-1.6.9a.5.5 0 0 0-.2.7l1.6 2.8c.1.2.4.3.7.2l1.6-.9c.5.4 1 .7 1.5.9l.2 1.8c0 .3.2.4.5.4h3.2c.3 0 .5-.1.5-.4l.2-1.8c.5-.2 1-.5 1.5-.9l1.6.9c.3.1.6 0 .7-.2l1.6-2.8a.5.5 0 0 0-.2-.7z" fill="currentColor"/></svg></div>
+<div class="sl s2"><div class="tx"><h2>열어보고,<br>행운을 찾으세요</h2><p>다음 크립토 컬렉터블</p></div><svg class="g" viewBox="0 0 200 200" style="--t:#FFE2B8;--l:#F7B86E;--r:#E08A3A;--a:#fff"><use href="#box"/></svg></div>
+<div class="sl s3"><div class="tx"><h2>첫 가입<br>1회 무료 뽑기</h2><p>등급별 확률 전체 공개</p></div><svg class="g" viewBox="0 0 200 200"><use href="#stack"/></svg></div>
+</div><button type="button" class="bna l" id="bpv" aria-label="이전 배너">‹</button><button type="button" class="bna r" id="bnx" aria-label="다음 배너">›</button></div>
+<div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
 
 
 <div class="tb" id="tb" role="tablist"></div>
