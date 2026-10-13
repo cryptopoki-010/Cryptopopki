@@ -11,9 +11,9 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 export function pickTier() {
   try { const m = /[?&]q=([012])/.exec(location.search); if (m) return +m[1]; const s = localStorage.getItem('cg_q'); if (s === '0' || s === '1' || s === '2') return +s; } catch (e) { }
   const mob = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || ''), mem = navigator.deviceMemory || (mob ? 3 : 8), cores = navigator.hardwareConcurrency || 4;
-  if (mem <= 2 || cores <= 4 && mob) return 0; if (mob || mem <= 4) return 1; return 2;
+  const ios = /iPhone|iPad/i.test(navigator.userAgent || ''); if (ios && cores >= 6) return 2; if (mem <= 2 || cores <= 4 && mob && !ios) return 0; if (mob || mem <= 4) return 1; return 2;
 }
-const TIERS = [{ dpr: 1, aa: false, parts: 260, seg: 20 }, { dpr: 1.5, aa: true, parts: 520, seg: 32 }, { dpr: 2, aa: true, parts: 900, seg: 48 }];
+const TIERS = [{ dpr: 1, aa: false, parts: 260, seg: 20 }, { dpr: 1.75, aa: true, parts: 520, seg: 32 }, { dpr: 2, aa: true, parts: 900, seg: 48 }];
 
 /* ---------------- timelines (same numbers as the 2D scene) ---------------- */
 export const GR = {
@@ -318,8 +318,8 @@ void main(){float d=length(vW.xz-vec2(0.,${UR ? '-2.' : '-6.'}));vec3 base=mix(v
   }
 
   function update(time, dt) {
-    t = time; uTime.value = t; frames++; scene.updateMatrixWorld(true); fpsAvg = fpsAvg * .95 + dt * 1000 * .05;
-    if (frames > 30 && fpsAvg > 34 && dpr > .75 && frames % 45 == 0) { dpr = Math.max(.75, dpr * .8); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); uni(); downs++; }
+    t = time; uTime.value = t; frames++; scene.updateMatrixWorld(true); if (frames > 60) fpsAvg = fpsAvg * .97 + Math.min(dt * 1000, 60) * .03;
+    if (frames > 150 && fpsAvg > 36 && dpr > 1 && frames % 90 == 0) { dpr = Math.max(1, dpr * .85); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); uni(); downs++; }
     flashL.intensity *= Math.pow(.002, dt); out.flash = 0; out.zoom = 0; kick *= Math.pow(.02, dt);
     if (UR) updateUR(dt); else updateNormal(dt);
     zoom += (out.zoom - zoom) * Math.min(1, dt * 8);

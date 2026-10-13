@@ -13,9 +13,9 @@ const rnd = (a, b) => a + Math.random() * (b - a);
 export function pickTier() {
   try { const m = /[?&]q=([012])/.exec(location.search); if (m) return +m[1]; const s = localStorage.getItem('cg_q'); if (s === '0' || s === '1' || s === '2') return +s; } catch (e) { }
   const mob = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || ''), mem = navigator.deviceMemory || (mob ? 3 : 8), cores = navigator.hardwareConcurrency || 4;
-  if (mem <= 2 || cores <= 4 && mob) return 0; if (mob || mem <= 4) return 1; return 2;
+  const ios = /iPhone|iPad/i.test(navigator.userAgent || ''); if (ios && cores >= 6) return 2; if (mem <= 2 || cores <= 4 && mob && !ios) return 0; if (mob || mem <= 4) return 1; return 2;
 }
-const TIERS = [{ dpr: 1, aa: false, parts: 260, shards: 48, seg: 16 }, { dpr: 1.5, aa: true, parts: 520, shards: 90, seg: 24 }, { dpr: 2, aa: true, parts: 900, shards: 160, seg: 32 }];
+const TIERS = [{ dpr: 1, aa: false, parts: 260, shards: 48, seg: 16 }, { dpr: 1.75, aa: true, parts: 520, shards: 90, seg: 24 }, { dpr: 2, aa: true, parts: 900, shards: 160, seg: 32 }];
 
 /* ---------------- timelines ---------------- */
 export const WM = [
@@ -318,8 +318,8 @@ void main(){vec3 d=normalize(vD);float h=clamp(d.y,0.,1.);
   }
 
   function update(time, dt) {
-    t = time; uTime.value = t; frames++; scene.updateMatrixWorld(true); fpsAvg = fpsAvg * .95 + dt * 1000 * .05;
-    if (frames > 30 && fpsAvg > 34 && dpr > .75 && frames % 45 == 0) { dpr = Math.max(.75, dpr * .8); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); uni(); downs++; }
+    t = time; uTime.value = t; frames++; scene.updateMatrixWorld(true); if (frames > 60) fpsAvg = fpsAvg * .97 + Math.min(dt * 1000, 60) * .03;
+    if (frames > 150 && fpsAvg > 36 && dpr > 1 && frames % 90 == 0) { dpr = Math.max(1, dpr * .85); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); uni(); downs++; }
     kickS.v *= Math.pow(.02, dt); zoomS.v *= Math.pow(.02, dt);
     if (UR) updateUR(dt); else updateNormal(dt);
     updShards(dt); updRings(t); spark.update(dt); smoke.update(dt); glowP.update(dt);
