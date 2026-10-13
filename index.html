@@ -170,7 +170,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-
 </defs></svg>
 
 <div class="app">
-<header><a class="logo" href="#"><i>₿</i>CRYPTO GACHA</a><div class="hr"><button class="lang" id="lg" onclick="setLang()" aria-label="Language / 언어"><b>KO</b> / EN</button><button class="login" onclick="toast('로그인 화면으로 이동합니다')">로그인</button></div></header>
+<header><a class="logo" href="#"><i>₿</i>CRYPTO GACHA</a><div class="hr"><button class="lang" id="lg" onclick="setLang()" aria-label="Language / 언어"><b>KO</b> / EN</button><button class="login" id="lgin" onclick="window.authBtn&&authBtn()">로그인</button></div></header>
 
 <div class="vw" id="v-home"><div class="pad">
 <div class="bn" id="bn" tabindex="0" aria-label="배너">
@@ -512,4 +512,28 @@ function sellAll(){var ks=Object.keys(inv),tot=0,n=0;if(!ks.length){toast('판�
 ks.forEach(function(i){tot+=invV[i];n+=inv[i]});
 sh('전체 판매','<p class="mt" style="text-align:center;margin:6px 0 14px">보유 아이템 '+n+'개를 <b>'+f2(tot)+' USDT</b>에 판매할까요?</p><button class="bt" onclick="doSellAll()">'+f2(tot)+' USDT 판매하기</button>')}
 function doSellAll(){var tot=0;Object.keys(inv).forEach(function(i){tot+=invV[i]});inv={};invV={};bal=+(bal+tot).toFixed(2);closeM();toast('전체 판매 +'+f2(tot)+' USDT');ri()}
-</script></body></html>
+</script><script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signOut,onAuthStateChanged}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import{getFirestore,doc,getDoc,setDoc}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+const app=initializeApp({apiKey:"AIzaSyCb4iTiqxc4ZrZX_gQicMO8t_zcUSea884",authDomain:"cryptopopki.firebaseapp.com",projectId:"cryptopopki",storageBucket:"cryptopopki.firebasestorage.app",messagingSenderId:"86462668135",appId:"1:86462668135:web:4ff382adc27ceae46723c2"});
+const auth=getAuth(app),db=getFirestore(app);let user=null,last='',ready=false;
+const snap=()=>JSON.parse(JSON.stringify({bal:window.bal,inv:window.inv,invV:window.invV,opens:window.opens,urN:window.urN,used:window.used,exp:window.exp,eq:window.eq}));
+const btn=()=>document.getElementById('lgin');
+window.authBtn=async()=>{if(user){if(ready)await save(true);await signOut(auth);toast('로그아웃되었습니다');return}
+const p=new GoogleAuthProvider();try{await signInWithPopup(auth,p)}catch(e){if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')await signInWithRedirect(auth,p);else if(e.code!=='auth/popup-closed-by-user')toast('로그인 실패: '+e.code)}};
+async function save(force){if(!user||!ready)return;const d=snap(),j=JSON.stringify(d);if(!force&&j===last)return;try{await setDoc(doc(db,'users',user.uid),d);last=j}catch(e){console.error('save',e)}}
+onAuthStateChanged(auth,async u=>{user=u;ready=false;const b=btn();
+if(!u){if(b)b.textContent='로그인';return}
+if(b)b.textContent='로그아웃';
+try{const r=await getDoc(doc(db,'users',u.uid));
+if(r.exists()){const d=r.data();window.bal=+d.bal;window.inv=d.inv||{};window.invV=d.invV||{};window.opens=d.opens||0;window.urN=d.urN||0;window.used=d.used||{};window.exp=d.exp||0;window.eq=(typeof d.eq==='number')?d.eq:-1;last=JSON.stringify(snap());toast('저장된 데이터를 불러왔습니다')}
+else{ready=true;await save(true);toast('환영합니다! 진행 상황이 자동 저장됩니다')}
+window.ME=((u.displayName||'user').slice(0,3))+'***';
+ready=true;try{tabs();grid()}catch(e){}}
+catch(e){console.error(e);toast('데이터 불러오기 실패: 규칙/DB 설정을 확인하세요')}});
+setInterval(()=>save(false),2500);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)save(false)});
+window.addEventListener('pagehide',()=>save(false));
+</script>
+</body></html>
