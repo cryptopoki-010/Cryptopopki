@@ -171,6 +171,44 @@ function buildChunkGeo() {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); return g;
 }
 
+/* ===== hi-res character parts: every part is ONE indexed parametric surface (~budget triangles) with real recessed panel seams ===== */
+const _sstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function hiSurface(N, aspect, fn) {
+  /* N = triangle budget; aspect = u-extent / v-extent in world units; fn(u,v,o) fills o={x,y,z,k} (k = vertex shade). u wraps (closed seam), v does not. */
+  const quads = Math.max(8, N >> 1); let nu = Math.max(6, Math.round(Math.sqrt(quads * aspect))), nv = Math.max(4, Math.round(quads / nu));
+  const cu = nu + 1, cv = nv + 1, P = new Float32Array(cu * cv * 3), Nn = new Float32Array(cu * cv * 3), Cc = new Float32Array(cu * cv * 3), o = { x: 0, y: 0, z: 0, k: 1 };
+  for (let j = 0; j < cv; j++) for (let i = 0; i < cu; i++) { fn((i % nu) / nu, j / nv, o); const q = (j * cu + i) * 3; P[q] = o.x; P[q + 1] = o.y; P[q + 2] = o.z; Cc[q] = Cc[q + 1] = Cc[q + 2] = o.k; }
+  const I = new Uint32Array(nu * nv * 6); let w = 0;
+  for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * cu + i, b = a + 1, c = a + cu, d = c + 1; I[w++] = a; I[w++] = c; I[w++] = b; I[w++] = b; I[w++] = c; I[w++] = d; }
+  for (let t = 0; t < I.length; t += 3) { const a = I[t] * 3, b = I[t + 1] * 3, c = I[t + 2] * 3, ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2], nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; for (const q of [a, b, c]) { Nn[q] += nx; Nn[q + 1] += ny; Nn[q + 2] += nz; } }
+  for (let j = 0; j < cv; j++) { const a = (j * cu) * 3, b = (j * cu + nu) * 3; for (let k = 0; k < 3; k++) { const s = Nn[a + k] + Nn[b + k]; Nn[a + k] = Nn[b + k] = s; } }   /* weld normals across the wrap seam */
+  for (let q = 0; q < Nn.length; q += 3) { const l = Math.hypot(Nn[q], Nn[q + 1], Nn[q + 2]) || 1; Nn[q] /= l; Nn[q + 1] /= l; Nn[q + 2] /= l; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('normal', new THREE.BufferAttribute(Nn, 3)); g.setAttribute('color', new THREE.BufferAttribute(Cc, 3)); g.setIndex(new THREE.BufferAttribute(I, 1)); g.userData.tris = I.length / 3; return g;
+}
+/* recessed panel: returns {d: radial scale 0..1 (1 = flat panel face), k: shade}. fu/fv = panel-local coords */
+function panelSeam(u, v, nPu, nPv, w, depth) {
+  const fu = (u * nPu) % 1, fv = (v * nPv) % 1, e = Math.min(fu, 1 - fu) * 1 / nPu, e2 = Math.min(fv, 1 - fv) * 1 / nPv;
+  const ee = Math.min(fu < .5 ? fu : 1 - fu, fv < .5 ? fv : 1 - fv), h = _sstep(0, w, ee), dome = 1 + .012 * (1 - Math.pow(2 * fu - 1, 2)) * (1 - Math.pow(2 * fv - 1, 2));
+  return { d: (1 - depth * (1 - h)) * dome, k: .42 + .58 * h };
+}
+function hiSphere(r, N, nPu, nPv, depth) {
+  return hiSurface(N, 2, (u, v, o) => { const th = v * Math.PI, ph = u * Math.PI * 2, s = nPu ? panelSeam(u, v, nPu, nPv, .09, depth || .03) : { d: 1, k: 1 }, rr = r * s.d; o.x = rr * Math.sin(th) * Math.cos(ph); o.y = rr * Math.cos(th); o.z = rr * Math.sin(th) * Math.sin(ph); o.k = s.k; });
+}
+/* tube along +y, y in [-.5,.5], radius rb at bottom -> rt at top, rounded ends, ring + longitudinal seams */
+function hiTube(rb, rt, N, nPu, nPv, depth, ex) {
+  const circ = Math.PI * (rb + rt), e = ex || .1;
+  return hiSurface(N, circ / 1, (u, v, o) => { const t = v * 2 - 1, at = Math.abs(t), cap = at > 1 - e ? Math.sqrt(Math.max(0, 1 - Math.pow((at - (1 - e)) / e, 2))) : 1, base = rb + (rt - rb) * v, s = nPu ? panelSeam(u, v, nPu, nPv, .1, depth || .035) : { d: 1, k: 1 }, ph = u * Math.PI * 2, r = base * cap * s.d; o.x = r * Math.cos(ph); o.y = (v - .5) * (1 - 0) ; o.z = r * Math.sin(ph); o.k = s.k; });
+}
+/* superellipsoid rounded box (foot / plates) */
+function hiBox(a, b, c, N, ex, nPu, nPv, depth) {
+  const sg = x => x < 0 ? -1 : 1, cp = (w, m) => sg(Math.cos(w)) * Math.pow(Math.abs(Math.cos(w)), m), sp = (w, m) => sg(Math.sin(w)) * Math.pow(Math.abs(Math.sin(w)), m);
+  return hiSurface(N, 2.4, (u, v, o) => { const th = (v - .5) * Math.PI, ph = u * Math.PI * 2 - Math.PI, s = nPu ? panelSeam(u, v, nPu, nPv, .1, depth || .03) : { d: 1, k: 1 }; o.x = a * cp(th, ex) * cp(ph, ex) * s.d; o.y = b * sp(th, ex) * s.d; o.z = c * cp(th, ex) * sp(ph, ex) * s.d; o.k = s.k; });
+}
+function hiTorus(R, r, N, notches) {
+  return hiSurface(N, R / r, (u, v, o) => { const ph = u * Math.PI * 2, th = v * Math.PI * 2, n = notches ? .5 + .5 * Math.cos(ph * notches) : 1, rr = r * (1 - .18 * (1 - _sstep(.15, .6, n)) * .0 - .22 * (1 - _sstep(.0, .35, n))); o.x = (R + rr * Math.cos(th)) * Math.cos(ph); o.y = rr * Math.sin(th); o.z = (R + rr * Math.cos(th)) * Math.sin(ph); o.k = .6 + .4 * _sstep(0, .35, n); });
+}
+function heroTriBudget(tier) { const m = /[?&]hp=(\d+)/.exec(location.search); if (m) return Math.max(200, +m[1]); return [6000, 25000, 100000][tier] || 6000; }
+
 /* ---------------- scene ---------------- */
 export function createWallScene(opt) {
   const tier = opt.tier == null ? pickTier() : opt.tier, Q = TIERS[tier], tl = opt.timeline, UR = tl.mode == 'ur', errors = [], onErr = opt.onError || (() => { });
@@ -246,7 +284,7 @@ void main(){float d=abs(vW.z);float T=1.4;vec2 q=vW.xz/T;vec2 id=floor(q),f=frac
 
 
   /* ---------------- hero (normal mode) / titan (UR) ---------------- */
-  const white = new THREE.MeshStandardMaterial({ color: 0x142257, roughness: .26, metalness: .4, emissive: 0x1b3fb0, emissiveIntensity: .32 });
+  const white = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0x142257, roughness: .26, metalness: .4, emissive: 0x1b3fb0, emissiveIntensity: .32 });
   const navy = new THREE.MeshStandardMaterial({ color: 0x070b1d, roughness: .16, metalness: .5, emissive: 0x0a1a50, emissiveIntensity: .25 }), glowM = new THREE.MeshBasicMaterial({ color: 0x7fe7ff });
   function cyl(r0, r1, h, m, seg) { return new THREE.Mesh(new THREE.CylinderGeometry(r0, r1, h, seg || 10), m); }
   function ik2(S, T, l1, l2, pole) { const d0 = tmp2.subVectors(T, S), d = clamp(d0.length(), .05, l1 + l2 - .005), dir = d0.clone().normalize(), a = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - a * a)), sd = pole.clone().addScaledVector(dir, -pole.dot(dir)).normalize(); return S.clone().addScaledVector(dir, a).addScaledVector(sd, h); }
@@ -258,18 +296,24 @@ void main(){float d=abs(vW.z);float T=1.4;vec2 q=vW.xz/T;vec2 id=floor(q),f=frac
     heroU = 26 * U0(); WWd = Math.max(66, Math.min(122, W * .2)) * U0(); WHd = H * .42 * U0();
     HX = planePoint(.2, .8, 0).x; WX = planePoint(.66, .8, 0).x;
     const g = new THREE.Group(), hs = .4; g.position.set(HX, GY0, 0); g.scale.setScalar(hs); scene.add(g);
-    const ub = new THREE.Group(); g.add(ub); const S3 = (r, m, a, b) => new THREE.Mesh(new THREE.SphereGeometry(r, a || 14, b || 10), m);
-    const torso = cyl(.5, .42, 2.0, white, 18); torso.position.y = 3.3; ub.add(torso);
-    const hd = S3(.72, navy, 26, 18); hd.position.y = 4.9; ub.add(hd);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(.5, .06, 8, 28), glowM); ring.position.y = 4.28; ring.rotation.x = Math.PI / 2; ub.add(ring);
-    [.2, -.2].forEach(zz => { const e = S3(.11, glowM, 10, 8); e.position.set(.66, 5.0, zz); ub.add(e); });
-    const pelvis = S3(.46, white, 16, 12); pelvis.position.y = 2.3; ub.add(pelvis);
-    [-.12, .12].forEach(z => { const sj = S3(.3, white); sj.position.set(0, 4.3, z); ub.add(sj); });
-    const arms = [0, 1].map(() => [cyl(.2, .18, 1, white, 10), cyl(.18, .16, 1, white, 10)]); arms.forEach(a => a.forEach(m => g.add(m)));
-    const joints = [0, 1].map(() => ({ e: S3(.24, white), h: S3(.3, white) })); joints.forEach(j2 => { g.add(j2.e); g.add(j2.h); });
-    const legs = [0, 1].map(() => ({ u: cyl(.27, .22, 1, white, 10), l: cyl(.22, .17, 1, white, 10), k: S3(.26, white), f: new THREE.Mesh(new THREE.BoxGeometry(.8, .3, .46), navy) })); legs.forEach(L => { g.add(L.u); g.add(L.l); g.add(L.k); g.add(L.f); });
+    const ub = new THREE.Group(); g.add(ub);
+    /* every part = one indexed high-res surface (budget per part: HP triangles; tier 2 = 100k). mirrored parts share the same geometry */
+    const HP = heroTriBudget(tier), hgeo = {}, HG = (key, mk) => hgeo[key] || (hgeo[key] = mk()), vcm = m => { m.vertexColors = true; return m; };
+    [white, navy].forEach(vcm); let heroTris = 0;
+    const part = (key, mk, m) => { const ge = HG(key, mk); heroTris += ge.userData.tris; return new THREE.Mesh(ge, m); };
+    const S3 = (r, m, k) => part('s' + r + (k || ''), () => hiSphere(r, HP, k == 'p' ? 0 : 12, k == 'p' ? 0 : 6, .035), m);
+    const T3 = (rb, rt, m, k, nPu, nPv) => part('t' + k, () => hiTube(rb, rt, HP, nPu, nPv, .04), m);
+    const torso = T3(.42, .5, white, 'torso', 16, 9); torso.scale.y = 2.0; torso.position.y = 3.3; ub.add(torso);
+    const hd = S3(.72, navy, 'hd'); hd.position.y = 4.9; ub.add(hd);
+    const ring = part('ring', () => hiTorus(.5, .06, HP, 24), glowM); ring.position.y = 4.28; ring.rotation.x = Math.PI / 2; ub.add(ring);
+    [.2, -.2].forEach(zz => { const e = S3(.11, glowM, 'p'); e.position.set(.66, 5.0, zz); ub.add(e); });
+    const pelvis = S3(.46, white, 'pel'); pelvis.position.y = 2.3; ub.add(pelvis);
+    [-.12, .12].forEach(z => { const sj = S3(.3, white, 'sh'); sj.position.set(0, 4.3, z); ub.add(sj); });
+    const arms = [0, 1].map(() => [T3(.18, .2, white, 'ua', 12, 4), T3(.16, .18, white, 'la', 12, 4)]); arms.forEach(a => a.forEach(m => g.add(m)));
+    const joints = [0, 1].map(() => ({ e: S3(.24, white, 'el'), h: S3(.3, white, 'hand') })); joints.forEach(j2 => { g.add(j2.e); g.add(j2.h); });
+    const legs = [0, 1].map(() => ({ u: T3(.22, .27, white, 'ul', 14, 5), l: T3(.17, .22, white, 'll', 14, 5), k: S3(.26, white, 'kn'), f: part('foot', () => hiBox(.4, .15, .23, HP, .32, 10, 4, .03), navy) })); legs.forEach(L => { g.add(L.u); g.add(L.l); g.add(L.k); g.add(L.f); });
     const aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: 0x7fe7ff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending })); aura.scale.set(9, 9, 1); aura.position.y = 3.6; g.add(aura);
-    hero = { g, ub, torso, hd, ring, legs, arms, joints, aura, lean: 0, hs, dy: 0, hand: new V3() };
+    hero = { g, ub, torso, hd, ring, legs, arms, joints, aura, lean: 0, hs, dy: 0, hand: new V3(), tris: heroTris };
     const sh = new THREE.Mesh(new THREE.CircleGeometry(1.4, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .4, depthWrite: false })); sh.rotation.x = -Math.PI / 2; sh.position.set(HX, GY0 + .01, 0); sh.scale.setScalar(hs * 1.4); scene.add(sh);
     /* beam */
     const bg = new THREE.CylinderGeometry(1, 1, 1, 14); bg.rotateZ(Math.PI / 2);
