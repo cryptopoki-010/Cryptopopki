@@ -314,7 +314,14 @@ void main(){vec3 d=normalize(vD);float h=clamp(d.y,0.,1.);
       const ru = clamp((t - tF) / 2.2, 0, 1); rays.visible = true; rays.position.copy(tmp); rays.userData.mat.uniforms.uA.value = .5 * (1 - ru); rays.children.forEach((ch, k) => { ch.rotation.z = k / 10 * 6.283 + t * .5; });
       const sc = toScreen(tmp); out.med.push({ sx: sc.sx, sy: sc.sy, r: T.BU * 1.5, sp: Math.cos(mu * Math.PI * 4), sc: easeBack(mu) * 1.05, g: 'UR', fin: true }); out.txt.push({ s: opt.en ? 'UR Confirmed!' : 'UR 확정!', x: sc.sx, y: sc.sy + T.BU * 2.6, a: clamp((t - tF - .5) / .5, 0, 1), big: T.BU * .9 }); }
     let hits = 0; urWalls.forEach(w => { if (w.done) hits++; }); out.hits = hits; const tg2 = hits / T.NW; gvS += (tg2 - gvS) * (1 - Math.pow(.003, dt || .016)); out.gv = gvS;
-    camX = x(cxm); const zz = t < .9 ? 1 : 1 + .7 * easeIO((t - .9) / 1.2) - .6 * easeIO((t - stop - .8) / 1.5); out.cz = zz;
+    /* chase camera: follows the Titan (x + vertical tilt + zoom). drop -> roar close-up -> dash chase -> pull back */
+    { const ts = T.tu * u0, e = easeIO; let zt, cw;
+      if (t < .9) { zt = 1 + .4 * e(t / .9); cw = e(t / .9) * .85; }
+      else if (t < 2.5) { zt = 1.4 + 1.5 * e((t - .9) / .6); cw = .85 + .15 * e((t - .9) / .4); }
+      else if (t < stop + .8) { zt = 2.9 - .6 * e((t - 2.5) / .5); cw = 1; }
+      else { const k = e((t - stop - .8) / 1.5); zt = 2.3 - 1.3 * k; cw = 1 - k; }
+      const lead = .16 * W * u0 / zt, cx0 = x(cxm);
+      camX = cx0 + (twx + lead - cx0) * cw; out.cz = zt; out.cw = cw; out.cy = ty + 3.4 * ts; }
   }
 
   function update(time, dt) {
@@ -325,7 +332,8 @@ void main(){vec3 d=normalize(vD);float h=clamp(d.y,0.,1.);
     updShards(dt); updRings(t); spark.update(dt); smoke.update(dt); glowP.update(dt);
     const sh = kickS.v * .1, zz = (out.cz || 1) * (1 + zoomS.v * 1.2);
     camera.fov = CAM.fov / zz; camera.updateProjectionMatrix(); camera.position.set(camX + Math.sin(t * .23) * .04 + Math.sin(t * 31) * sh * .6, CAM.y + Math.sin(t * .31) * .025 + Math.sin(t * 27 + 1) * sh * .6, CAM.z);
-    camera.rotation.set(-CAM.pitch, 0, 0); sky.position.copy(camera.position); out.kick = kickS.v; out.zoomv = zoomS.v; return out;
+    { const cw = out.cw || 0; let rx = -CAM.pitch; if (cw > 0) { const a1 = Math.atan2(out.cy - CAM.y, CAM.z); rx += (a1 - rx) * cw; } camera.rotation.set(rx, 0, 0); }
+    sky.position.copy(camera.position); out.kick = kickS.v; out.zoomv = zoomS.v; return out;
   }
   function uni() { const us = renderer.domElement.height / (2 * tanV()); [spark, smoke, glowP].forEach(p => p.uni.uScale.value = us); }
   function resize(w, h) { W = w; H = h; renderer.setSize(W, H, false); camera.aspect = W / H; camera.updateProjectionMatrix(); uni(); }

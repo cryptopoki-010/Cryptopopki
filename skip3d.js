@@ -18,13 +18,13 @@ export function pickTier() {
   } catch (e) { /* storage may be blocked */ }
   const mob = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
   const mem = navigator.deviceMemory || (mob ? 3 : 8), cores = navigator.hardwareConcurrency || 4;
-  if (mem <= 2 || cores <= 4 && mob) return 0;
+  const ios = /iPhone|iPad/i.test(navigator.userAgent || ''); if (ios && cores >= 6) return 2; if (mem <= 2 || cores <= 4 && mob && !ios) return 0;
   if (mob || mem <= 4) return 1;
   return 2;
 }
 const TIERS = [
   { dpr: 1, shadow: 0, ow: 40, od: 70, dust: 90, shafts: 3, weeds: 7, aa: false, pmrem: false, spray: 160 },
-  { dpr: 1.5, shadow: 1024, ow: 70, od: 130, dust: 200, shafts: 5, weeds: 12, aa: true, pmrem: true, spray: 320 },
+  { dpr: 1.75, shadow: 1024, ow: 70, od: 130, dust: 200, shafts: 5, weeds: 12, aa: true, pmrem: true, spray: 320 },
   { dpr: 2, shadow: 2048, ow: 110, od: 200, dust: 360, shafts: 7, weeds: 18, aa: true, pmrem: true, spray: 480 }
 ];
 
@@ -275,8 +275,8 @@ void main(){
 
   function update(t, dt) {
     uTime.value = t; frames++; const U = tlm.U;
-    fpsAvg = fpsAvg * .95 + dt * 1000 * .05;
-    if (frames > 30 && fpsAvg > 34 && dpr > .75 && frames % 45 == 0) { dpr = Math.max(.75, dpr * .8); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); const us = uScale(); [spray, glow, trail].forEach(p => p.uni.uScale.value = us); lowCount++; }
+    if (frames > 60) fpsAvg = fpsAvg * .97 + Math.min(dt * 1000, 60) * .03;
+    if (frames > 150 && fpsAvg > 36 && dpr > 1 && frames % 90 == 0) { dpr = Math.max(1, dpr * .85); renderer.setPixelRatio(dpr); renderer.setSize(W, H, false); const us = uScale(); [spray, glow, trail].forEach(p => p.uni.uScale.value = us); lowCount++; }
     kick *= Math.pow(.02, dt); zoomS *= Math.pow(.02, dt); out.flash = 0; out.dim = 0; out.zoom = 0;
     /* ---- thrower pose ---- */
     let phi = .25;
@@ -348,7 +348,7 @@ void main(){
     let tp = new V3(CAM.x, CAM.y, CAM.z), tl = new V3(CAM.x, CAM.y + Math.tan(-CAM.pitch) * CAM.z, 0), tf = CAM.fov, rate = .02;
     if (U) {
       if (t >= U.trA - .1 && t < U.tS - .1) { const k = easeIO((t - U.trB) / 3.2); tp.set(TX + 1.0 - k * .1, 1.2, ZT + 3.2 - k * .8); tl.set(TX + .1, GY + .85, ZT); tf = 36 - k * 6; rate = .003; }
-      else if (t >= U.tS - .1 && t < U.te - .5) { const k = easeIO((t - U.tS) / 4.5), lp = U.lp || [TX + 2, 0, 0], fx = lp[0], fz = lp[2]; tp.set(fx * .55 + .4, 1.5, fz + 8.5 - k * 1.2); tl.set(fx + .9, .7, fz); tf = 40 - k * 6; rate = .004; }
+      else if (t >= U.tS - .1 && t < U.te - .5) { const k = easeIO((t - U.tS) / 4.5), lp = U.lp || [TX + 2, 0, 0], fx = lp[0], fy = lp[1], fz = lp[2]; /* chase cam: stays beside/behind the stone and keeps it near screen centre */ tp.set(fx - 1.9, .85 + fy * .4, fz + 4.6 - k * .6); tl.set(fx + .3, .3 + fy * .7, fz); tf = 36 - k * 4; rate = .003; }
     }
     const kk = 1 - Math.pow(rate, dt); camPos.lerp(tp, kk); camLook.lerp(tl, kk); camFov += (tf - camFov) * kk;
     const par = (U && t >= U.trA - .1 && t < U.te) ? .3 : 1;

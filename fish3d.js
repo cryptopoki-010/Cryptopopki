@@ -671,6 +671,7 @@ void main(){float dist=length(cameraPosition-vW);
   });
 
   /* ---- scene-level state ---- */
+  let urOn = false, urNext = false, urW = 0; const urSm = new V3(), urTg = new V3();
   let t = 0, px = 0, py = 0, kick = 0, zoom = 0, big = 0, frames = 0, fpsAvg = 16, lowCount = 0;
   const camTarget = new V3(), tmp = new V3(), tmp2 = new V3(), tipW = new V3(), baseW = new V3(), out = { head: { x: 0, y: 0 }, fish: F.map(() => ({ sx: 0, sy: 0 })) };
   function uScale() { return renderer.domElement.height / (2 * tanV()); }
@@ -729,8 +730,13 @@ void main(){float dist=length(cameraPosition-vW);
     kick *= Math.pow(.02, dt); zoom += ((st.zoom || 0) - zoom) * Math.min(1, dt * 6); big += ((st.big || 0) - big) * Math.min(1, dt * 3);
     /* camera: parallax + drift + a gentle reaction to the big fish (no shake) */
     const cx = px * .22 + Math.sin(t * .23) * .07, cy = CAM.y - py * .06 + Math.sin(t * .31) * .025 - big * .12 - kick * .02;
-    camera.fov = CAM.fov / (1 + zoom * .9 - big * .0); camera.updateProjectionMatrix();
-    camera.position.set(cx, cy, CAM.z - big * .5); camTarget.set(cx * .3, CAM.y - Math.tan(CAM.pitch) * CAM.z - big * .35, 0); camera.lookAt(camTarget);
+    /* UR chase: the camera tracks the legendary fish (approach -> fight -> jump), then eases back */
+    urW += ((urOn ? 1 : 0) - urW) * Math.min(1, dt * (urOn ? 2.2 : 1.6));
+    if (urOn) { if (urW < .03) urSm.copy(urTg); else urSm.lerp(urTg, 1 - Math.exp(-dt * 4.5)); }
+    const w = urW * urW * (3 - 2 * urW), baseLY = CAM.y - Math.tan(CAM.pitch) * CAM.z - big * .35;
+    camera.fov = CAM.fov / (1 + zoom * .9 + w * .45); camera.updateProjectionMatrix();
+    camera.position.set(lerp(cx, clamp(urSm.x * .6, -1.2, 1.2), w), lerp(cy, clamp(urSm.y * .55 + .3, -1.1, 1.5), w), CAM.z - big * .5 - w * 3.4);
+    camTarget.set(lerp(cx * .3, clamp(urSm.x * .9, -1.6, 1.6), w), lerp(baseLY, urSm.y * .9 + .1, w), lerp(0, urSm.z, w)); camera.lookAt(camTarget); camera.updateMatrixWorld();
     sky.position.copy(camera.position);
     poseAngler(st.tn || 0);
 
@@ -787,13 +793,14 @@ void main(){float dist=length(cameraPosition-vW);
         if (c.ur) ur = 1;
         if (lu < .22) dust.react(lx, fy, z0, R.s * 2.4, 5, dt);
       }
-      grp.visible = fishVis;
+      grp.visible = fishVis; if (c.ur && fishVis) { urTg.copy(grp.position); urNext = true; }
       if (fish.halo) fish.halo.material.opacity = fishVis ? (ph == 'bite' || ph == 'lift' ? (c.ur ? .5 : .28) * (.75 + .25 * Math.sin(t * 6)) : 0) : 0;
       R.bob.visible = bobVis && ph != 'lift'; R.line.visible = !!lineTo; R.hook.visible = hookVis;
       if (lineTo) setLine(R, tipW, lineTo, sag * tipW.distanceTo(lineTo) * (1 - (st.tn || 0) * .8));
       if (hookVis) { const a = R.hook.geometry.attributes.position; grp.updateMatrixWorld(); tmp2.set(1.0, -.02, 0).multiplyScalar(R.s); R.mouth.copy(tmp2).applyMatrix4(grp.matrixWorld); a.setXYZ(0, bx, by - .06, z0); a.setXYZ(1, R.mouth.x, R.mouth.y, R.mouth.z); a.needsUpdate = true; }
       tmp.set(R.X0, 0, z0).project(camera); out.fish[i].sx = (tmp.x * .5 + .5) * W; out.fish[i].sy = (-tmp.y * .5 + .5) * H;
     });
+    urOn = urNext; urNext = false;
     shafts.forEach(m => { m.position.x += Math.sin(t * .15 + m.userData.sw * 9) * .0007; });
     dust.update(dt, t); spray.update(dt, t); bubbles.update(dt, t);
     return out;
