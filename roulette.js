@@ -20,9 +20,12 @@ export function rollOutcome(n) {
   return n < 500 ? BYK.bomb : n < 800 ? BYK.x1 : n < 950 ? BYK.x5 : n < 995 ? BYK.x15 : n < 999 ? BYK.x50 : BYK.x100;
 }
 /* 휠 20칸 배치 (꽝 8 · x1 6 · x5 3 · x15 1 · x50 1 · x100 1) — 실제 확률은 추첨으로 결정되고 칸 수와는 무관 */
-export const SLICES = ['bomb', 'x1', 'bomb', 'x5', 'bomb', 'x1', 'x15', 'bomb', 'x1', 'bomb', 'x5', 'x50', 'bomb', 'x1', 'bomb', 'x5', 'x1', 'bomb', 'x100', 'x1'];
-const N = SLICES.length, STEP = Math.PI * 2 / N, TAU = Math.PI * 2;
-const MULS = [1, 2, 3, 5, 10], CHIPS = [1, 5, 10, 50, 100];
+export const SLICES_FULL = ['bomb', 'x1', 'bomb', 'x5', 'bomb', 'x1', 'x15', 'bomb', 'x1', 'bomb', 'x5', 'x50', 'bomb', 'x1', 'bomb', 'x5', 'x1', 'bomb', 'x100', 'x1'];
+export const SLICES_HALF = ['bomb', 'x1', 'x5', 'bomb', 'x15', 'x1', 'bomb', 'x50', 'x5', 'x100', 'bomb', 'x1'];
+export let SLICES = SLICES_FULL;
+const TAU = Math.PI * 2; let N = SLICES.length, STEP = TAU / N;
+function setSlices(half) { SLICES = half ? SLICES_HALF : SLICES_FULL; N = SLICES.length; STEP = TAU / N; }
+const MULS = [1, 2, 3, 5, 10, 50, 100, 500, 1000, 5000], CHIPS = [1, 5, 10, 50, 100];
 const SLC = { bomb: ['#1b1a1c', '#2a2133'], x1: ['#2e5a38', '#26502f'], x5: ['#8e2a20', '#7c231b'], x15: ['#b98a2b', '#a87a24'], x50: ['#d9a52e', '#e0b13a'], x100: ['#6b0f12', '#5a0c10'] };
 
 /* ---------------- 그리기 도구 ---------------- */
@@ -207,7 +210,7 @@ const CSS = `
 .rlp{position:absolute;left:0;right:0;bottom:0;padding:12px 14px calc(env(safe-area-inset-bottom,0px) + 12px);background:linear-gradient(#0000,#0b0705f2 18%,#0b0705);z-index:2}
 .rlbox{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:9px}
 .rlrow{display:flex;align-items:center;gap:8px}.rlrow>em{flex:none;width:34px;font-style:normal;font-size:12px;font-weight:700;color:#c9a15a}
-.rlm{display:flex;gap:6px;flex:1}.rlm button,.rlc2 button{flex:1;height:36px;border-radius:10px;border:1px solid #6a4e2a;background:linear-gradient(#2a1d13,#160f0a);color:#e8d9b4;font-weight:700;font-size:14px;box-shadow:inset 0 1px 0 #ffe7b41a}
+.rlm{display:flex;flex-wrap:wrap;gap:5px;flex:1}.rlm button{flex:1 0 calc(20% - 5px);height:32px;font-size:13px!important}.rlm button,.rlc2 button{flex:1;height:36px;border-radius:10px;border:1px solid #6a4e2a;background:linear-gradient(#2a1d13,#160f0a);color:#e8d9b4;font-weight:700;font-size:14px;box-shadow:inset 0 1px 0 #ffe7b41a}
 .rlm button.on,.rlc2 button.on{background:linear-gradient(#d9a52e,#9a6c14);color:#1c1207;border-color:#ffe08a;box-shadow:0 0 12px #d9a52e66,inset 0 1px 0 #fff6}
 .rla{display:flex;align-items:center;gap:6px;flex:1;min-width:0}.rla button{width:36px;height:40px;border-radius:10px;border:1px solid #6a4e2a;background:linear-gradient(#2a1d13,#160f0a);color:#ffe9b0;font-size:20px;font-weight:700}
 .rla input{flex:1;min-width:0;width:0;height:40px;border-radius:10px;border:1px solid #c9a15a99;background:#0d0805;color:#ffe9b0;font:700 18px ${FONT};text-align:center;outline:0;font-variant-numeric:tabular-nums}
@@ -225,6 +228,7 @@ const CSS = `
 .rlo .sheet{width:min(360px,100%);background:linear-gradient(#2a1c12,#140d09);border:1px solid #c9a15a;border-radius:18px;padding:16px}
 .rlo h4{margin:0 0 10px;font-size:16px;color:#ffe9b0}.rlo table{width:100%;border-collapse:collapse;font-size:14px}.rlo td{padding:7px 4px;border-bottom:1px solid #ffffff14}.rlo td:last-child{text-align:right;font-variant-numeric:tabular-nums;color:#ffe9b0}
 .rlo p{font-size:11px;color:#a89873;margin:10px 0 12px;line-height:1.5}.rlo button{width:100%;height:40px;border-radius:12px;border:1px solid #c9a15a;background:#1a110c;color:#ffe9b0;font-weight:700}
+.rlhf{position:absolute;right:12px;top:calc(env(safe-area-inset-top,0px) + 108px);height:28px;padding:0 12px;border-radius:15px;border:1px solid #c9a15a;background:#1a110ccc;color:#ffe9b0;font:800 12px inherit;z-index:3}.rlhf.on{background:linear-gradient(#d9a52e,#9a6c14);color:#1c1207}
 @media (max-height:700px){.rlp{padding-top:6px}.rlbox{gap:6px}.rlsp{height:48px}}
 `;
 
@@ -236,7 +240,7 @@ export async function openRoulette(br) {
   if (!document.getElementById('rlcss')) { const s = document.createElement('style'); s.id = 'rlcss'; s.textContent = CSS; document.head.appendChild(s); }
   try { await Promise.race([document.fonts.load('900 20px "IBM Plex Sans KR"'), new Promise(r => setTimeout(r, 700))]); } catch (e) { }
   const root = document.createElement('div'); root.className = 'rl';
-  root.innerHTML = '<canvas></canvas><div class="rlt"><button class="rlx" aria-label="닫기">✕</button><div class="rlb"><small>보유 잔액</small><b><span id="rlbal">0.00</span><i>USDT</i></b><small id="rlsh" style="color:#9ee08a;letter-spacing:0"></small></div><div class="rlh" id="rlhist"></div></div>' +
+  root.innerHTML = '<canvas></canvas><div class="rlt"><button class="rlx" aria-label="닫기">✕</button><div class="rlb"><small>보유 잔액</small><b><span id="rlbal">0.00</span><i>USDT</i></b><small id="rlsh" style="color:#9ee08a;letter-spacing:0"></small></div><div class="rlh" id="rlhist"></div><button class="rlhf" id="rlhf">🌗 1/2판</button></div>' +
     '<div class="rlr" id="rlres"><div class="card"><h3></h3><p></p><b></b></div></div>' +
     '<div class="rlp"><div class="rlbox"><div class="rlrow"><em>배율</em><div class="rlm" id="rlm"></div></div>' +
     '<div class="rlrow"><em>금액</em><div class="rla"><button id="rlmi" aria-label="감소">−</button><input id="rlin" inputmode="decimal" autocomplete="off"><button id="rlpl" aria-label="증가">+</button></div></div>' +
@@ -256,6 +260,9 @@ export async function openRoulette(br) {
     scene = paintScene(L, dpr); neon = paintNeon(L, dpr); wheel = paintWheel(L.R, dpr); shade = paintWheelShade(L.R, dpr);
   }
   build();
+  let half = false;
+  function setHalf(v) { if (spinning) return; half = v; setSlices(half); wheel = paintWheel(L.R, dpr); hl = null; $('rlhf').classList.toggle('on', half); $('rlhf').textContent = half ? '🌕 일반판' : '🌗 1/2판'; sfx('rl_tick'); }
+  $('rlhf').onclick = () => setHalf(!half);
   let rto = 0; const onR = () => { clearTimeout(rto); rto = setTimeout(() => { if (alive) build(); }, 180); }; window.addEventListener('resize', onR);
 
   /* ---- 입력 UI ---- */
@@ -265,7 +272,7 @@ export async function openRoulette(br) {
     $('rlbal').textContent = fmt(bal()); $('rlsh').textContent = (br.getShield ? br.getShield() : 0) > 0 ? '꽝 방어권 ' + br.getShield() + '장' : ''; [...$('rlm').children].forEach(b => b.classList.toggle('on', +b.dataset.m === mul)); [...$('rlc2').children].forEach(b => b.classList.toggle('on', b.dataset.c && +b.dataset.c === amt));
     const tot = +(amt * mul).toFixed(2); $('rltot').textContent = fmt(tot); $('rlmax').textContent = fmt(tot * 100); const ok = !spinning && amt >= minBet && tot <= bal() + 1e-9; $('rlsp').disabled = !ok; $('rlsp').textContent = spinning ? '...' : (tot > bal() + 1e-9 ? '잔액 부족' : 'SPIN');
   }
-  function setAmt(v, keep) { v = Math.round(v * 100) / 100; amt = clamp(v, minBet, Math.max(minBet, 1e7)); if (!keep) $('rlin').value = String(amt); sync(); }
+  function setAmt(v, keep) { v = Math.round(v * 100) / 100; amt = clamp(v, minBet, Math.max(minBet, 1e15)); if (!keep) $('rlin').value = String(amt); sync(); }
   $('rlm').innerHTML = MULS.map(m => '<button data-m="' + m + '">x' + m + '</button>').join('');
   $('rlc2').innerHTML = CHIPS.map(c => '<button data-c="' + c + '">' + c + '</button>').join('') + '<button data-x="max">MAX</button>';
   $('rlm').onclick = e => { const b = e.target.closest('button'); if (!b || spinning) return; mul = +b.dataset.m; sfx('rl_tick'); sync(); };
@@ -330,9 +337,11 @@ export async function openRoulette(br) {
     { const nx = W * .035, ny = H * .085, sc = Math.min(1, (W * .42) / (neon.__w - 60)); g.globalAlpha = neonF; g.drawImage(neon, nx - 30 * sc, ny - 30 * sc, neon.__w * sc, neon.__h * sc); g.globalAlpha = 1; const rg2 = g.createRadialGradient(nx + W * .2, ny + 30, 0, nx + W * .2, ny + 30, W * .5); rg2.addColorStop(0, 'rgba(255,50,30,' + (.2 * neonF) + ')'); rg2.addColorStop(1, 'rgba(255,50,30,0)'); g.fillStyle = rg2; g.fillRect(0, 0, W, H); }
     g.globalCompositeOperation = 'source-over';
     /* 휠 */
+    if (half) { g.save(); g.beginPath(); g.rect(0, 0, W, L.cy + 1); g.clip(); }
     { const R = L.R, S = wheel.__S; g.save(); g.translate(L.cx, L.cy); g.shadowColor = 'rgba(0,0,0,.7)'; g.shadowBlur = R * .12; g.shadowOffsetY = R * .05; g.fillStyle = '#1a100a'; g.beginPath(); g.arc(0, 0, R * .99, 0, TAU); g.fill(); g.shadowColor = 'transparent'; g.rotate(th); g.drawImage(wheel, -S / 2, -S / 2, S, S); g.restore();
       if (hl) { hl.t += dt; const pa = Math.max(0, 1 - hl.t / 2.6) * (.55 + .45 * Math.sin(hl.t * 9)); if (hl.t > 2.6) hl = null; else { g.save(); g.translate(L.cx, L.cy); g.rotate(th); g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(' + hl.c + ',' + (.3 * pa) + ')'; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, L.R * .865, -Math.PI / 2 + hl.i * STEP, -Math.PI / 2 + (hl.i + 1) * STEP); g.closePath(); g.fill(); g.restore(); } }
       g.save(); g.translate(L.cx, L.cy); g.drawImage(shade, -S / 2, -S / 2, S, S); g.restore(); /* 허브 하이라이트는 포함됨 */ }
+    if (half) { g.restore(); const R = L.R, bw = R * 2.3, bh = R * .2, bx = L.cx - bw / 2, by = L.cy; const bgp = g.createLinearGradient(0, by, 0, by + bh); bgp.addColorStop(0, '#5a3d22'); bgp.addColorStop(.12, '#7a5430'); bgp.addColorStop(1, '#2a1a0e'); g.fillStyle = bgp; g.shadowColor = 'rgba(0,0,0,.7)'; g.shadowBlur = R * .08; g.fillRect(bx, by, bw, bh); g.shadowColor = 'transparent'; g.fillStyle = 'rgba(255,225,170,.28)'; g.fillRect(bx, by, bw, 2); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(bx, by + bh - 3, bw, 3); for (let i = 0; i < 6; i++) { g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(bx + (i + .5) * bw / 6, by + 4, 1.5, bh - 8); } g.fillStyle = '#c9a15a'; g.font = '900 ' + Math.round(R * .085) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('HALF  ROULETTE · 1/2', L.cx, by + bh / 2); }
     drawPointer(g, L.cx, L.cy - L.R * .98, L.R * .2, -ptr * .8);
     /* 먼지 */
     g.globalCompositeOperation = 'lighter'; motes.forEach(m => { m.y += m.v * dt; m.x += Math.sin(t * .4 + m.ph) * .0004; if (m.y > 1) { m.y = 0; m.x = Math.random(); } const px = m.x * W, py = m.y * H, d = Math.hypot(px - lx, (py - ly) * .8) / (W * .6), a = Math.max(0, 1 - d) * .5 * (.6 + .4 * Math.sin(t * 1.3 + m.ph)); if (a > .02) { g.fillStyle = 'rgba(255,214,150,' + a + ')'; g.beginPath(); g.arc(px, py, m.r, 0, TAU); g.fill(); } }); g.globalCompositeOperation = 'source-over';
@@ -348,6 +357,6 @@ export async function openRoulette(br) {
   /* 회전 중에 닫으면 결과를 즉시 정산 (차감만 되고 당첨금이 사라지는 일이 없도록) */
   function settleNow() { if (!spin) return; const s = spin; spin = null; spinning = false; let win = +(s.tot * s.o.mult).toFixed(2), g_ = false; if (s.o.k == 'bomb' && br.useShield && br.useShield()) { g_ = true; win = s.tot; } setBal(+(bal() + win).toFixed(2)); toast(g_ ? '꽝 방어권 사용 · 배팅금 환급 +' + fmt(win) + ' USDT' : s.o.k == 'bomb' ? '꽝! -' + fmt(s.tot) + ' USDT' : '당첨 x' + s.o.mult + ' +' + fmt(win) + ' USDT'); }
   root.querySelector('.rlx').onclick = () => { settleNow(); close(); };
-  const api = { close, spin: startSpin, get state() { return { th, spinning, mul, amt, hist: hist.map(h => h.o.k) }; }, setMul(m) { mul = m; sync(); }, setAmt, root };
+  const api = { close, spin: startSpin, get state() { return { th, spinning, mul, amt, hist: hist.map(h => h.o.k) }; }, setMul(m) { mul = m; sync(); }, setHalf, get half() { return half; }, setAmt, root };
   return api;
 }

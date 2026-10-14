@@ -11,8 +11,11 @@ const mod = (a, n) => ((a % n) + n) % n;
 const angd = (a, b) => { let d = (a - b) % TAU; if (d > PI) d -= TAU; if (d < -PI) d += TAU; return d; };
 function mul32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-export const CFG = { cars: 10, laps: 3, fee: 1e8, minBet: 1e10, mult: [5, 2, 1], driftWin: 1.0, wrongSlow: .5, wrongT: 2, boostX: 1.5, boostT: 2, missileT: 3, stunT: 2, shieldT: 5, aiX: 1.005, W: [.4, .3, .3], PASS: [.12, .20, .30], BM: [1.05, 1.08, 1.11], BT: [1.4, 1.8, 2.2] };
-export function payoutOf(rank, bet) { return rank >= 1 && rank <= 3 ? bet * CFG.mult[rank - 1] : 0; }
+/* 난이도: 입장료(=최소 배팅금) · 최대 배팅금 · AI 속도 배수 */
+export const DIFFS = { easy: { n: '쉬움', fee: 1e4, max: 1e7, aiX: .975 }, normal: { n: '보통', fee: 1e7, max: 1e8, aiX: 1.005 }, hard: { n: '어려움', fee: 1e8, max: Infinity, aiX: 1.02 } };
+export const CFG = { cars: 10, laps: 3, fee: 1e7, minBet: 1e7, mult: [5, 2, 0], driftWin: 1.0, wrongSlow: .5, wrongT: 2, boostX: 1.5, boostT: 2, missileT: 3, stunT: 2, shieldT: 5, aiX: 1.005, W: [.4, .3, .3], PASS: [.12, .20, .30], BM: [1.05, 1.08, 1.11], BT: [1.4, 1.8, 2.2] };
+/* 1등 배팅금×5 · 2등 배팅금×2 · 3등 입장료 환급(배팅금 몰수) · 그 외 전액 몰수 */
+export function payoutOf(rank, bet, fee) { return rank === 1 ? bet * 5 : rank === 2 ? bet * 2 : rank === 3 ? (fee || 0) : 0; }
 export const ITEMS = { boost: { n: '부스터', ic: '⚡', d: '2초간 속도 +50%' }, missile: { n: '미사일', ic: '🚀', d: '3초 후 앞 차 격추' }, shield: { n: '방어권', ic: '🛡️', d: '미사일 1회 방어 (5초)' } };
 export const CARS = [
   { n: '레드 팔콘', c: '#e5262f', a: '#ffd0d0', st: 0, sp: 0 }, { n: '블루 웨이브', c: '#2f6bff', a: '#bcd5ff', st: 1, sp: 1 },
@@ -411,6 +414,7 @@ const CSS = `
 .rcin input{flex:1;min-width:0;background:#060a12;border:1px solid #3a5c96;border-radius:10px;color:#fff;font:800 17px ${FONT};padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums}
 .rcin span{font-size:12px;color:#8fb2ec;font-weight:700}
 .rcprev{font-size:12px;color:#ffcb2e;text-align:right;margin:5px 2px 0;min-height:16px}
+.rcdf{display:flex;gap:6px}.rcdf button{flex:1;padding:10px 4px;border-radius:10px;border:1px solid #34527f;background:#16233a;color:#cfe0ff;font-size:14px;font-weight:800}.rcdf button.on{background:linear-gradient(#ffd54a,#e0a020);color:#241800;border-color:#ffe9a0}
 .rcch{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .rcch button{flex:1;min-width:64px;background:#16233a;border:1px solid #34527f;color:#fff;border-radius:9px;padding:7px 4px;font-size:12px;font-weight:700}
 .rcsum{margin-top:10px;font-size:12px;color:#aebcd6;line-height:1.6}.rcsum b{color:#fff}
@@ -459,22 +463,24 @@ export async function openRace(br) {
   root.innerHTML = '<canvas class="rcv"></canvas><button class="rcx" aria-label="닫기">✕</button>' +
     '<div class="rcsel" id="rcsel"><div class="rch"><h2><i>🏁</i> 자동차 레이싱</h2><div class="rcbal"><small>보유 잔액</small><b id="rcb">0</b></div></div>' +
     '<div class="rcsub">8자 서킷 · 3바퀴 · 10대 출전 · 내 차는 자동 주행, 드리프트만 직접!</div>' +
-    '<div class="rcrule">참가비 <b>1억 USDT</b> (결과와 상관없이 소모) · 최소 배팅금 <b>100억 USDT</b><div class="r"><span>1등 ×5</span><span>2등 ×2</span><span>3등 원금 보존</span><span class="l">4등 이하 전액 손실</span></div>' +
+    '<div class="rcrule"><span id="rcrl"></span><div class="r"><span>1등 배팅금 ×5</span><span>2등 배팅금 ×2</span><span>3등 입장료 환급</span><span class="l">4등 이하 입장료·배팅금 몰수</span></div>' +
     '커브에서 창이 열리면 <b>1초 안에</b> DRIFT! 못 누르면 기회 끝, <b>잘못 누르면 속도 50% 감소</b>. 타이밍이 정확할수록 가속·추월 확률(12/20/30%)이 올라요.<br>반 바퀴마다 <b>아이템 🎁</b> 지급(2칸): ⚡부스터 · 🚀미사일 · 🛡️방어권 — <b>두 번 눌러</b> 사용. 상대 9명도 아이템을 씁니다!</div>' +
+    '<div class="rch3">난이도</div><div class="rcdf" id="rcdf"><button data-d="easy">쉬움</button><button data-d="normal">보통</button><button data-d="hard">어려움</button></div>' +
     '<div class="rch3">① 내 차 선택</div><div class="rcgrid" id="rcg"></div>' +
     '<div class="rch3">② 배팅금 입력</div><div class="rcbet"><div class="rcin"><input id="rcin" inputmode="numeric" autocomplete="off" placeholder="10,000,000,000"><span>USDT</span></div><div class="rcprev" id="rcpv"></div>' +
-    '<div class="rcch" id="rcch"><button data-a="min">최소 100억</button><button data-a="p100">+100억</button><button data-a="p1000">+1000억</button><button data-a="x2">×2</button><button data-a="max">MAX</button></div>' +
+    '<div class="rcch" id="rcch"><button data-a="min">최소</button><button data-a="p100">+</button><button data-a="p1000">++</button><button data-a="x2">×2</button><button data-a="max">MAX</button></div>' +
     '<div class="rcsum" id="rcsum"></div><div class="rcerr" id="rcerr"></div></div></div>' +
     '<div class="rcbar" id="rcbar"><button class="rcgo" id="rcgo">START (3초 후 출발)</button></div>' +
     '<button class="rcdr" id="rcdr">DRIFT<small>드리프트</small></button><button class="rcit e" id="rcit0"></button><button class="rcit e" id="rcit1"></button>' +
     '<div class="rcres" id="rcres"><div class="cd2"></div></div>' +
-    '<div class="rccf" id="rccf"><div class="cd2"><p>경기를 중단하면 <b>지금 상태에서 자동 주행으로 끝까지 진행</b>해 결과를 바로 정산합니다. 참가비와 배팅금은 환불되지 않습니다.</p><div class="bt"><button id="rccn">계속 달리기</button><button class="p" id="rcst">중단하고 정산</button></div></div></div>';
+    '<div class="rccf" id="rccf"><div class="cd2"><p>경기를 중단하면 <b>지금 상태에서 자동 주행으로 끝까지 진행</b>해 결과를 바로 정산합니다. 입장료와 배팅금은 환불되지 않습니다.</p><div class="bt"><button id="rccn">계속 달리기</button><button class="p" id="rcst">중단하고 정산</button></div></div></div>';
   document.body.appendChild(root); document.body.style.overflow = 'hidden';
   const $ = id => root.querySelector('#' + id), cv = root.querySelector('canvas.rcv'), g = cv.getContext('2d');
   let W = 0, H = 0, dpr = 1, alive = true, raf = 0, last = performance.now(), T = 0, Lc = null, dprCap = 2, qual = 1, ema = .016, qT = 0;
 
   /* ---- 상태 ---- */
-  let proj = {}, phase = 'sel', sel = -1, bet = CFG.minBet, sim = null, cd = 0, cdLast = 4, acc = 0, goT = 0, finT = -1, settled = false, paid = 0, msgs = [], prevRank = 0, dfx = null, wheel = 0, camH = 0, camInit = false, gearNow = 1, gearOld = 1, shiftT = 1, rpm = .3, kmh = 0, shakeT = 0, roll = 0, lastGoodRank = 0, armed = -1, armAt = 0, itKey = '', fxWarn = 0, fxHit = -9, fxBlock = -9, fxBoost = 0, fxWrong = 0, hitShake = 0, lastWarnN = 0, tickT = 0;
+  let fee = DIFFS.normal.fee, minBet = DIFFS.normal.fee, maxBet = DIFFS.normal.max, diff = 'normal';
+  let proj = {}, phase = 'sel', sel = -1, bet = DIFFS.normal.fee, sim = null, cd = 0, cdLast = 4, acc = 0, goT = 0, finT = -1, settled = false, paid = 0, msgs = [], prevRank = 0, dfx = null, wheel = 0, camH = 0, camInit = false, gearNow = 1, gearOld = 1, shiftT = 1, rpm = .3, kmh = 0, shakeT = 0, roll = 0, lastGoodRank = 0, armed = -1, armAt = 0, itKey = '', fxWarn = 0, fxHit = -9, fxBlock = -9, fxBoost = 0, fxWrong = 0, hitShake = 0, lastWarnN = 0, tickT = 0;
   const bal = () => +getBal() || 0;
   function layout() {
     W = root.clientWidth; H = root.clientHeight; dpr = Math.min(window.devicePixelRatio || 1, dprCap); if (W * H * dpr * dpr > 2.4e6) dpr = Math.max(1, Math.sqrt(2.4e6 / (W * H)));
@@ -490,40 +496,47 @@ export async function openRace(br) {
     const cc = d.querySelector('canvas').getContext('2d'); const bgc = cc.createLinearGradient(0, 0, 0, 88); bgc.addColorStop(0, '#2a3a58'); bgc.addColorStop(1, '#10161f'); cc.fillStyle = bgc; cc.fillRect(0, 0, 128, 88); cc.fillStyle = '#23262c'; cc.fillRect(0, 70, 128, 18); drawCar(cc, c, 64, 78, 92, { num: i + 1 }); });
   grid.onclick = e => { const d = e.target.closest('.rcc'); if (!d || phase !== 'sel') return; sel = +d.dataset.i; sfx('rl_tick'); sync(); };
   const inp = $('rcin');
-  const fee = CFG.fee;
   function sync() {
     [...grid.children].forEach(d => d.classList.toggle('on', +d.dataset.i === sel));
     $('rcb').textContent = kfmt(bal()) + ' USDT'; $('rcpv').textContent = bet > 0 ? '= ' + kfmt(bet) + ' USDT' : '';
     const need = fee + bet; let err = '';
-    if (bet < CFG.minBet) err = '최소 배팅금은 ' + kfmt(CFG.minBet) + ' USDT 입니다'; else if (need > bal() + 1e-6) err = '잔액이 부족합니다 (필요: ' + kfmt(need) + ' USDT)'; else if (sel < 0) err = '먼저 자동차를 선택하세요';
+    if (bet < minBet) err = '최소 배팅금은 ' + kfmt(minBet) + ' USDT 입니다'; else if (bet > maxBet) err = '최대 배팅금은 ' + kfmt(maxBet) + ' USDT 입니다'; else if (need > bal() + 1e-6) err = '잔액이 부족합니다 (필요: ' + kfmt(need) + ' USDT)'; else if (sel < 0) err = '먼저 자동차를 선택하세요';
     $('rcerr').textContent = err;
-    $('rcsum').innerHTML = '총 지출 <b>' + kfmt(need) + ' USDT</b> (참가비 ' + kfmt(fee) + ' + 배팅금 ' + kfmt(bet) + ')<br>1등 <b>' + kfmt(bet * 5) + '</b> · 2등 <b>' + kfmt(bet * 2) + '</b> · 3등 <b>' + kfmt(bet) + '</b> (원금)';
+    $('rcsum').innerHTML = '총 지출 <b>' + kfmt(need) + ' USDT</b> (입장료 ' + kfmt(fee) + ' + 배팅금 ' + kfmt(bet) + ')<br>1등 <b>' + kfmt(bet * 5) + '</b> · 2등 <b>' + kfmt(bet * 2) + '</b> · 3등 <b>' + kfmt(fee) + '</b> (입장료 환급)';
     $('rcgo').disabled = !!err;
   }
-  function setBet(v) { bet = Math.max(0, Math.min(Math.floor(v) || 0, 9e15)); inp.value = bet ? bet.toLocaleString('en-US') : ''; sync(); }
+  function setBet(v) { bet = Math.max(0, Math.min(Math.floor(v) || 0, Math.min(maxBet, 9e15))); inp.value = bet ? bet.toLocaleString('en-US') : ''; sync(); }
   inp.oninput = () => { const d = inp.value.replace(/[^0-9]/g, ''); setBet(d ? +d : 0); };
-  $('rcch').onclick = e => { const b = e.target.closest('button'); if (!b || phase !== 'sel') return; sfx('rl_tick'); const a = b.dataset.a; if (a === 'min') setBet(CFG.minBet); else if (a === 'p100') setBet(bet + 1e10); else if (a === 'p1000') setBet(bet + 1e11); else if (a === 'x2') setBet(Math.max(bet, CFG.minBet) * 2); else setBet(Math.floor(bal() - fee)); };
-  setBet(CFG.minBet);
+  $('rcch').onclick = e => { const b = e.target.closest('button'); if (!b || phase !== 'sel') return; sfx('rl_tick'); const a = b.dataset.a; if (a === 'min') setBet(minBet); else if (a === 'p100') setBet(bet + minBet); else if (a === 'p1000') setBet(bet + minBet * 10); else if (a === 'x2') setBet(Math.max(bet, minBet) * 2); else setBet(Math.floor(bal() - fee)); };
+  function setDiff(d) {
+    if (phase !== 'sel' || !DIFFS[d]) return; diff = d; const D = DIFFS[d]; fee = D.fee; minBet = D.fee; maxBet = D.max;
+    [...$('rcdf').children].forEach(b => b.classList.toggle('on', b.dataset.d === d));
+    $('rcrl').innerHTML = '<b>' + D.n + '</b> · 입장료 <b>' + kfmt(fee) + ' USDT</b> (결과와 상관없이 소모) · 최소 배팅금 <b>' + kfmt(minBet) + '</b> · 최대 배팅금 <b>' + (isFinite(maxBet) ? kfmt(maxBet) + ' USDT' : '무제한') + '</b>';
+    const cs = $('rcch').children; cs[0].textContent = '최소 ' + kfmt(minBet); cs[1].textContent = '+' + kfmt(minBet); cs[2].textContent = '+' + kfmt(minBet * 10); inp.placeholder = minBet.toLocaleString('en-US');
+    setBet(minBet);
+  }
+  $('rcdf').onclick = e => { const b = e.target.closest('button'); if (!b) return; sfx('rl_tick'); setDiff(b.dataset.d); };
+  setDiff('normal');
 
   /* ---- 진행 ---- */
   function newSeed() { try { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0]; } catch (e) { return (Math.random() * 4294967296) >>> 0; } }
   function startCountdown() {
     if (phase !== 'sel') return; sync(); if ($('rcgo').disabled) return;
     paid = fee + bet; setBal(bal() - paid); settled = false;
-    sim = createRace(newSeed(), sel); cd = 3; cdLast = 4; phase = 'count'; root.classList.add('pl'); acc = 0; camInit = false; msgs = []; prevRank = 0; dfx = null; finT = -1; goT = 0; shiftT = 1; gearNow = gearOld = 1;
-    toast('참가비 ' + kfmt(fee) + ' + 배팅금 ' + kfmt(bet) + ' USDT 차감');
+    CFG.aiX = DIFFS[diff].aiX; sim = createRace(newSeed(), sel); cd = 3; cdLast = 4; phase = 'count'; root.classList.add('pl'); acc = 0; camInit = false; msgs = []; prevRank = 0; dfx = null; finT = -1; goT = 0; shiftT = 1; gearNow = gearOld = 1;
+    toast('입장료 ' + kfmt(fee) + ' + 배팅금 ' + kfmt(bet) + ' USDT 차감');
   }
   $('rcgo').onclick = startCountdown;
   function startRace() { phase = 'race'; root.classList.add('race'); goT = 0; sfx('rc_go'); eng.start(); prevRank = sim.rank(sim.P); lastGoodRank = prevRank; }
   function settle() {
-    if (settled || !sim) return null; settled = true; const res = sim.res || sim.ff(); const rank = res.rank, pay = payoutOf(rank, bet);
+    if (settled || !sim) return null; settled = true; const res = sim.res || sim.ff(); const rank = res.rank, pay = payoutOf(rank, bet, fee);
     if (pay > 0) setBal(bal() + pay); return { rank, pay, net: pay - paid, time: res.time };
   }
   function showResult() {
     const r = settle(); if (!r) return; phase = 'res'; eng.stop(); root.classList.remove('race');
     const ord = sim.order(); const cls = r.rank === 1 ? '' : r.rank <= 3 ? 'm' : 'l';
-    const ttl = r.rank === 1 ? '🏆 1등!' : r.rank === 2 ? '🥈 2등!' : r.rank === 3 ? '🥉 3등 (원금 보존)' : r.rank + '등 · 아쉬워요';
-    const sub = r.rank <= 3 ? '배당 ×' + CFG.mult[r.rank - 1] + ' 적용' : '참가비와 배팅금을 모두 잃었습니다';
+    const ttl = r.rank === 1 ? '🏆 1등!' : r.rank === 2 ? '🥈 2등!' : r.rank === 3 ? '🥉 3등 (입장료 환급)' : r.rank + '등 · 아쉬워요';
+    const sub = r.rank === 1 ? '배팅금 ×5 지급' : r.rank === 2 ? '배팅금 ×2 지급' : r.rank === 3 ? '입장료 환급 · 배팅금은 몰수' : '입장료와 배팅금을 모두 몰수당했습니다';
     $('rcres').querySelector('.cd2').innerHTML = '<h3 class="' + cls + '">' + ttl + '</h3><p>' + CARS[sel].n + ' (#' + (sel + 1) + ') · 기록 ' + r.time.toFixed(1) + '초<br>' + sub + '</p>' +
       '<div>지급 <span class="big">' + kfmt(r.pay) + ' USDT</span></div><div style="margin-top:4px">순손익 <span class="big ' + (r.net >= 0 ? 'w' : 'l') + '">' + (r.net >= 0 ? '+' : '−') + kfmt(Math.abs(r.net)) + ' USDT</span></div>' +
       '<div style="font-size:11px;color:#9fb0cc;margin-top:8px">드리프트 성공 ' + sim.D.ok + '/6 (PERFECT ' + sim.D.grades[2] + ') · 오입력 ' + sim.D.wrong + ' · 아이템 사용 ' + sim.P.used + ' · 피격 ' + sim.P.hit + ' · 방어 ' + sim.P.blocked + '</div><div class="ord">' + ord.map((c, i) => '<span class="' + (c.id === sel ? 'me' : '') + '">' + (i + 1) + '위 #' + (c.id + 1) + '</span>').join('') + '</div>' +
@@ -533,7 +546,7 @@ export async function openRace(br) {
   function again() { $('rcres').classList.remove('on'); root.classList.remove('pl', 'race'); phase = 'sel'; sim = null; setBet(bet); sync(); }
   function close() {
     if (!alive) return; let r = null;
-    if (phase === 'count' && !settled) { setBal(bal() + paid); settled = true; toast('출발 전 취소 · 참가비와 배팅금 환불'); }
+    if (phase === 'count' && !settled) { setBal(bal() + paid); settled = true; toast('출발 전 취소 · 입장료와 배팅금 환불'); }
     else if (phase === 'race' || (phase === 'fin' && !settled)) { r = settle(); if (r) toast(r.rank + '등 정산 · ' + (r.pay ? '+' + kfmt(r.pay) : '지급 없음') + ' USDT'); }
     alive = false; cancelAnimationFrame(raf); window.removeEventListener('resize', onR); window.removeEventListener('keydown', onKey); eng.stop(); root.remove(); document.body.style.overflow = ''; if (br.onClose) br.onClose();
   }
@@ -731,5 +744,5 @@ export async function openRace(br) {
     g.textAlign = 'center'; g.fillStyle = '#9fb6dd'; g.font = '700 ' + Math.round(W * .034) + 'px ' + FONT; g.fillText('출발하면 1인칭 운전석 시점으로 전환됩니다', W / 2, H * .955);
   }
   sync(); raf = requestAnimationFrame(frame);
-  return { close, get sim() { return sim; }, get phase() { return phase; }, root, press: onDrift, startCountdown, showResult, settle, setBet, get sel() { return sel; }, set sel(v) { sel = v; sync(); } };
+  return { close, get sim() { return sim; }, get phase() { return phase; }, root, press: onDrift, startCountdown, showResult, settle, setBet, setDiff, get diff() { return diff; }, get fee() { return fee; }, get sel() { return sel; }, set sel(v) { sel = v; sync(); } };
 }
