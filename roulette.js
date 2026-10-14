@@ -271,7 +271,7 @@ export async function openRoulette(br) {
   const bal = () => +getBal() || 0, minBet = .1;
   function maxAmt() { return Math.max(0, Math.floor(bal() / mul * 100) / 100); }
   function sync() {
-    $('rlbal').textContent = fmt(bal()); $('rlsh').textContent = (br.getShield ? br.getShield() : 0) > 0 ? '꽝 방어권 ' + br.getShield() + '장' : ''; [...$('rlm').children].forEach(b => b.classList.toggle('on', +b.dataset.m === mul)); [...$('rlc2').children].forEach(b => b.classList.toggle('on', b.dataset.c && +b.dataset.c === amt));
+    $('rlbal').textContent = br.fmtBal ? br.fmtBal(bal()) : fmt(bal()); $('rlsh').textContent = (br.getShield ? br.getShield() : 0) > 0 ? '꽝 방어권 ' + br.getShield() + '장' : ''; [...$('rlm').children].forEach(b => b.classList.toggle('on', +b.dataset.m === mul)); [...$('rlc2').children].forEach(b => b.classList.toggle('on', b.dataset.c && +b.dataset.c === amt));
     const tot = +(amt * mul).toFixed(2); $('rltot').textContent = fmt(tot); $('rlmax').textContent = fmt(tot * (half ? 2 : 100)); const ok = !spinning && amt >= minBet && tot <= bal() + 1e-9; $('rlsp').disabled = !ok; $('rlsp').textContent = spinning ? '...' : (tot > bal() + 1e-9 ? '잔액 부족' : 'SPIN');
   }
   function setAmt(v, keep) { v = Math.round(v * 100) / 100; amt = clamp(v, minBet, Math.max(minBet, 1e15)); if (!keep) $('rlin').value = String(amt); sync(); }
@@ -350,7 +350,7 @@ export async function openRoulette(br) {
     /* 비네트 + 플래시 */
     { const vg = g.createRadialGradient(W / 2, H * .42, Math.min(W, H) * .3, W / 2, H * .45, Math.max(W, H) * .78); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.72)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }
     if (flashA > .01) { g.globalAlpha = Math.min(.8, flashA); g.fillStyle = flashC; g.fillRect(0, 0, W, H); g.globalAlpha = 1; flashA *= Math.pow(.004, dt); }
-    g.restore(); resT += dt; if (resT > .25) { resT = 0; $('rlbal').textContent = fmt(bal()); $('rlsh').textContent = (br.getShield ? br.getShield() : 0) > 0 ? '꽝 방어권 ' + br.getShield() + '장' : ''; }
+    g.restore(); resT += dt; if (resT > .25) { resT = 0; $('rlbal').textContent = br.fmtBal ? br.fmtBal(bal()) : fmt(bal()); $('rlsh').textContent = (br.getShield ? br.getShield() : 0) > 0 ? '꽝 방어권 ' + br.getShield() + '장' : ''; }
   }
   raf = requestAnimationFrame(frame); bed('r');
   function close() { if (!alive) return; settleNow(); alive = false; cancelAnimationFrame(raf); clearTimeout(resTimer); window.removeEventListener('resize', onR); root.remove(); document.body.style.overflow = ''; try { br.onClose && br.onClose(); } catch (e) { } }

@@ -209,6 +209,8 @@ export function mountMine(el, br) {
   br = br || {};
   const getBal = br.getBal || (() => 0), setBal = br.setBal || (() => { }), sfx = br.sfx || (() => { });
   const fmt = v => (+v).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtK = v => { v = +v; if (!isFinite(v)) return '∞'; if (v < 1e4) return v.toLocaleString('ko-KR', { maximumFractionDigits: 2 }); const U = ['', '만', '억', '조', '경', '해', '자', '양', '구', '간', '정']; let k = 0; while (v >= 1e4 && k < U.length - 1) { v /= 1e4; k++; } return (v >= 100 ? Math.round(v) : Math.round(v * 100) / 100).toLocaleString('ko-KR') + U[k]; };
+  const fmtB = v => (br.fmtBal ? br.fmtBal(v) : fmt(v));
   if (!document.getElementById('mncss')) { const s = document.createElement('style'); s.id = 'mncss'; s.textContent = CSS; document.head.appendChild(s); }
   const root = document.createElement('div'); root.className = 'mn';
   root.innerHTML = '<div class="mnst"><button class="on" data-v="m">채굴장</button><button data-v="s">상점</button><button data-v="f">합성</button></div>' +
@@ -232,17 +234,21 @@ export function mountMine(el, br) {
   }
   $('mngo').onclick = () => { if (br.start && br.start()) { sfx('rl_start'); curK = -2; ui(); } };
   /* ---- 상점 ---- */
-  let pend = null, shopKey = '';
+  let pend = null, shopKey = '', shopQ = 1;
   function shop(force) {
     const L = br.shop ? br.shop() : [], now = Date.now(); if (pend && now - pend.t > 3000) pend = null;
-    const key = JSON.stringify(L.map(x => x.g ? x.g : [x.id, x.st, x.priceTxt, x.can, x.max])) + (pend ? pend.id : '') + fmt(getBal()); if (!force && key === shopKey) return; shopKey = key;
-    $('mns').innerHTML = '<div class="mnbal">보유 잔액 <b>' + fmt(getBal()) + '</b> USDT</div>' + L.map(x => x.g ? '<h4 class="mngh">' + x.g + '</h4>' : '<div class="mnit"><div class="ic">' + x.ic + '</div><div class="bd"><b>' + x.name + '</b><p>' + x.desc + '</p><small>' + x.st + '</small></div><button data-id="' + x.id + '"' + ((x.max || !x.can) ? ' disabled' : '') + (pend && pend.id === x.id ? ' class="ask"' : x.on ? ' class="on"' : '') + '>' + (x.max ? '최대' : (pend && pend.id === x.id ? '한 번 더 눌러 구매' : x.priceTxt)) + '</button></div>').join('') + '<p class="mnnt">구매한 효과는 계정에 저장됩니다. 구매 버튼은 두 번 눌러야 결제돼요.</p>';
+    const key = JSON.stringify(L.map(x => x.g ? x.g : [x.id, x.st, x.priceTxt, x.can, x.max])) + (pend ? pend.id : '') + fmt(getBal()) + '|' + shopQ; if (!force && key === shopKey) return; shopKey = key;
+    const qb = '<div class="mnq"><span>구매 수량</span>' + [1, 10, 100].map(n => '<button data-q="' + n + '"' + (shopQ === n ? ' class="on"' : '') + '>x' + n + '</button>').join('') + '</div>';
+    const lab = x => { if (x.max) return '최대'; if (pend && pend.id === x.id) return '한 번 더 눌러 구매'; if (x.free || shopQ === 1 || !br.quote) return x.priceTxt; const q = br.quote(x.id, shopQ); return q.k ? ('x' + q.k + ' · ' + fmtK(q.total)) : x.priceTxt; };
+    const cant = x => x.max || !x.can;
+    $('mns').innerHTML = '<div class="mnbal">보유 잔액 <b>' + fmtB(getBal()) + '</b> USDT</div>' + qb + L.map(x => x.g ? '<h4 class="mngh">' + x.g + '</h4>' : '<div class="mnit"><div class="ic">' + x.ic + '</div><div class="bd"><b>' + x.name + '</b><p>' + x.desc + '</p><small>' + x.st + '</small></div><button data-id="' + x.id + '"' + (cant(x) ? ' disabled' : '') + (pend && pend.id === x.id ? ' class="ask"' : x.on ? ' class="on"' : '') + '>' + lab(x) + '</button></div>').join('') + '<p class="mnnt">구매한 효과는 계정에 저장됩니다. 수량(x1/x10/x100)을 고른 뒤 구매 버튼을 두 번 눌러야 결제돼요. 잔액이 모자라면 살 수 있는 만큼만 구매합니다.</p>';
   }
   $('mns').onclick = e => {
+    const qbtn = e.target.closest('button[data-q]'); if (qbtn) { shopQ = +qbtn.dataset.q; pend = null; sfx('rl_tick'); shop(true); return; }
     const b = e.target.closest('button[data-id]'); if (!b || b.disabled) return; const id = b.dataset.id;
     const it = (br.shop ? br.shop() : []).find(x => x.id === id);
     if (!(it && it.free) && (!pend || pend.id !== id)) { pend = { id, t: Date.now() }; sfx('rl_tick'); shop(true); return; }
-    pend = null; const r = br.buy ? br.buy(id) : { ok: false, msg: '구매할 수 없습니다' }; (br.toast || (() => { }))(r.msg); sfx(r.ok ? 'rl_win' : 'cc_miss', 1); shop(true); ui();
+    pend = null; const r = br.buy ? br.buy(id, shopQ) : { ok: false, msg: '구매할 수 없습니다' }; (br.toast || (() => { }))(r.msg); sfx(r.ok ? 'rl_win' : 'cc_miss', 1); shop(true); ui();
   };
   shop(true);
   ui();
@@ -262,10 +268,11 @@ export function mountMine(el, br) {
   function fview(force) {
     if ($('mnf').hidden && !force) return;
     const L = br.fuseList ? br.fuseList() : [], m = mine(), now = Date.now(); if (pendF && now - pendF.t > 3000) pendF = null;
-    const key = JSON.stringify(L.map(x => [x.id, x.have, x.can, x.noBal])) + (pendF ? pendF.id : '') + fmt(getBal()) + fxBusy; if (!force && key === fKey) return; fKey = key;
+    const key = (br.fuseStat ? JSON.stringify(br.fuseStat()) : '') + JSON.stringify(L.map(x => [x.id, x.have, x.can, x.noBal])) + (pendF ? pendF.id : '') + fmt(getBal()) + fxBusy; if (!force && key === fKey) return; fKey = key;
     const u = br.units ? br.units() : { um: 0, ut: 0 };
     const hold = (k, a, b, c, tot) => '<div class="mnfh"><img src="' + iconURL(k, 0) + '"><div><b>' + NAMES[k][0] + '</b><span>0성 ' + a + ' · 1성 ' + b + ' · 2성 ' + c + '</span><small>총 효율 ' + tot + '마리분</small></div></div>';
-    let h = '<div class="mnbal">보유 잔액 <b>' + fmt(getBal()) + '</b> USDT</div><div class="mnfs">' + hold('m', m.mice | 0, m.m1 | 0, m.m2 | 0, u.um) + hold('t', m.tur | 0, m.t1 | 0, m.t2 | 0, u.ut) + '</div>';
+    const st = br.fuseStat ? br.fuseStat() : { s: 0, f: 0 }, anyCan = L.some(x => x.can), askA = pendF && pendF.id === '*';
+    let h = '<div class="mnbal">보유 잔액 <b>' + fmtB(getBal()) + '</b> USDT</div><div class="mnfst"><span>누적 합성</span><b class="ok">성공 ' + st.s + '회</b><b class="no">실패 ' + st.f + '회</b></div><button class="mnall' + (askA ? ' ask' : '') + '" data-f="*"' + (anyCan && !fxBusy ? '' : ' disabled') + '>' + (fxBusy ? '합성 중…' : askA ? '한 번 더 눌러 한번에 합성' : anyCan ? '⚡ 한번에 합성하기' : '합성할 재료/잔액이 없어요') + '</button><div class="mnfs">' + hold('m', m.mice | 0, m.m1 | 0, m.m2 | 0, u.um) + hold('t', m.tur | 0, m.t1 | 0, m.t2 | 0, u.ut) + '</div>';
     h += L.map(x => {
       const nm = NAMES[x.k], ask = pendF && pendF.id === x.id, lab = fxBusy ? '합성 중…' : ask ? '한 번 더 눌러 합성' : x.have < x.need ? '재료 부족' : x.noBal ? '잔액 부족' : '합성하기 · 1만 USDT';
       return '<div class="mfc"><div class="mfr"><div class="mfi"><img src="' + iconURL(x.k, x.from) + '"><em>×' + x.need + '</em></div><div class="mfa">▶</div><div class="mfi to"><img src="' + iconURL(x.k, x.to) + '"><em>×1</em></div></div><div class="mfd"><b>' + nm[x.from] + ' ' + x.need + '마리 → ' + nm[x.to] + '</b><small>보유 <u>' + x.have + '</u> / 필요 ' + x.need + ' · 비용 ' + x.cost.toLocaleString('en-US') + ' USDT · 성공 ' + Math.round(x.chance * 100) + '%</small><small class="mfe">' + nm[x.to] + ' = ' + EFFN[x.k][x.to] + '</small><small class="mfw">실패 시 재료 ' + x.need + '마리와 합성비가 모두 사라집니다</small></div><button data-f="' + x.id + '"' + (x.can && !fxBusy ? '' : ' disabled') + (ask ? ' class="ask"' : '') + '>' + lab + '</button></div>';
@@ -275,10 +282,17 @@ export function mountMine(el, br) {
   $('mnf').onclick = e => {
     const b = e.target.closest('button[data-f]'); if (!b || b.disabled || fxBusy) return; const id = b.dataset.f;
     if (!pendF || pendF.id !== id) { pendF = { id, t: Date.now() }; sfx('rl_tick'); fview(true); return; }
+    if (id === '*') { pendF = null; const ra = br.fuseAll ? br.fuseAll() : { ok: false, msg: '합성할 수 없습니다' }; if (!ra.ok) { (br.toast || (() => { }))(ra.msg); sfx('cc_miss', 1); fview(true); ui(); return; } fview(true); ui(); showBulk(ra); return; }
     pendF = null; const r = br.fuse ? br.fuse(id) : { ok: false, msg: '합성할 수 없습니다' };
     if (!r.ok) { (br.toast || (() => { }))(r.msg); sfx('cc_miss', 1); fview(true); ui(); return; }
     fxBusy = true; fview(true); ui(); runFx(r.win, r.k, r.to, () => { fxBusy = false; fview(true); ui(); (br.toast || (() => { }))(r.msg); });
   };
+  function showBulk(ra) {
+    sfx(ra.win ? 'mn_fuse_ok' : 'mn_fuse_fail', 1);
+    const o = document.createElement('div'); o.className = 'mnbr';
+    o.innerHTML = '<div class="bx"><h3>⚡ 한번에 합성 결과</h3><div class="bs"><div class="ok"><small>성공</small><b>' + ra.win + '회</b></div><div class="no"><small>실패</small><b>' + ra.lose + '회</b></div></div><div class="br">' + ra.rows.map(x => '<div><span>' + NAMES[x.k][x.from] + ' → ' + NAMES[x.k][x.to] + '</span><em>성공 ' + x.w + ' · 실패 ' + x.l + '</em></div>').join('') + '</div><p>합성 비용 <b>' + fmtK(ra.cost) + ' USDT</b> 사용 · 총 ' + (ra.win + ra.lose) + '회 시도</p><button>확인</button></div>';
+    o.onclick = ev => { if (ev.target === o || ev.target.tagName === 'BUTTON') o.remove(); }; document.body.appendChild(o);
+  }
   function runFx(win, k, to, done) {
     const ov = document.createElement('div'); ov.className = 'mnfx'; const c = document.createElement('canvas'); ov.appendChild(c); document.body.appendChild(ov); fxEl = ov;
     const dp = Math.min(window.devicePixelRatio || 1, 2), w = window.innerWidth, h = window.innerHeight; c.width = w * dp; c.height = h * dp; c.style.width = w + 'px'; c.style.height = h + 'px';
@@ -468,6 +482,10 @@ const CSS = `
 .mfc .mfr{display:flex;align-items:center;justify-content:center;gap:12px}.mfc .mfi{position:relative;width:110px;height:82px;border-radius:12px;background:linear-gradient(#3a2a18,#22160c);border:1px solid #6a4e2a;display:flex;align-items:center;justify-content:center}.mfc .mfi.to{border-color:#ffd54a;box-shadow:0 0 12px rgba(255,213,74,.35)}.mfc .mfi img{width:100px;height:75px}.mfc .mfi em{position:absolute;right:6px;bottom:3px;font:900 14px ${FONT};font-style:normal;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}.mfc .mfa{color:#ffd54a;font-size:18px}
 .mfc .mfd{display:flex;flex-direction:column;gap:2px;line-height:1.4}.mfc .mfd b{font-size:14px;color:#ffe9b0}.mfc .mfd small{font-size:11px;color:#c9a15a}.mfc .mfd u{text-decoration:none;color:#fff;font-weight:800}.mfc .mfd .mfe{color:#9ee08a}.mfc .mfd .mfw{color:#e8a070}
 .mn .mfc button{display:flex;align-items:center;justify-content:center;text-align:center;padding:0!important;width:100%!important;margin:0!important;height:44px;border-radius:11px;border:1px solid #ffe08a;background:linear-gradient(#e8421f,#a8200f);color:#fff3d6;font:800 13px ${FONT};cursor:pointer}.mn .mfc button.ask{background:linear-gradient(#d9a52e,#9a6c14);color:#1c1207}.mn .mfc button:disabled{filter:grayscale(.8) brightness(.55);cursor:default;border-color:#6a4e2a}
+.mnq{display:flex;align-items:center;gap:6px;margin-top:8px}.mnq span{font-size:12px;color:#c9a15a;margin-right:4px}.mn .mnq button{flex:1!important;width:auto!important;margin:0!important;padding:0!important;text-align:center!important;display:flex!important;align-items:center;justify-content:center;height:34px;border-radius:10px;border:1px solid #6a4e2a;background:#1a110c;color:#e8d9b4;font-weight:800;font-size:14px}.mn .mnq button.on{background:linear-gradient(#d9a52e,#9a6c14);color:#1c1207;border-color:#ffe08a}
+.mnfst{display:flex;align-items:center;gap:10px;margin-top:8px;background:#1a110c;border:1px solid #4a3620;border-radius:12px;padding:9px 12px;font-size:12px;color:#c9a15a}.mnfst b{font-size:14px}.mnfst .ok{color:#7affb0}.mnfst .no{color:#ff9a8a}
+.mn .mnall{width:100%!important;display:flex!important;align-items:center;justify-content:center;text-align:center!important;padding:0!important;height:46px;margin:8px 0 0!important;border-radius:12px;border:1px solid #ffe08a;background:linear-gradient(#e8421f,#a8200f);color:#fff3d6;font:800 15px inherit}.mn .mnall.ask{background:linear-gradient(#ffd54a,#e0a020);color:#241800}.mn .mnall:disabled{filter:grayscale(.8) brightness(.55)}
+.mnbr{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px}.mnbr .bx{width:min(340px,100%);background:linear-gradient(#2a1c12,#140d09);border:2px solid #d9a52e;border-radius:18px;padding:18px;color:#f3e7c9;display:flex;flex-direction:column;gap:10px;text-align:center}.mnbr h3{margin:0;color:#ffe27a;font-size:18px}.mnbr .bs{display:flex;gap:10px}.mnbr .bs>div{flex:1;border-radius:12px;padding:10px;background:#0f0a06;border:1px solid #4a3620}.mnbr .bs small{display:block;font-size:11px;color:#c9a15a}.mnbr .bs b{font-size:26px}.mnbr .bs .ok b{color:#7affb0}.mnbr .bs .no b{color:#ff9a8a}.mnbr .br{display:flex;flex-direction:column;gap:5px;font-size:12px}.mnbr .br div{display:flex;justify-content:space-between;gap:8px;background:#1a110c;border-radius:8px;padding:6px 8px}.mnbr .br em{font-style:normal;color:#c9a15a}.mnbr p{margin:0;font-size:12px;color:#c9b88a}.mnbr button{height:44px;border-radius:12px;border:1px solid #ffe08a;background:linear-gradient(#e8421f,#a8200f);color:#fff3d6;font:800 15px inherit}
 .mnfx{position:fixed;inset:0;z-index:99999;touch-action:none}.mnfx canvas{display:block}
 .mnsoon{height:240px;border-radius:14px;border:1px dashed #6a4e2a;background:#14100c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#e8d9b4}.mnsoon b{font-size:20px;color:#ffe9b0}.mnsoon span{font-size:12px;color:#a89873}
 `;
