@@ -116,8 +116,8 @@ export function heroStats(s) {
 }
 const mFn = age => 1 + Math.min(age / 3600, 48) / 12;
 const intv = age => Math.max(1.6, 10 - age / 3600 * .33);
-const SD = .2, SDB = .28, HORDE_HP = .7, BOSS_T = 60, BOSS_LEAVE = 75, BOSS_START = 300;
-const hordeN = age => Math.min(28, 6 + Math.floor(age / 3600 * .7)), hordeI = age => Math.max(18, 40 - age / 3600 * .8);
+const SD = .2, SDB = .28, HORDE_HP = .35, HORDE_ATK = .5, HORDE_MT = .3, ZCAP = 600, BOSS_T = 60, BOSS_LEAVE = 75, BOSS_START = 300;
+const hordeN = age => Math.min(320, 30 + Math.floor(age / 3600 * 8)), hordeI = age => Math.max(15, 38 - age / 3600 * .6);
 const bossMul = bn => bn < 30 ? .15 + .85 * bn / 30 : 1 + Math.min(bn - 30, 1410) / 60 * .1;
 function mix(age) {
   const L = Object.keys(ZT).filter(k => age >= ZT[k].un), tw = L.reduce((a, k) => a + ZT[k].w, 0); return L.map(k => [k, ZT[k].w / tw]);
@@ -150,12 +150,12 @@ export function settle(s, sec) {
     const ds = Math.min(30, left); left -= ds; const age = s.age; s.age += ds;
     const m = mFn(age), ma = 1 + (m - 1) * .5, mx = mix(age);
     let H = 0, A = 0, M = 0, wb = 0; mx.forEach(([k, w]) => { const z = ZT[k]; H += w * z.hp * m; A += w * z.atk * ma; M += w * z.mt * m; if (k === 'bomb') wb = w });
-    const a1 = ds / intv(age), a2 = ds / hordeI(age) * hordeN(age), arr = a1 + a2, Hm = H * (a1 + a2 * HORDE_HP) / arr;
+    const a1 = ds / intv(age), a2 = ds / hordeI(age) * hordeN(age) * 1.125, arr = a1 + a2, Hm = H * (a1 + a2 * HORDE_HP) / arr; A *= (a1 + a2 * HORDE_ATK) / arr; M *= (a1 + a2 * HORDE_MT) / arr;
     s.bk += (a1 + a2 * HORDE_HP) * H; let cap = dpsOf(s) * ds / ds;
     s.tp.forEach(t => { if (t.t > 0 && t.d > 0) { const T = TRAP[t.t - 1], hits = Math.min(t.d, ds / Math.max(T.cd, .3) * .5 * (s.bk > 0 ? 1 : 0)); const dm = hits * T.dmg * (T.once ? 1 : 2); cap += dm / ds; t.d -= hits; if (t.d <= 0) { t.t = 0; t.d = 0 } } });
     const k2 = Math.min(s.bk, cap * ds), n = k2 / Hm;
     s.bk -= k2; s.kills += n; s.meat += n * M; rep.kills += n; rep.meat += n * M;
-    const att = Math.min(35, s.bk / Hm); let dmg = att * A * ds * SD + arr * wb * Math.min(1, .02 + s.bk / (Hm * arr + 1e-9)) * (150 + 50 * (m - 1));
+    const att = Math.min(40, s.bk / Hm); let dmg = att * A * ds * SD + arr * wb * Math.min(1, .02 + s.bk / (Hm * arr + 1e-9)) * (150 + 50 * (m - 1));
     rep.dmg += dmg;
     if (s.fn > 0) { for (let i = 0; i < s.fh.length && dmg > 0; i++) { if (s.fh[i] > 0) { const x = Math.min(s.fh[i], dmg); s.fh[i] -= x; dmg -= x } } }
     if (dmg > 0) s.hp -= dmg;
@@ -176,7 +176,7 @@ function segInter(ax, ay, bx, by, b) {
 }
 export class Sim {
   constructor(S, ev) {
-    this.S = S; this.ev = ev || {}; this.z = []; this.fx = []; this.pt = []; this.proj = []; this.t = 0; this.spT = 0; this.wvT = 12; this.tele = []; this.pool = []; this.banner = null; this.bossOut = []; this.shake = 0; this.id = 1;
+    this.S = S; this.ev = ev || {}; this.z = []; this.fx = []; this.pt = []; this.proj = []; this.t = 0; this.spT = 0; this.wvT = 12; this.tele = []; this.pool = []; this.hq = []; this.ac = {}; this.acT = 0; this.banner = null; this.bossOut = []; this.shake = 0; this.id = 1;
     this.hs = heroStats(S); this.hero = { x: CX, y: CY + R + 34, hp: this.hs.hpMax, cd: 0, down: 0, face: 1, sw: 0, k: 'hero' };
     this.allies = []; S.al.forEach((v, i) => { if (v) this.allies.push({ i, x: CX + (i - 2) * 22, y: CY + R + 50, hp: ALLY[i].hp, cd: 0, down: 0, face: 1, sw: 0, k: 'ally' }) });
     this.mechs = []; this.arcs = []; this.zapT = 0; this.repT = 0; if ((S.ex | 0) >= 8) this.addMechs();
@@ -208,7 +208,7 @@ export class Sim {
     if (z.shield > 0) dmg *= .1;
     z.hp -= dmg; z.hurt = .12;
     for (let i = 0; i < 3; i++) this.pt.push({ x: z.x, y: z.y, vx: (Math.random() - .5) * 70, vy: (Math.random() - .5) * 70, l: .5, c: z.k === 'bomb' ? '#d94a2a' : '#7a1010', s: 2 });
-    if (z.hp <= 0 && !z.dead) { z.dead = 1; const S = this.S; S.kills++; S.meat += z.mt; this.fx.push({ x: z.x, y: z.y - 10, t: 0, txt: '+' + (z.mt < 10 ? z.mt.toFixed(1) : Math.round(z.mt)) + '🥩', big: z.boss ? 1 : 0 }); if (z.boss) { S.bkl = (S.bkl | 0) + 1; this.shake = .4; this.banner = { txt: '🏆 ' + z.boss.n + ' 처치! 고기 +' + Math.round(z.mt), sub: '', t: 2.6 } } if (this.ev.kill) this.ev.kill() }
+    if (z.hp <= 0 && !z.dead) { z.dead = 1; const S = this.S; S.kills++; S.meat += z.mt; if (z.boss || this.z.length < 100 || Math.random() < .04) this.fx.push({ x: z.x, y: z.y - 10, t: 0, txt: '+' + (z.mt < 10 ? z.mt.toFixed(1) : Math.round(z.mt)) + '🥩', big: z.boss ? 1 : 0 }); if (z.boss) { S.bkl = (S.bkl | 0) + 1; this.shake = .4; this.banner = { txt: '🏆 ' + z.boss.n + ' 처치! 고기 +' + Math.round(z.mt), sub: '', t: 2.6 } } if (this.ev.kill) this.ev.kill() }
   }
   explode(z) {
     const S = this.S, m = mFn(S.age); z.dead = 1; this.shake = .35;
@@ -219,13 +219,19 @@ export class Sim {
     this.units().forEach(hit);
   }
   horde() {
-    const S = this.S, n = hordeN(S.age) + (Math.random() * 4 | 0), side = Math.random() * 4 | 0, u = .12 + Math.random() * .76;
-    for (let i = 0; i < n && this.z.length < 90; i++) {
-      this.spawn(pickType(S.age)); const z = this.z[this.z.length - 1], a = (Math.random() - .5) * 110, out = 10 + Math.random() * 60;
-      if (side === 0) { z.x = u * W + a; z.y = -out } else if (side === 1) { z.x = W + out; z.y = u * H + a } else if (side === 2) { z.x = u * W + a; z.y = H + out } else { z.x = -out; z.y = u * H + a }
-      z.hp *= HORDE_HP; z.hpMax *= HORDE_HP; z.mt *= .8; z.horde = 1;
-    }
-    this.fx.push({ x: W / 2, y: 70, t: 0, txt: '🧟 좀비 떼가 몰려온다!', red: 1, big: 1 });
+    const S = this.S, n = hordeN(S.age) + (Math.random() * hordeN(S.age) * .25 | 0);
+    this.hq.push({ n, side: Math.random() * 4 | 0, u: .12 + Math.random() * .76 });
+    this.fx.push({ x: W / 2, y: 70, t: 0, txt: '🧟 좀비 떼 ' + n + '마리가 몰려온다!', red: 1, big: 1 });
+  }
+  hordeTick(dt) {
+    const S = this.S; for (const q of this.hq) {
+      const k = Math.min(q.n, Math.ceil(q.n / 2.5 * dt)); q.n -= k;
+      for (let i = 0; i < k && this.z.length < ZCAP; i++) {
+        let k0 = pickType(S.age); if (k0 === 'bomb' && Math.random() < .85) k0 = 'slow'; this.spawn(k0); const z = this.z[this.z.length - 1], a = (Math.random() - .5) * 260, out = 8 + Math.random() * 150, W2 = W, H2 = H;
+        if (q.side === 0) { z.x = q.u * W2 + a; z.y = -out } else if (q.side === 1) { z.x = W2 + out; z.y = q.u * H2 + a } else if (q.side === 2) { z.x = q.u * W2 + a; z.y = H2 + out } else { z.x = -out; z.y = q.u * H2 + a }
+        z.hp *= HORDE_HP; z.hpMax *= HORDE_HP; z.atk *= HORDE_ATK; z.mt *= HORDE_MT; z.horde = 1; z.sp *= .9 + Math.random() * .3;
+      }
+    } this.hq = this.hq.filter(q => q.n > 0);
   }
   spawnBoss() {
     const S = this.S, bn = S.bn | 0, sp = BOSS[bn % 5], m = mFn(S.age), ma = 1 + (m - 1) * .5, side = Math.random() * 4 | 0, u = Math.random();
@@ -263,7 +269,7 @@ export class Sim {
     if (rdy('slam') && (dn < 85 || dh < 95)) { set('slam', 7.5); z.cast = .95; const x = z.x, y = z.y; this.tele.push({ kind: 'c', x, y, r: 64, t: 0, dur: .9, fn: () => { this.shake = .4; this.fx.push({ x, y, t: 0, boom: 1.4 }); this.areaHit(x, y, 64, z.atk * 2.2, 650, z.atk * 4) } }); return true }
     if (rdy('charge') && near && dn > 80 && dn < 280) { set('charge', 11); z.cast = .85; const dx = (near.x - z.x) / dn, dy = (near.y - z.y) / dn; z.face = dx >= 0 ? 1 : -1; this.tele.push({ kind: 'l', x: z.x, y: z.y, dx, dy, len: 230, w: 20, t: 0, dur: .8, fn: () => { z.dash = .55; z.dx = dx; z.dy = dy; z.hit = 0 } }); return true }
     if (rdy('spit') && (near || true)) { set('spit', 4.8); z.cast = .6; const t = (near && Math.random() < .7) ? near : { x: CX + (Math.random() - .5) * 80, y: CY + 40 }; const x = t.x, y = t.y; this.tele.push({ kind: 'c', x, y, r: 32, t: 0, dur: 1, fn: () => { this.pool.push({ x, y, r: 32, t: 7, dps: z.atk * .8 }); this.fx.push({ x, y, t: 0, boom: .7, c: '#7acb2a' }) } }); return true }
-    if (rdy('summon')) { set('summon', 11); z.cast = .9; this.fx.push({ x: z.x, y: z.y - 26, t: 0, txt: '☠ 소환!', red: 1, big: 1 }); for (let i = 0; i < 4 && this.z.length < 90; i++) { this.spawn(pickType(S.age)); const q = this.z[this.z.length - 1]; q.x = z.x + (Math.random() - .5) * 70; q.y = z.y + (Math.random() - .5) * 70; q.hp *= .5; q.hpMax *= .5; q.mt *= .2 } return true }
+    if (rdy('summon')) { set('summon', 11); z.cast = .9; this.fx.push({ x: z.x, y: z.y - 26, t: 0, txt: '☠ 소환!', red: 1, big: 1 }); for (let i = 0; i < 4 && this.z.length < ZCAP; i++) { this.spawn(pickType(S.age)); const q = this.z[this.z.length - 1]; q.x = z.x + (Math.random() - .5) * 70; q.y = z.y + (Math.random() - .5) * 70; q.hp *= .5; q.hpMax *= .5; q.mt *= .2 } return true }
     if (rdy('shield')) { set('shield', 15); z.shield = 4; z.cast = .5; this.fx.push({ x: z.x, y: z.y - 26, t: 0, txt: '🛡 보호막', red: 1, big: 1 }); return true }
     if (rdy('roar')) { set('roar', 13); z.cast = .9; this.shake = .5; this.fx.push({ x: z.x, y: z.y - 28, t: 0, txt: '📢 포효!', red: 1, big: 1 }); this.fx.push({ x: z.x, y: z.y, t: 0, boom: 1.6, c: '#ff5a3a' }); this.z.forEach(q => { if (!q.boss) q.buff = 4 }); this.hero.stun = .9; this.hero.cd = Math.max(this.hero.cd, 1); return true }
     if (rdy('bomb')) { set('bomb', 5.5); z.cast = .7; const segs = S.fn > 0 ? SEGS.map((b, i) => [b, i]).filter(q => S.fh[q[1]] > 0) : []; const tg = segs.length && Math.random() < .7 ? segs[Math.random() * segs.length | 0][0] : HOUSE_RECT, x = tg.x + tg.w / 2, y = tg.y + tg.h / 2; this.tele.push({ kind: 'c', x, y, r: 40, t: 0, dur: 1.1, fn: () => { this.shake = .35; this.fx.push({ x, y, t: 0, boom: 1.1 }); this.areaHit(x, y, 40, z.atk * 1.5, 1e9, z.atk * 5) } }); return true }
@@ -293,8 +299,9 @@ export class Sim {
   step(dt) {
     const S = this.S; if (S.dead || S.rest) return; dt = Math.min(dt, .1); this.t += dt; S.age += dt;
     const sol = this.solids(), m = mFn(S.age);
-    this.spT -= dt; if (this.spT <= 0 && this.z.length < 90) { this.spT = intv(S.age) * (.6 + Math.random() * .8); this.spawn(pickType(S.age)) }
+    this.spT -= dt; if (this.spT <= 0 && this.z.length < ZCAP) { this.spT = intv(S.age) * (.6 + Math.random() * .8); this.spawn(pickType(S.age)) }
     this.wvT -= dt; if (this.wvT <= 0) { this.wvT = hordeI(S.age) * (.8 + Math.random() * .4); this.horde() }
+    this.hordeTick(dt); this.acT += dt; if (this.acT >= 1) { this.acT = 0; this.ac = {} }
     if (S.age >= BOSS_START) { S.bt += dt; if (S.bt >= BOSS_T) { S.bt -= BOSS_T; this.spawnBoss() } } else S.bt = 0;
     this.tele.forEach(t => { t.t += dt; if (t.t >= t.dur && !t.done) { t.done = 1; t.fn() } }); this.tele = this.tele.filter(t => !t.done);
     this.pool.forEach(p => { p.t -= dt; p.tk = (p.tk || 0) - dt; if (p.tk <= 0) { p.tk = .5; this.poolHit(p) } }); this.pool = this.pool.filter(p => p.t > 0);
@@ -322,7 +329,7 @@ export class Sim {
       if (b) {
         if (z.k === 'bomb') { this.explode(z); continue }
         // 막혔다: 벽/집을 공격 (관통 불가)
-        if (z.cd <= 0) { z.cd = 1; const k = z.k === 'heavy' ? 2 : 1, d = z.atk * k * (z.boss ? SDB : SD); if (b.i !== undefined) { S.fh[b.i] = Math.max(0, S.fh[b.i] - d) } else { S.hp -= d; this.fx.push({ x: z.x, y: z.y - 12, t: 0, txt: '-' + Math.round(d), red: 1 }) } z.sw = .2 }
+        if (z.cd <= 0) { z.cd = 1; const key = b.i !== undefined ? 's' + b.i : 'h', cap = b.i !== undefined ? 4 : 10; this.ac[key] = (this.ac[key] || 0) + 1; if (!z.boss && this.ac[key] > cap) continue; const k = z.k === 'heavy' ? 2 : 1, d = z.atk * k * (z.boss ? SDB : SD); if (b.i !== undefined) { S.fh[b.i] = Math.max(0, S.fh[b.i] - d) } else { S.hp -= d; this.fx.push({ x: z.x, y: z.y - 12, t: 0, txt: '-' + Math.round(d), red: 1 }) } z.sw = .2 }
       }
       // 함정
       S.tp.forEach((t, i) => { if (t.t <= 0 || t.d <= 0) return; const T = TRAP[t.t - 1], p = TRAPPOS[i]; if (this.trapCd[i] > 0) return; if (Math.hypot(z.x - p.x, z.y - p.y) < T.r) { this.trapCd[i] = Math.max(T.cd, .05); t.d--; for (const o of this.z) if (!o.dead && Math.hypot(o.x - p.x, o.y - p.y) < (T.once ? T.r : Math.max(T.r * .6, 14))) this.dmgZ(o, T.dmg, 'trap'); this.fx.push({ x: p.x, y: p.y, t: 0, boom: T.once ? 1 : .35, c: t.t === 3 ? '#7fd0ff' : t.t === 4 ? '#ff8030' : null }); if (t.d <= 0) { t.t = 0; t.d = 0 } } });
@@ -380,8 +387,18 @@ function bossDraw(c, z, t) {
   const w = 46; c.fillStyle = '#000a'; c.fillRect(x - w / 2, y - r * 2.9, w, 5); c.fillStyle = z.shield > 0 ? '#7fc8ff' : '#ff4a3a'; c.fillRect(x - w / 2, y - r * 2.9, w * Math.max(0, z.hp / z.hpMax), 5);
   c.font = 'bold 9px sans-serif'; c.textAlign = 'center'; c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 2; c.strokeText(sp.n, x, y - r * 2.9 - 3); c.fillText(sp.n, x, y - r * 2.9 - 3);
 }
+let LOD = 0;
+const LODC = { slow: ['#7a9a5a', '#5a4a6a'], fast: ['#8ab06a', '#a04a3a'], crawl: ['#6a8a5a', '#4a5a6a'], hop: ['#9ab05a', '#6a8a3a'], tall: ['#7a9a8a', '#2a2a3a'], heavy: ['#5a7a4a', '#3a3a2a'], bomb: ['#8a9a6a', '#c0302a'] };
+function zombLite(c, z) {
+  const q = LODC[z.k], x = z.x, y = z.y, sc = z.k === 'heavy' ? 1.6 : z.k === 'tall' ? 1.15 : 1, hop = z.k === 'hop' ? Math.abs(Math.sin(z.ph * Math.PI)) * 6 : 0;
+  c.fillStyle = 'rgba(0,0,0,.25)'; c.fillRect(x - 6 * sc, y + 7, 12 * sc, 3);
+  if (z.k === 'crawl') { c.fillStyle = q[1]; c.fillRect(x - 9, y, 18, 6); c.fillStyle = q[0]; c.fillRect(x + z.face * 8 - 3, y - 1, 7, 7); return }
+  const th = z.k === 'tall' ? 1.5 : 1; c.fillStyle = q[1]; c.fillRect(x - 5 * sc, y - 8 * th * sc - hop, 10 * sc, 15 * th * sc); c.fillStyle = q[0]; c.fillRect(x - 4 * sc, y - 15 * th * sc - hop, 8 * sc, 8 * sc); c.fillStyle = '#d02020'; c.fillRect(x + (z.face > 0 ? 0 : -3), y - 13 * th * sc - hop, 3, 2);
+  if (z.hp < z.hpMax) { c.fillStyle = '#e0503a'; c.fillRect(x - 8, y - 20 * th * sc, 16 * Math.max(0, z.hp / z.hpMax), 2) }
+}
 function zomb(c, z, t) {
   if (z.boss) return bossDraw(c, z, t);
+  if (LOD) return zombLite(c, z);
   const hop = z.k === 'hop' ? Math.abs(Math.sin(z.ph * Math.PI)) * 8 : 0, x = z.x, y = z.y, f = z.face; const bob = Math.sin(z.ph * (z.k === 'fast' ? 14 : 6)) * 1.2;
   shadow(c, x, y, z.r); c.save(); c.translate(x, y - hop); if (z.hurt > 0) c.filter = 'brightness(2)';
   const skin = { slow: '#7a9a5a', fast: '#8ab06a', crawl: '#6a8a5a', hop: '#9ab05a', tall: '#7a9a8a', heavy: '#5a7a4a', bomb: '#8a9a6a' }[z.k], cloth = { slow: '#5a4a6a', fast: '#a04a3a', crawl: '#4a5a6a', hop: '#6a8a3a', tall: '#2a2a3a', heavy: '#3a3a2a', bomb: '#c0302a' }[z.k];
@@ -440,7 +457,7 @@ export function draw(c, sim, S, t) {
   sim.pool.forEach(p => { c.fillStyle = 'rgba(110,200,40,' + (.28 + .1 * Math.sin(t * 6)) + ')'; c.beginPath(); c.arc(p.x, p.y, p.r, 0, 6.3); c.fill(); c.strokeStyle = 'rgba(160,255,80,.7)'; c.lineWidth = 2; c.stroke(); for (let i = 0; i < 4; i++) { c.fillStyle = 'rgba(200,255,120,.8)'; c.beginPath(); c.arc(p.x + Math.sin(t * 3 + i * 2) * p.r * .6, p.y + Math.cos(t * 2.4 + i * 3) * p.r * .5, 2, 0, 6.3); c.fill() } });
   sim.tele.forEach(q => { const k = Math.min(1, q.t / q.dur); if (q.kind === 'c') { c.fillStyle = 'rgba(255,40,30,' + (.12 + .2 * k) + ')'; c.beginPath(); c.arc(q.x, q.y, q.r, 0, 6.3); c.fill(); c.strokeStyle = 'rgba(255,90,60,.95)'; c.lineWidth = 2; c.setLineDash([6, 4]); c.stroke(); c.setLineDash([]); c.fillStyle = 'rgba(255,60,40,.35)'; c.beginPath(); c.arc(q.x, q.y, q.r * k, 0, 6.3); c.fill() } else { c.save(); c.translate(q.x, q.y); c.rotate(Math.atan2(q.dy, q.dx)); c.fillStyle = 'rgba(255,40,30,' + (.12 + .22 * k) + ')'; c.fillRect(0, -q.w, q.len, q.w * 2); c.fillStyle = 'rgba(255,60,40,.4)'; c.fillRect(0, -q.w, q.len * k, q.w * 2); c.strokeStyle = 'rgba(255,90,60,.9)'; c.lineWidth = 1.5; c.strokeRect(0, -q.w, q.len, q.w * 2); c.restore() } });
   // 유닛 정렬 그리기
-  const L = []; sim.z.forEach(z => L.push([z.y, () => zomb(c, z, t)]));
+  LOD = sim.z.length > 120; const L = []; sim.z.forEach(z => L.push([z.y, () => zomb(c, z, t)]));
   const hero = sim.hero; hero.hpMax = sim.hs.hpMax; L.push([hero.y, () => person(c, hero, S, t, Object.assign({}, S, sim.hs))]);
   sim.mechs.forEach(a => { a.hpMax = a.mech.hp; L.push([a.y, () => mechDraw(c, a, t)]) });
   sim.allies.forEach(a => { a.hpMax = ALLY[a.i].hp; a.ic = ALLY[a.i].ic; a.col = ALLY[a.i].col; a.id = a.i; L.push([a.y, () => person(c, a, S, t, null)]) });
