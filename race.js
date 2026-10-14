@@ -11,8 +11,9 @@ const mod = (a, n) => ((a % n) + n) % n;
 const angd = (a, b) => { let d = (a - b) % TAU; if (d > PI) d -= TAU; if (d < -PI) d += TAU; return d; };
 function mul32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-export const CFG = { cars: 10, laps: 3, fee: 1e8, minBet: 1e10, mult: [5, 2, 1], driftPass: .2 };
+export const CFG = { cars: 10, laps: 3, fee: 1e8, minBet: 1e10, mult: [5, 2, 1], driftWin: 1.0, wrongSlow: .5, wrongT: 2, boostX: 1.5, boostT: 2, missileT: 3, stunT: 2, shieldT: 5, aiX: 1.005, W: [.4, .3, .3], PASS: [.12, .20, .30], BM: [1.05, 1.08, 1.11], BT: [1.4, 1.8, 2.2] };
 export function payoutOf(rank, bet) { return rank >= 1 && rank <= 3 ? bet * CFG.mult[rank - 1] : 0; }
+export const ITEMS = { boost: { n: '부스터', ic: '⚡', d: '2초간 속도 +50%' }, missile: { n: '미사일', ic: '🚀', d: '3초 후 앞 차 격추' }, shield: { n: '방어권', ic: '🛡️', d: '미사일 1회 방어 (5초)' } };
 export const CARS = [
   { n: '레드 팔콘', c: '#e5262f', a: '#ffd0d0', st: 0, sp: 0 }, { n: '블루 웨이브', c: '#2f6bff', a: '#bcd5ff', st: 1, sp: 1 },
   { n: '옐로 스팅', c: '#ffd21f', a: '#262626', st: 2, sp: 0 }, { n: '그린 비스트', c: '#22b455', a: '#c8ffd8', st: 3, sp: 1 },
@@ -35,83 +36,115 @@ function pathAt(u, o) {
   o[0] = x; o[1] = y; o[2] = h; o[3] = k; return o;
 }
 /* 속도 한계 프로필: 직선 66 m/s(≈238km/h), 코너 √(14·R)≈37 m/s, 코너 앞 감속 반영 */
-const VS = 66, VC = Math.sqrt(14 * R), AB = 22, DS = 2, NS = Math.ceil(LAP / DS), VL = new Float32Array(NS);
+const VS = 92.4, VC = Math.sqrt(27 * R), AB = 31, DS = 2, NS = Math.ceil(LAP / DS), VL = new Float32Array(NS);
 (function () {
   for (let i = 0; i < NS; i++) { const u = i * DS; VL[i] = (u >= A1 && u < A1E) || u >= A2 ? VC : VS; }
   for (let r = 0; r < 3; r++) for (let i = NS - 1; i >= 0; i--) { const j = (i + 1) % NS; VL[i] = Math.min(VL[i], Math.sqrt(VL[j] * VL[j] + 2 * AB * DS)); }
 })();
 const vlimAt = u => VL[Math.floor(mod(u, LAP) / DS) % NS];
-export const WIN = [.30, .62]; /* 코너 진행률 중 드리프트 성공 구간 */
+export const WIN0 = .30; /* 코너 진행률이 이 값에 닿으면 1초짜리 드리프트 창이 열립니다 */
 
 /* ---------------- 시뮬레이션 ---------------- */
 export function createRace(seed, pi) {
-  const rnd = mul32(seed >>> 0), rnd2 = mul32((seed ^ 0x9e3779b9) >>> 0);
+  const rnd = mul32(seed >>> 0), rnd2 = mul32((seed ^ 0x9e3779b9) >>> 0), rnd3 = mul32((seed ^ 0x5bd1e995) >>> 0);
   const gauss = () => { let u = 0; while (!u) u = rnd(); const v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
   const slots = [...Array(CFG.cars).keys()]; for (let i = slots.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [slots[i], slots[j]] = [slots[j], slots[i]]; }
-  const TOT = CFG.laps * LAP;
-  const cars = slots.map((sl, i) => ({ id: i, slot: sl, s: -5 - Math.floor(sl / 2) * 11, lat: sl % 2 ? -2.6 : 2.6, v: 0, n: 0, ph: rnd() * TAU, fin: -1, brake: false, tgt: 0 }));
+  const TOT = CFG.laps * LAP, HL = LAP / 2;
+  const cars = slots.map((sl, i) => ({ id: i, slot: sl, s: -5 - Math.floor(sl / 2) * 11, lat: sl % 2 ? -2.6 : 2.6, v: 0, n: 0, ph: rnd() * TAU, fin: -1, brake: false, tgt: 0,
+    items: [null, null], shield: 0, boostT: 0, stun: 0, half: -1, aiT: 1 + rnd3() * 2, react: Infinity, got: 0, used: 0, hit: 0, blocked: 0 }));
   const P = cars[pi];
-  const D = { done: {}, cd: 0, pen: 0, boost: 0, catchT: 0, catchCar: null, last: null, ok: 0, miss: 0, pass: 0 };
-  const S = { cars, P, pi, t: 0, TOT, D, res: null, seed };
+  const D = { done: {}, win: null, cd: 0, slow: 0, boostT: 0, bm: 1, catchT: 0, catchCar: null, last: null, ok: 0, miss: 0, wrong: 0, pass: 0, grades: [0, 0, 0] };
+  const S = { cars, P, pi, t: 0, TOT, D, res: null, seed, ev: [], missiles: [] };
   const NT = 6.5, SIG = .05;
   S.prog = c => c.fin >= 0 ? 1e9 - c.fin : c.s;
   S.rank = c => { const p = S.prog(c); let r = 1; for (const o of cars) if (o !== c && S.prog(o) > p) r++; return r; };
   S.order = () => cars.slice().sort((a, b) => S.prog(b) - S.prog(a));
+  S.ahead = c => { let a = null; for (const o of cars) if (o !== c && o.fin < 0 && o.s > c.s && (!a || o.s < a.s)) a = o; return a; };
   S.zone = () => {
     const u = mod(P.s + S0, LAP); let arc = -1, fr = 0;
     if (u >= A1 && u < A1E) { arc = 0; fr = (u - A1) / AR; } else if (u >= A2) { arc = 1; fr = (u - A2) / AR; }
-    const lapNo = Math.floor((P.s + S0) / LAP);
+    const lapNo = Math.floor((P.s + S0) / LAP), id = arc < 0 ? -1 : lapNo * 2 + arc;
     const d = Math.min(mod(A1 - u, LAP), mod(A2 - u, LAP));
-    return { arc, fr, id: arc < 0 ? -1 : lapNo * 2 + arc, inWin: arc >= 0 && fr >= WIN[0] && fr <= WIN[1], toNext: d, done: arc >= 0 && !!D.done[lapNo * 2 + arc] };
+    const w = D.win && D.win.id === id ? D.win : null;
+    return { arc, fr, id, toNext: d, done: arc >= 0 && !!D.done[id], win: !!w, left: w ? Math.max(0, w.t1 - S.t) : 0, tOpen: w ? S.t - w.t0 : 0 };
   };
-  /* 드리프트 버튼: 반환 {ok, pass, roll, why} */
+  const ev = o => { o.t = S.t; S.ev.push(o); };
+  /* ---- 아이템 ---- */
+  function give(c) {
+    const i = c.items[0] ? (c.items[1] ? -1 : 1) : 0; if (i < 0) { if (c === P) ev({ k: 'full', c: c.id }); return; }
+    const r = rnd3(), W = CFG.W; const it = r < W[0] ? 'boost' : r < W[0] + W[1] ? 'missile' : 'shield'; c.items[i] = it; c.got++; ev({ k: 'item', c: c.id, item: it, slot: i });
+  }
+  S.useItem = (c, slot) => {
+    const it = c.items[slot]; if (!it) return { ok: false, why: 'empty' }; if (c.fin >= 0 || c.stun > 0 && it === 'boost') return { ok: false, why: 'cant' };
+    if (it === 'boost') { c.boostT = CFG.boostT; }
+    else if (it === 'shield') { if (c.shield > 0) return { ok: false, why: 'active' }; c.shield = CFG.shieldT; }
+    else { const tg = S.ahead(c); if (!tg) return { ok: false, why: 'notarget' }; S.missiles.push({ from: c, to: tg, t: CFG.missileT }); if (tg !== P) tg.react = rnd3() < .75 ? S.t + .5 + rnd3() * 1.8 : Infinity; ev({ k: 'launch', c: c.id, to: tg.id }); }
+    c.items[slot] = null; c.used++; ev({ k: 'use', c: c.id, item: it }); return { ok: true, item: it };
+  };
+  function aiThink(c) {
+    if (c.fin >= 0 || c.stun > 0) return;
+    const has = k => c.items.indexOf(k);
+    if (has('shield') >= 0 && c.shield <= 0 && S.missiles.some(m => m.to === c) && S.t >= c.react) { S.useItem(c, has('shield')); return; }
+    c.aiT -= 1 / 60; if (c.aiT > 0) return; c.aiT = .7 + rnd3() * 1.6;
+    const bi = has('boost'), mi = has('missile');
+    if (mi >= 0 && c.boostT <= 0 && rnd3() < .85) { const a = S.ahead(c); if (a && !S.missiles.some(m => m.from === c)) { S.useItem(c, mi); return; } }
+    if (bi >= 0 && c.boostT <= 0) { const u = mod(c.s + S0, LAP); const strt = !((u >= A1 - 60 && u < A1E) || u >= A2 - 60); if (strt && rnd3() < .7) S.useItem(c, bi); }
+  }
+  /* ---- 드리프트 ---- */
   S.press = () => {
-    if (P.fin >= 0 || D.cd > 0) return { ok: false, why: 'cd' };
-    const z = S.zone();
-    if (z.arc >= 0 && z.inWin && !D.done[z.id]) {
-      D.done[z.id] = true; D.boost = 1.6; D.ok++;
-      pathAt(P.s + S0); const dir = P3[3] > 0 ? 1 : -1;
-      const roll = rnd2() < CFG.driftPass; let pass = false;
-      if (roll && S.rank(P) > 1) {
-        let a = null; for (const o of cars) if (o !== P && o.fin < 0 && o.s > P.s && (!a || o.s < a.s)) a = o;
-        if (a) { pass = true; D.catchCar = a; D.catchT = D.catchD = clamp((a.s - P.s) / 10, 2, 5); D.pass++; }
-      }
-      D.last = { t: S.t, dir, pass, roll, id: z.id }; return { ok: true, pass, roll, dir };
+    if (P.fin >= 0 || D.cd > 0 || P.stun > 0) return { ok: false, why: 'cd' };
+    if (D.win && S.t <= D.win.t1 && !D.done[D.win.id]) {
+      const w = D.win, h = CFG.driftWin / 2, q = clamp(1 - Math.abs(S.t - (w.t0 + h)) / h, 0, 1), g = q >= .7 ? 3 : q >= .4 ? 2 : 1;
+      D.done[w.id] = true; D.win = null; D.boostT = CFG.BT[g - 1]; D.bm = CFG.BM[g - 1]; D.cd = .7; D.ok++; D.grades[g - 1]++;
+      pathAt(P.s + S0); const dir = P3[3] > 0 ? 1 : -1; const roll = rnd2() < CFG.PASS[g - 1]; let pass = false;
+      if (roll && S.rank(P) > 1) { const a = S.ahead(P); if (a) { pass = true; D.catchCar = a; D.catchT = clamp((a.s - P.s) / 14, 2, 5); D.pass++; } }
+      D.last = { t: S.t, dir, pass, roll, grade: g, q }; ev({ k: 'drift', grade: g, pass, roll }); return { ok: true, pass, roll, dir, grade: g, q };
     }
-    D.cd = 1.2; D.pen = .9; D.miss++; D.last = { t: S.t, dir: 0, fail: true };
-    return { ok: false, why: z.arc >= 0 ? (z.done ? 'done' : 'timing') : 'straight' };
+    D.slow = CFG.wrongT; D.cd = 1.2; D.wrong++; D.last = { t: S.t, dir: 0, fail: true }; ev({ k: 'wrong' });
+    const z = S.zone(); return { ok: false, why: z.arc < 0 ? 'straight' : z.done ? 'done' : 'timing' };
   };
   S.step = dt => {
     S.t += dt; const t = S.t;
     let sum = 0, cnt = 0; for (const c of cars) if (c.fin < 0) { sum += c.s; cnt++; } const mean = cnt ? sum / cnt : 0;
+    for (const c of cars) if (c !== P) aiThink(c);
+    for (const m of S.missiles) { m.t -= dt; if (m.t <= 0) { const tg = m.to; m.done = true; if (tg.fin < 0) { if (tg.shield > 0) { tg.shield = 0; tg.blocked++; ev({ k: 'block', c: tg.id, from: m.from.id }); } else { tg.stun = CFG.stunT; tg.v = 0; tg.hit++; ev({ k: 'hit', c: tg.id, from: m.from.id }); } } } }
+    if (S.missiles.length) S.missiles = S.missiles.filter(m => !m.done);
+    /* 6초 시간 창 */
+    if (P.fin < 0) { const z = S.zone(); if (z.arc >= 0 && z.fr >= WIN0 && !D.done[z.id] && !(D.win && D.win.id === z.id)) D.win = { id: z.id, t0: t, t1: t + CFG.driftWin };
+      if (D.win && t > D.win.t1) { D.done[D.win.id] = 'miss'; D.miss++; D.win = null; D.last = { t, miss: true }; ev({ k: 'miss' }); } }
     for (const c of cars) {
+      if (c.shield > 0) { c.shield -= dt; if (c.shield <= 0) { c.shield = 0; ev({ k: 'shieldEnd', c: c.id }); } }
+      if (c.boostT > 0) c.boostT -= dt;
+      if (c.stun > 0) { c.stun -= dt; c.v = 0; c.brake = true; continue; }
       const u = c.s + S0;
       c.n += -c.n / NT * dt + SIG * Math.sqrt(2 / NT * dt) * gauss(); c.n = clamp(c.n, -.14, .14);
       const base = vlimAt(u);
-      let tg = base * (1 + c.n * (base > 50 ? 1 : .45)) * (1 + .10 * clamp((mean - c.s) / 70, -1, 1));
-      if (c === P) { if (D.boost > 0) tg *= 1.07; if (D.pen > 0) tg *= .94; }
+      let tg = base * (1 + c.n * (base > 50 ? 1 : .45)) * (1 + .10 * clamp((mean - c.s) / 100, -1, 1)) * (c === P ? 1 : CFG.aiX);
+      let acc = 21, brk = 42;
+      if (c === P) { if (D.boostT > 0) tg *= D.bm; if (D.slow > 0) { tg *= CFG.wrongSlow; brk = 60; } }
+      if (c.boostT > 0) { tg *= CFG.boostX; acc = 40; }
       c.tgt = tg;
-      const dv = clamp(tg - c.v, -30 * dt, 15 * dt); c.v = Math.max(0, c.v + dv); c.brake = dv < -.15;
+      const dv = clamp(tg - c.v, -brk * dt, acc * dt); c.v = Math.max(0, c.v + dv); c.brake = dv < -.15;
       let ex = 0;
       if (c === P && D.catchT > 0 && D.catchCar) {
         const a = D.catchCar, rem = Math.max(.15, D.catchT);
-        if (P.s > a.s + 4) D.catchT = 0; else { ex = clamp(((a.s + a.v * rem + 5) - (P.s + P.v * rem)) / rem, 0, 32); D.catchT -= dt; }
+        if (P.s > a.s + 4) D.catchT = 0; else { ex = clamp(((a.s + a.v * rem + 5) - (P.s + P.v * rem)) / rem, 0, 45); D.catchT -= dt; }
       }
       c.s += (c.v + ex) * dt;
     }
-    if (D.cd > 0) D.cd -= dt; if (D.pen > 0) D.pen -= dt; if (D.boost > 0) D.boost -= dt;
-    /* 차선: 완만한 사행 + 앞차 회피 */
+    if (D.cd > 0) D.cd -= dt; if (D.slow > 0) D.slow -= dt; if (D.boostT > 0) D.boostT -= dt;
+    for (const c of cars) { const h = Math.floor(c.s / HL); if (h > c.half) { for (let k = c.half + 1; k <= h; k++) if (k >= 1 && k <= 5 && c.fin < 0) give(c); c.half = h; } }
     for (const c of cars) {
       const wob = Math.min(1, t / 8); let lt = (c.slot % 2 ? -2.6 : 2.6) * (1 - wob) + 4.2 * Math.sin(t * .11 + c.ph) * wob;
-      let a = null; for (const o of cars) if (o !== c) { const d = o.s - c.s; if (d > 0 && d < 18 && Math.abs(o.lat - c.lat) < 3.1 && (!a || d < a.s - c.s)) a = o; }
+      let a = null; for (const o of cars) if (o !== c) { const d = o.s - c.s; if (d > 0 && d < 24 && Math.abs(o.lat - c.lat) < 3.1 && (!a || d < a.s - c.s)) a = o; }
       if (a) { const side = c.lat >= a.lat ? 1 : -1; lt = a.lat + (Math.abs(a.lat + side * 3.5) > 6.2 ? -side : side) * 3.5; }
-      lt = clamp(lt, -6.2, 6.2); c.lat += clamp(lt - c.lat, -3.5 * dt, 3.5 * dt);
+      lt = clamp(lt, -6.2, 6.2); c.lat += clamp(lt - c.lat, -4.5 * dt, 4.5 * dt);
     }
     for (const c of cars) if (c.fin < 0 && c.s >= TOT) c.fin = t - (c.s - TOT) / Math.max(1, c.v);
     if (!S.res && P.fin >= 0) { let r = 1; for (const o of cars) if (o !== P && o.fin >= 0 && o.fin < P.fin) r++; S.res = { rank: r, time: P.fin }; }
     if (!S.res && t > 400) S.res = { rank: S.rank(P), time: t };
   };
-  S.ff = (max = 60000) => { for (let i = 0; i < max && !S.res; i++) S.step(1 / 60); return S.res; };
+  S.ff = (max = 60000) => { for (let i = 0; i < max && !S.res; i++) { S.step(1 / 60); S.ev.length = 0; } return S.res; };
   S.finishedAll = () => cars.every(c => c.fin >= 0);
   return S;
 }
@@ -159,6 +192,9 @@ function drawCar(g, spec, x, y, w, o) {
   g.fillStyle = '#f2f2ee'; rr(g, -13, -22, 26, 9, 2); g.fill(); g.fillStyle = '#222'; g.fillRect(-9, -19, 3, 4); g.fillRect(-3, -19, 3, 4); g.fillRect(3, -19, 3, 4);
   g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(-46, -6, 92, 3);
   if (o.num && !front && w > 18) { g.font = '900 ' + Math.round(ch * .62) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.65)'; g.fillStyle = '#fff'; const ty = -bh - ch * .46; g.strokeText(o.num, 0, ty); g.fillText(o.num, 0, ty); }
+  if (o.boost && !front) { const fl = .8 + .4 * Math.sin((o.T || 0) * 40); for (const sx of [-30, 30]) { const fg2 = g.createLinearGradient(0, -6, 0, 26 * fl); fg2.addColorStop(0, 'rgba(255,250,200,.95)'); fg2.addColorStop(.4, 'rgba(255,150,30,.85)'); fg2.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = fg2; g.beginPath(); g.moveTo(sx - 7, -6); g.lineTo(sx + 7, -6); g.lineTo(sx, 26 * fl); g.closePath(); g.fill(); } }
+  if (o.shield) { const sg = g.createRadialGradient(0, -bh * .8, 20, 0, -bh * .8, 82); sg.addColorStop(0, 'rgba(120,220,255,.04)'); sg.addColorStop(.8, 'rgba(90,200,255,.28)'); sg.addColorStop(1, 'rgba(180,240,255,.7)'); g.fillStyle = sg; g.beginPath(); g.ellipse(0, -bh * .8, 78, 62, 0, 0, TAU); g.fill(); g.strokeStyle = 'rgba(200,245,255,.9)'; g.lineWidth = 2; g.stroke(); }
+  if (o.stun) { const T = o.T || 0; for (let i = 0; i < 6; i++) { const p = (T * 1.7 + i * .17) % 1; g.fillStyle = 'rgba(' + (i % 2 ? '255,140,30' : '60,60,60') + ',' + (.65 * (1 - p)) + ')'; g.beginPath(); g.arc(Math.sin(i * 2.3) * 26, -bh * .6 - p * 60, 14 + p * 22, 0, TAU); g.fill(); } g.fillStyle = 'rgba(255,220,100,' + (.5 + .3 * Math.sin(T * 30)) + ')'; g.beginPath(); g.arc(0, -bh * .6, 26, 0, TAU); g.fill(); }
   g.restore();
 }
 
@@ -265,7 +301,7 @@ function drawWorld(g, X, Y, w, h, cam, o) {
   const sp = []; const lim = o.lod > 1 ? 130 : 330;
   for (let i = 0; i < SC.length; i++) { const s = SC[i]; const dx = s.x - cam.x, dy = s.y - cam.y, f = dx * cf + dy * sf; if (f < 1.2 || f > lim) continue; const l = -dx * sf + dy * cf; if (Math.abs(l) > f * 1.5 + 8) continue; sp.push([f, l, 0, s]); }
   /* 출발 게이트 */
-  { const kk = Math.round((camU - S0) / LAP); for (let q = kk - 1; q <= kk + 1; q++) { const u0 = S0 + q * LAP; pathAt(u0); const dx = P3[0] - cam.x, dy = P3[1] - cam.y, f = dx * cf + dy * sf; if (f > 3 && f < lim) sp.push([f, -dx * sf + dy * cf, 2, { u: u0, h: P3[2], x: P3[0], y: P3[1] }]); } }
+  { const kk = Math.round((camU - S0) / (LAP / 2)); for (let q = kk - 3; q <= kk + 3; q++) { const u0 = S0 + q * LAP / 2; pathAt(u0); const dx = P3[0] - cam.x, dy = P3[1] - cam.y, f = dx * cf + dy * sf; if (f > 3 && f < lim) sp.push([f, -dx * sf + dy * cf, 2, { u: u0, h: P3[2], x: P3[0], y: P3[1], item: !!(q & 1) }]); } }
   if (o.cars) for (const c of o.cars) { if (c === o.skip) continue; pathAt(c.s + S0); const nx = -Math.sin(P3[2]), ny = Math.cos(P3[2]); const wx = P3[0] + nx * c.lat, wy = P3[1] + ny * c.lat; const dx = wx - cam.x, dy = wy - cam.y, f = dx * cf + dy * sf; if (f < 1.3 || f > (o.lod > 1 ? 160 : 300)) continue; sp.push([f, -dx * sf + dy * cf, 1, c, P3[2]]); }
   sp.sort((a, b) => b[0] - a[0]);
   for (const s of sp) {
@@ -275,11 +311,14 @@ function drawWorld(g, X, Y, w, h, cam, o) {
       const q = s[3], nx = -Math.sin(q.h), ny = Math.cos(q.h), pt = (o2, hgt) => { const wx = q.x + nx * o2, wy = q.y + ny * o2, dx = wx - cam.x, dy = wy - cam.y, ff = dx * cf + dy * sf; return ff < NEARF ? null : [px(ff, -dx * sf + dy * cf), py(ff) - hgt * F / ff]; };
       const bl = pt(-HALF - 1.5, 0), br = pt(HALF + 1.5, 0), tl = pt(-HALF - 1.5, 6.4), tr = pt(HALF + 1.5, 6.4), ml = pt(-HALF - 1.5, 4.7), mr = pt(HALF + 1.5, 4.7);
       if (bl && br && tl && tr && ml && mr) { g.strokeStyle = '#d6d9de'; g.lineWidth = Math.max(2, .55 * k); g.beginPath(); g.moveTo(bl[0], bl[1]); g.lineTo(tl[0], tl[1]); g.moveTo(br[0], br[1]); g.lineTo(tr[0], tr[1]); g.stroke();
-        g.fillStyle = '#17181c'; g.beginPath(); g.moveTo(tl[0], tl[1]); g.lineTo(tr[0], tr[1]); g.lineTo(mr[0], mr[1]); g.lineTo(ml[0], ml[1]); g.closePath(); g.fill();
-        const cw = Math.max(2, (tr[0] - tl[0]) / 24); g.save(); g.beginPath(); g.moveTo(tl[0], tl[1]); g.lineTo(tr[0], tr[1]); g.lineTo(mr[0], mr[1]); g.lineTo(ml[0], ml[1]); g.closePath(); g.clip(); g.fillStyle = '#f4f4f4'; const rh = (ml[1] - tl[1]) / 2; for (let c = 0; c < 24; c++) for (let r = 0; r < 2; r++) if ((c + r) & 1) { const x0 = tl[0] + (tr[0] - tl[0]) * c / 24, x1 = tl[0] + (tr[0] - tl[0]) * (c + 1) / 24, y0 = tl[1] + (tr[1] - tl[1]) * c / 24 + rh * r, y1 = tl[1] + (tr[1] - tl[1]) * (c + 1) / 24 + rh * r; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineTo(x1, y1 + rh); g.lineTo(x0, y0 + rh); g.closePath(); g.fill(); } g.restore(); }
+        g.fillStyle = q.item ? '#4a21b8' : '#17181c'; g.beginPath(); g.moveTo(tl[0], tl[1]); g.lineTo(tr[0], tr[1]); g.lineTo(mr[0], mr[1]); g.lineTo(ml[0], ml[1]); g.closePath(); g.fill();
+        if (q.item) { g.save(); g.beginPath(); g.moveTo(tl[0], tl[1]); g.lineTo(tr[0], tr[1]); g.lineTo(mr[0], mr[1]); g.lineTo(ml[0], ml[1]); g.closePath(); g.clip(); g.fillStyle = '#ffcb2e'; for (let c = 0; c < 16; c += 2) { const x0 = tl[0] + (tr[0] - tl[0]) * c / 16, x1 = tl[0] + (tr[0] - tl[0]) * (c + 1) / 16, y0 = tl[1] + (tr[1] - tl[1]) * c / 16, y1 = tl[1] + (tr[1] - tl[1]) * (c + 1) / 16; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineTo(x1, ml[1] + (mr[1] - ml[1]) * (c + 1) / 16); g.lineTo(x0, ml[1] + (mr[1] - ml[1]) * c / 16); g.closePath(); g.fill(); } g.restore(); const bhh = ml[1] - tl[1], tcx = (tl[0] + tr[0]) / 2, tcy = (tl[1] + tr[1] + ml[1] + mr[1]) / 4; if (bhh > 7) { g.fillStyle = '#fff'; g.strokeStyle = '#2a0f78'; g.lineWidth = Math.max(2, bhh * .12); g.font = '900 ' + Math.round(bhh * .62) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.strokeText('🎁 ITEM', tcx, tcy); g.fillText('🎁 ITEM', tcx, tcy); } }
+        else {
+        const cw = Math.max(2, (tr[0] - tl[0]) / 24); g.save(); g.beginPath(); g.moveTo(tl[0], tl[1]); g.lineTo(tr[0], tr[1]); g.lineTo(mr[0], mr[1]); g.lineTo(ml[0], ml[1]); g.closePath(); g.clip(); g.fillStyle = '#f4f4f4'; const rh = (ml[1] - tl[1]) / 2; for (let c = 0; c < 24; c++) for (let r = 0; r < 2; r++) if ((c + r) & 1) { const x0 = tl[0] + (tr[0] - tl[0]) * c / 24, x1 = tl[0] + (tr[0] - tl[0]) * (c + 1) / 24, y0 = tl[1] + (tr[1] - tl[1]) * c / 24 + rh * r, y1 = tl[1] + (tr[1] - tl[1]) * (c + 1) / 24 + rh * r; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.lineTo(x1, y1 + rh); g.lineTo(x0, y0 + rh); g.closePath(); g.fill(); } g.restore(); } }
     } else {
       const c = s[3], spec = CARS[c.id], carH = s[4], rel0 = angd(carH, cam.h), front = Math.abs(rel0) > PI / 2, rel = front ? angd(carH + PI, cam.h) : rel0;
-      const wpx = 2.0 * k; if (wpx < 3) { g.fillStyle = spec.c; g.fillRect(sx - wpx / 2, sy - wpx * .5, wpx, wpx * .5); } else drawCar(g, spec, sx, sy, wpx, { front, brake: c.brake, rel: rel * (o.mirror ? 1 : 1), num: c.id + 1 });
+      const wpx = 2.0 * k; if (wpx < 3) { g.fillStyle = spec.c; g.fillRect(sx - wpx / 2, sy - wpx * .5, wpx, wpx * .5); } else drawCar(g, spec, sx, sy, wpx, { front, brake: c.brake, rel: rel, num: c.id + 1, boost: c.boostT > 0, shield: c.shield > 0, stun: c.stun > 0, T: o.T });
+      if (o.proj) o.proj[c.id] = { x: sx, y: sy, w: wpx, f };
     }
   }
   g.restore();
@@ -383,6 +422,15 @@ const CSS = `
 .rcdr{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-50%);width:84px;height:84px;border-radius:50%;border:3px solid #ffffffcc;background:radial-gradient(circle at 35% 30%,#ff8a5c,#d11f2a 60%,#7a0b14);color:#fff;font:900 15px/1.05 ${FONT};letter-spacing:.04em;display:none;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0;z-index:4;box-shadow:0 6px 18px #000a;touch-action:manipulation}
 .rcdr small{font-size:10px;font-weight:700;opacity:.9}
 .rc.race .rcdr{display:flex}
+.rcit{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);width:62px;height:66px;border-radius:16px;border:2px solid #ffffff44;background:linear-gradient(#1a2233ee,#0b0f18ee);color:#fff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0;z-index:4;font-size:26px;line-height:1;touch-action:manipulation}
+.rcit small{font-size:10px;font-weight:800;color:#aab8d4}
+.rc.race .rcit{display:flex}
+#rcit0{left:calc(50% - 42px - 12px - 62px)}#rcit1{left:calc(50% + 42px + 12px)}
+.rcit.e{border-style:dashed;opacity:.55;font-size:11px;color:#8090ad}
+.rcit.arm{border-color:#ffe36a;background:linear-gradient(#4a3c10f0,#1c1604f0);box-shadow:0 0 0 3px #ffcb2e77,0 0 22px #ffcb2e;animation:rchot .4s ease-in-out infinite alternate}
+.rcit.arm small{color:#ffe36a}
+.rcit:active{transform:scale(.94)}
+
 .rcdr:active{transform:translateX(-50%) scale(.93)}
 .rcdr.hot{animation:rchot .45s ease-in-out infinite alternate;border-color:#ffe36a;box-shadow:0 0 0 4px #ffcb2e88,0 0 26px #ffcb2e}
 .rcdr.cd{filter:grayscale(.85) brightness(.6)}
@@ -412,13 +460,13 @@ export async function openRace(br) {
     '<div class="rcsel" id="rcsel"><div class="rch"><h2><i>🏁</i> 자동차 레이싱</h2><div class="rcbal"><small>보유 잔액</small><b id="rcb">0</b></div></div>' +
     '<div class="rcsub">8자 서킷 · 3바퀴 · 10대 출전 · 내 차는 자동 주행, 드리프트만 직접!</div>' +
     '<div class="rcrule">참가비 <b>1억 USDT</b> (결과와 상관없이 소모) · 최소 배팅금 <b>100억 USDT</b><div class="r"><span>1등 ×5</span><span>2등 ×2</span><span>3등 원금 보존</span><span class="l">4등 이하 전액 손실</span></div>' +
-    '커브에서 타이밍 맞춰 <b>DRIFT</b> 성공 시 소폭 가속 + <b>20%</b> 확률로 앞 차 추월 (1등이면 유지)</div>' +
+    '커브에서 창이 열리면 <b>1초 안에</b> DRIFT! 못 누르면 기회 끝, <b>잘못 누르면 속도 50% 감소</b>. 타이밍이 정확할수록 가속·추월 확률(12/20/30%)이 올라요.<br>반 바퀴마다 <b>아이템 🎁</b> 지급(2칸): ⚡부스터 · 🚀미사일 · 🛡️방어권 — <b>두 번 눌러</b> 사용. 상대 9명도 아이템을 씁니다!</div>' +
     '<div class="rch3">① 내 차 선택</div><div class="rcgrid" id="rcg"></div>' +
     '<div class="rch3">② 배팅금 입력</div><div class="rcbet"><div class="rcin"><input id="rcin" inputmode="numeric" autocomplete="off" placeholder="10,000,000,000"><span>USDT</span></div><div class="rcprev" id="rcpv"></div>' +
     '<div class="rcch" id="rcch"><button data-a="min">최소 100억</button><button data-a="p100">+100억</button><button data-a="p1000">+1000억</button><button data-a="x2">×2</button><button data-a="max">MAX</button></div>' +
     '<div class="rcsum" id="rcsum"></div><div class="rcerr" id="rcerr"></div></div></div>' +
     '<div class="rcbar" id="rcbar"><button class="rcgo" id="rcgo">START (3초 후 출발)</button></div>' +
-    '<button class="rcdr" id="rcdr">DRIFT<small>드리프트</small></button>' +
+    '<button class="rcdr" id="rcdr">DRIFT<small>드리프트</small></button><button class="rcit e" id="rcit0"></button><button class="rcit e" id="rcit1"></button>' +
     '<div class="rcres" id="rcres"><div class="cd2"></div></div>' +
     '<div class="rccf" id="rccf"><div class="cd2"><p>경기를 중단하면 <b>지금 상태에서 자동 주행으로 끝까지 진행</b>해 결과를 바로 정산합니다. 참가비와 배팅금은 환불되지 않습니다.</p><div class="bt"><button id="rccn">계속 달리기</button><button class="p" id="rcst">중단하고 정산</button></div></div></div>';
   document.body.appendChild(root); document.body.style.overflow = 'hidden';
@@ -426,7 +474,7 @@ export async function openRace(br) {
   let W = 0, H = 0, dpr = 1, alive = true, raf = 0, last = performance.now(), T = 0, Lc = null, dprCap = 2, qual = 1, ema = .016, qT = 0;
 
   /* ---- 상태 ---- */
-  let phase = 'sel', sel = -1, bet = CFG.minBet, sim = null, cd = 0, cdLast = 4, acc = 0, goT = 0, finT = -1, settled = false, paid = 0, msgs = [], prevRank = 0, dfx = null, wheel = 0, camH = 0, camInit = false, gearNow = 1, gearOld = 1, shiftT = 1, rpm = .3, kmh = 0, shakeT = 0, roll = 0, lastGoodRank = 0;
+  let proj = {}, phase = 'sel', sel = -1, bet = CFG.minBet, sim = null, cd = 0, cdLast = 4, acc = 0, goT = 0, finT = -1, settled = false, paid = 0, msgs = [], prevRank = 0, dfx = null, wheel = 0, camH = 0, camInit = false, gearNow = 1, gearOld = 1, shiftT = 1, rpm = .3, kmh = 0, shakeT = 0, roll = 0, lastGoodRank = 0, armed = -1, armAt = 0, itKey = '', fxWarn = 0, fxHit = -9, fxBlock = -9, fxBoost = 0, fxWrong = 0, hitShake = 0, lastWarnN = 0, tickT = 0;
   const bal = () => +getBal() || 0;
   function layout() {
     W = root.clientWidth; H = root.clientHeight; dpr = Math.min(window.devicePixelRatio || 1, dprCap); if (W * H * dpr * dpr > 2.4e6) dpr = Math.max(1, Math.sqrt(2.4e6 / (W * H)));
@@ -478,7 +526,7 @@ export async function openRace(br) {
     const sub = r.rank <= 3 ? '배당 ×' + CFG.mult[r.rank - 1] + ' 적용' : '참가비와 배팅금을 모두 잃었습니다';
     $('rcres').querySelector('.cd2').innerHTML = '<h3 class="' + cls + '">' + ttl + '</h3><p>' + CARS[sel].n + ' (#' + (sel + 1) + ') · 기록 ' + r.time.toFixed(1) + '초<br>' + sub + '</p>' +
       '<div>지급 <span class="big">' + kfmt(r.pay) + ' USDT</span></div><div style="margin-top:4px">순손익 <span class="big ' + (r.net >= 0 ? 'w' : 'l') + '">' + (r.net >= 0 ? '+' : '−') + kfmt(Math.abs(r.net)) + ' USDT</span></div>' +
-      '<div class="ord">' + ord.map((c, i) => '<span class="' + (c.id === sel ? 'me' : '') + '">' + (i + 1) + '위 #' + (c.id + 1) + '</span>').join('') + '</div>' +
+      '<div style="font-size:11px;color:#9fb0cc;margin-top:8px">드리프트 성공 ' + sim.D.ok + '/6 (PERFECT ' + sim.D.grades[2] + ') · 오입력 ' + sim.D.wrong + ' · 아이템 사용 ' + sim.P.used + ' · 피격 ' + sim.P.hit + ' · 방어 ' + sim.P.blocked + '</div><div class="ord">' + ord.map((c, i) => '<span class="' + (c.id === sel ? 'me' : '') + '">' + (i + 1) + '위 #' + (c.id + 1) + '</span>').join('') + '</div>' +
       '<div class="bt"><button id="rcex">나가기</button><button class="p" id="rcag">다시 하기</button></div>';
     $('rcres').classList.add('on'); $('rcex').onclick = close; $('rcag').onclick = again; sfx(r.rank <= 3 ? 'rc_win' : 'rc_lose');
   }
@@ -496,10 +544,18 @@ export async function openRace(br) {
   const drBtn = $('rcdr');
   function onDrift(e) {
     if (e) { e.preventDefault(); } if (phase !== 'race' || !sim) return; const r = sim.press();
-    if (r.ok) { dfx = { t: 0, dir: r.dir }; sfx('rc_drift'); msgs.push({ t: 0, txt: 'DRIFT 성공!', sub: r.pass ? '앞 차 추월!' : (r.roll ? '1위 유지' : '소폭 가속'), col: '#ffd54a' }); if (r.pass) setTimeout(() => sfx('rc_pass'), 450); }
-    else if (r.why !== 'cd') { sfx('rc_miss'); msgs.push({ t: 0, txt: r.why === 'done' ? '이미 성공한 커브' : '타이밍 미스', sub: '', col: '#ff7a6a' }); }
+    if (r.ok) { dfx = { t: 0, dir: r.dir }; sfx('rc_drift'); msgs.push({ t: 0, txt: ['', 'GOOD', 'GREAT!', 'PERFECT!!'][r.grade], sub: r.pass ? '앞 차 추월!' : (r.roll ? '1위 유지' : '소폭 가속'), col: ['', '#ffd54a', '#ffa23a', '#6dfff0'][r.grade] }); if (r.pass) setTimeout(() => sfx('rc_pass'), 450); }
+    else if (r.why !== 'cd') { sfx('rc_wrong'); fxWrong = 1; msgs.push({ t: 0, txt: '잘못 눌렀다!', sub: '속도 −50%', col: '#ff7a6a' }); }
   }
   drBtn.addEventListener('pointerdown', onDrift);
+  const itB = [$('rcit0'), $('rcit1')];
+  function onItem(i, e) {
+    if (e) e.preventDefault(); if (phase !== 'race' || !sim) return; const P = sim.P, it = P.items[i]; if (!it) return;
+    if (armed === i && T - armAt < 2.5) { armed = -1; const r = sim.useItem(P, i); if (!r.ok) { msgs.push({ t: 0, txt: r.why === 'notarget' ? '앞 차가 없습니다' : r.why === 'active' ? '방어막 작동 중' : '지금은 사용할 수 없어요', sub: '', col: '#ff9a8a' }); } }
+    else { armed = i; armAt = T; sfx('rl_tick'); }
+    itKey = '';
+  }
+  itB.forEach((b, i) => b.addEventListener('pointerdown', e => onItem(i, e)));
   const onKey = e => { if (e.code === 'Space' || e.key === 'Enter') { if (phase === 'race') onDrift(e); } }; window.addEventListener('keydown', onKey);
 
   /* ---- 프레임 ---- */
@@ -518,19 +574,32 @@ export async function openRace(br) {
   function update(dt) {
     const P = sim.P; kmh = P.v * 3.6;
     const rk = sim.rank(P); if (phase === 'race' && rk !== prevRank) { if (rk < prevRank) { if (!(dfx && dfx.t < 2.5 && msgs.length && msgs[msgs.length - 1].sub === '앞 차 추월!')) msgs.push({ t: 0, txt: '▲ ' + rk + '위', sub: '', col: '#6dff9f' }); } else msgs.push({ t: 0, txt: '▼ ' + rk + '위', sub: '', col: '#ff9a8a' }); prevRank = rk; }
-    const u = P.s + S0; pathAt(u + 7); const th = P3[2], kap = P3[3];
+    const u = P.s + S0; pathAt(u + 11); const th = P3[2], kap = P3[3];
     if (!camInit) { camH = th; camInit = true; } camH += angd(th, camH) * (1 - Math.exp(-9 * dt));
     if (dfx) { dfx.t += dt; if (dfx.t > 2) dfx = null; }
     const env = dfx ? Math.sin(PI * clamp(dfx.t / 1.8, 0, 1)) : 0, dd = dfx ? dfx.dir : 0;
     pathAt(u); const nx = -Math.sin(P3[2]), ny = Math.cos(P3[2]); const px = P3[0] + nx * (P.lat + .38), py = P3[1] + ny * (P.lat + .38);
     shakeT += dt * (8 + kmh * .08);
-    cam.x = px; cam.y = py; cam.u = u; cam.h = camH + dd * .3 * env; cam.roll = -dd * .07 * env + Math.sin(shakeT * 1.7) * .0025 * clamp(kmh / 200, 0, 1.2);
+    cam.x = px; cam.y = py; cam.u = u; cam.h = camH + dd * .3 * env; cam.roll = -dd * .07 * env + Math.sin(shakeT * 1.7) * .0025 * clamp(kmh / 280, 0, 1.2) + Math.sin(T * 55) * .035 * hitShake + Math.sin(T * 33) * .006 * fxBoost;
     const wt = -clamp(kap * 9500, -135, 135) * PI / 180 * (1 + env * .45) - dd * env * .55; wheel += (wt - wheel) * (1 - Math.exp(-6 * dt));
-    const GT = [0, 45, 85, 130, 180, 230]; let gr = 1; for (let i = 1; i < 6; i++) if (kmh >= GT[i]) gr = i + 1; if (gr !== gearNow) { gearOld = gearNow; gearNow = gr; shiftT = 0; sfx('rc_shift'); } shiftT = Math.min(1, shiftT + dt / .3);
-    const lo = GT[gr - 1], hi = GT[gr] || 290; rpm = .26 + .62 * clamp((kmh - lo) / (hi - lo), 0, 1) - (shiftT < 1 ? .18 * Math.sin(PI * shiftT) : 0);
-    eng.set(rpm, clamp(kmh / 240, 0, 1));
+    const GT = [0, 63, 119, 182, 252, 322]; let gr = 1; for (let i = 1; i < 6; i++) if (kmh >= GT[i]) gr = i + 1; if (gr !== gearNow) { gearOld = gearNow; gearNow = gr; shiftT = 0; sfx('rc_shift'); } shiftT = Math.min(1, shiftT + dt / .3);
+    const lo = GT[gr - 1], hi = GT[gr] || 406; rpm = .26 + .62 * clamp((kmh - lo) / (hi - lo), 0, 1) - (shiftT < 1 ? .18 * Math.sin(PI * shiftT) : 0);
+    eng.set(rpm, clamp(kmh / 330, 0, 1));
+    const me = sim.pi; for (const e of sim.ev) {
+      if (e.k === 'item' && e.c === me) { msgs.push({ t: 0, txt: '🎁 ' + ITEMS[e.item].ic + ' ' + ITEMS[e.item].n, sub: ITEMS[e.item].d, col: '#d6b6ff' }); sfx('rc_item'); itKey = ''; }
+      else if (e.k === 'full' && e.c === me) msgs.push({ t: 0, txt: '아이템 칸이 가득!', sub: '', col: '#b8c4dc' });
+      else if (e.k === 'use' && e.c === me) { itKey = ''; if (e.item === 'boost') { sfx('rc_boost'); msgs.push({ t: 0, txt: '⚡ 부스터!', sub: '속도 +50% · 2초', col: '#ffb02e' }); } else if (e.item === 'shield') { sfx('rc_shield'); msgs.push({ t: 0, txt: '🛡️ 방어막 ON', sub: '5초간 미사일 1회 방어', col: '#7fe3ff' }); } }
+      else if (e.k === 'launch') { if (e.c === me) { sfx('rc_launch'); msgs.push({ t: 0, txt: '🚀 미사일 발사!', sub: '3초 후 #' + (e.to + 1) + ' 격추', col: '#ff9a6a' }); } if (e.to === me) { sfx('rc_warn'); lastWarnN = 4; } }
+      else if (e.k === 'block') { if (e.c === me) { fxBlock = T; sfx('rc_block'); msgs.push({ t: 0, txt: '방어 성공!', sub: '방어막이 깨졌다', col: '#7fe3ff' }); } else if (e.from === me) msgs.push({ t: 0, txt: '#' + (e.c + 1) + ' 방어함', sub: '', col: '#b8c4dc' }); }
+      else if (e.k === 'hit') { if (e.c === me) { fxHit = T; hitShake = 1; sfx('rc_boom'); msgs.push({ t: 0, txt: '격추당했다!', sub: '2초 정지', col: '#ff5a4a' }); } else if (e.from === me) { sfx('rc_pass'); msgs.push({ t: 0, txt: '🎯 격추 성공!', sub: '#' + (e.c + 1), col: '#ffd54a' }); } }
+      else if (e.k === 'miss') msgs.push({ t: 0, txt: '타이밍 놓침', sub: '이번 커브는 기회 끝', col: '#b8c4dc' });
+    } sim.ev.length = 0;
+    const myM = sim.missiles.filter(m => m.to === sim.P); fxWarn = myM.length ? Math.min(...myM.map(m => m.t)) : 0; if (fxWarn > 0) { const nn = Math.ceil(fxWarn); if (nn !== lastWarnN && nn >= 1) { lastWarnN = nn; sfx('rc_count', nn); } }
+    fxBoost = clamp(fxBoost + ((P.boostT > 0 ? 1 : (sim.D.boostT > 0 ? .45 : 0)) - fxBoost) * (1 - Math.exp(-9 * dt)), 0, 1); fxWrong = Math.max(0, fxWrong - dt * .6); hitShake = Math.max(0, hitShake - dt * .8);
+    if (armed >= 0 && T - armAt > 2.5) { armed = -1; itKey = ''; }
+    const key = P.items.join() + '|' + armed + '|' + P.shield; if (key !== itKey) { itKey = key; itB.forEach((b, i) => { const it = P.items[i]; b.className = 'rcit' + (it ? '' : ' e') + (armed === i ? ' arm' : ''); b.innerHTML = it ? ITEMS[it].ic + '<small>' + (armed === i ? '한 번 더!' : ITEMS[it].n) + '</small>' : '비어있음'; }); }
     for (const m of msgs) m.t += dt; msgs = msgs.filter(m => m.t < 1.9);
-    const z = sim.zone(); drBtn.classList.toggle('hot', phase === 'race' && z.inWin && !z.done && P.fin < 0); drBtn.classList.toggle('cd', sim.D.cd > 0);
+    const z = sim.zone(); drBtn.classList.toggle('hot', phase === 'race' && z.win && P.fin < 0); drBtn.classList.toggle('cd', sim.D.cd > 0);
   }
 
   /* ---- 그리기 ---- */
@@ -538,13 +607,41 @@ export async function openRace(br) {
     g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
     if (phase === 'sel' || !sim) return;
     if (phase === 'count') { drawOverview(); return; }
-    const P = sim.P, L = Lc, z = goT < .9 ? 1 + .35 * Math.pow(1 - goT / .9, 2) : 1;
-    drawWorld(g, 0, 0, W, L.wsB, cam, { F: L.F, hy: L.hy, cars: sim.cars, skip: P, zoom: z, dir: 1, maxd: qual ? 380 : 230, lod: qual ? 1 : 2 });
+    const P = sim.P, L = Lc, z = (goT < .9 ? 1 + .35 * Math.pow(1 - goT / .9, 2) : 1) * (1 + .07 * fxBoost);
+    proj = {}; drawWorld(g, 0, 0, W, L.wsB, cam, { F: L.F, hy: L.hy, cars: sim.cars, skip: P, zoom: z, dir: 1, maxd: qual ? 420 : 260, lod: qual ? 1 : 2, proj, T });
     /* 속도감 라인 */
-    if (kmh > 120) { const a = clamp((kmh - 120) / 150, 0, .5); g.strokeStyle = 'rgba(255,255,255,' + a * .5 + ')'; g.lineWidth = 1.2; const vx = W / 2, vy = L.hy; for (let i = 0; i < 16; i++) { const ang = (i / 16) * TAU + ((T * .9 + i * .37) % 1) * .05, r0 = W * (.36 + ((T * 2.2 + i * .173) % 1) * .5), r1 = r0 + W * .12 * a * 2; const cx0 = vx + Math.cos(ang) * r0, cy0 = vy + Math.sin(ang) * r0 * .7, cx1 = vx + Math.cos(ang) * r1, cy1 = vy + Math.sin(ang) * r1 * .7; if (cy0 > L.dashY - 8) continue; g.beginPath(); g.moveTo(cx0, cy0); g.lineTo(cx1, Math.min(cy1, L.dashY - 8)); g.stroke(); } }
+    if (kmh > 200 || fxBoost > .05) { const a = clamp((kmh - 200) / 200 + fxBoost * .55, 0, 1); g.strokeStyle = 'rgba(255,255,255,' + a * .55 + ')'; g.lineWidth = 1.2 + fxBoost * 1.4; const vx = W / 2, vy = L.hy; for (let i = 0; i < 16 + (fxBoost * 14 | 0); i++) { const ang = (i / (16 + (fxBoost * 14 | 0))) * TAU + ((T * .9 + i * .37) % 1) * .05, r0 = W * (.36 + ((T * 2.2 + i * .173) % 1) * .5), r1 = r0 + W * .12 * a * 2; const cx0 = vx + Math.cos(ang) * r0, cy0 = vy + Math.sin(ang) * r0 * .7, cx1 = vx + Math.cos(ang) * r1, cy1 = vy + Math.sin(ang) * r1 * .7; if (cy0 > L.dashY - 8) continue; g.beginPath(); g.moveTo(cx0, cy0); g.lineTo(cx1, Math.min(cy1, L.dashY - 8)); g.stroke(); } }
     if (dfx) { const e = Math.sin(PI * clamp(dfx.t / 1.8, 0, 1)); for (let i = 0; i < 9; i++) { const p = (dfx.t * 1.6 + i * .13) % 1, sx = (i % 2 ? .12 : .88) * W + (i % 2 ? -1 : 1) * p * W * .12, sy = L.dashY - 20 - p * 70; g.fillStyle = 'rgba(235,235,235,' + (.35 * (1 - p) * e) + ')'; g.beginPath(); g.arc(sx, sy, 10 + p * 34, 0, TAU); g.fill(); } }
-    cockpit(); hud();
+    cockpit(); fxLayer(); hud();
     if (goT < .6) { g.fillStyle = 'rgba(255,255,255,' + (.8 * (1 - goT / .6)) + ')'; g.fillRect(0, 0, W, H); }
+  }
+  function fxLayer() {
+    const L = Lc, P = sim.P, ww = L.wsB;
+    if (fxBoost > .02) { const bg2 = g.createRadialGradient(W / 2, L.hy, W * .25, W / 2, L.hy, W * .85); bg2.addColorStop(0, 'rgba(255,170,40,0)'); bg2.addColorStop(1, 'rgba(255,130,20,' + (.55 * fxBoost) + ')'); g.fillStyle = bg2; g.fillRect(0, 0, W, L.dashY + 10);
+      if (P.boostT > 0) { g.fillStyle = 'rgba(255,230,160,' + (.5 + .3 * Math.sin(T * 40)) * fxBoost + ')'; g.font = '900 ' + Math.round(W * .06) + 'px ' + FONT; g.textAlign = 'center'; g.fillText('BOOST', W / 2, L.hdr + H * .075); } }
+    if (fxWrong > .02) { const rg2 = g.createRadialGradient(W / 2, L.hy, W * .2, W / 2, L.hy, W * .8); rg2.addColorStop(0, 'rgba(255,40,40,0)'); rg2.addColorStop(1, 'rgba(255,40,40,' + (.45 * Math.min(1, fxWrong)) + ')'); g.fillStyle = rg2; g.fillRect(0, 0, W, L.dashY + 10); }
+    if (P.shield > 0) { const a = P.shield < 1.2 ? (.5 + .5 * Math.sin(T * 24)) : 1; const sg = g.createRadialGradient(W / 2, L.hy + 20, W * .3, W / 2, L.hy + 20, W * .78); sg.addColorStop(0, 'rgba(90,210,255,0)'); sg.addColorStop(1, 'rgba(90,210,255,' + (.38 * a) + ')'); g.fillStyle = sg; g.fillRect(0, 0, W, L.dashY + 10); g.strokeStyle = 'rgba(190,240,255,' + (.7 * a) + ')'; g.lineWidth = 2; g.beginPath(); g.ellipse(W / 2, L.hy + 30, W * .46, L.dashY * .42, 0, 0, TAU); g.stroke();
+      g.fillStyle = 'rgba(0,0,0,.5)'; rr(g, W - 112, L.hdr + 8, 62, 26, 13); g.fill(); g.fillStyle = '#9ff0ff'; g.font = '800 13px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🛡 ' + P.shield.toFixed(1) + 's', W - 81, L.hdr + 21); }
+    if (P.boostT > 0) { g.fillStyle = 'rgba(0,0,0,.5)'; rr(g, 10, L.hdr + 8, 64, 26, 13); g.fill(); g.fillStyle = '#ffd08a'; g.font = '800 13px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('⚡ ' + P.boostT.toFixed(1) + 's', 42, L.hdr + 21); }
+    if (sim.D.slow > 0) { g.fillStyle = 'rgba(160,0,0,.6)'; rr(g, 10, L.hdr + 40, 92, 26, 13); g.fill(); g.fillStyle = '#ffb0a8'; g.font = '800 13px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('속도 −50% ' + sim.D.slow.toFixed(1), 56, L.hdr + 53); }
+    /* 내 미사일: 조준선 + 날아가는 로켓 */
+    for (const m of sim.missiles) if (m.from === P) { const pr = proj[m.to.id], p = clamp(1 - m.t / CFG.missileT, 0, 1), tx = pr ? pr.x : W / 2, ty = pr ? pr.y - pr.w * .3 : L.hy - 30, w2 = pr ? Math.max(30, pr.w * .7) : 40;
+      g.strokeStyle = '#ff4030'; g.lineWidth = 2.5; g.beginPath(); g.arc(tx, ty, w2 * .5 + Math.sin(T * 14) * 2, 0, TAU); g.moveTo(tx - w2 * .8, ty); g.lineTo(tx - w2 * .3, ty); g.moveTo(tx + w2 * .8, ty); g.lineTo(tx + w2 * .3, ty); g.moveTo(tx, ty - w2 * .8); g.lineTo(tx, ty - w2 * .3); g.moveTo(tx, ty + w2 * .8); g.lineTo(tx, ty + w2 * .3); g.stroke();
+      g.fillStyle = '#fff'; g.font = '900 ' + Math.round(w2 * .5) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = 4; g.strokeText(Math.ceil(m.t), tx, ty - w2 * 1.05); g.fillText(Math.ceil(m.t), tx, ty - w2 * 1.05);
+      const e = p * p * (3 - 2 * p), rx = lerp(W / 2, tx, e), ry = lerp(L.dashY - 6, ty, e), ang = Math.atan2(ty - (L.dashY - 6), tx - W / 2), sz = lerp(26, 8, e);
+      g.save(); g.translate(rx, ry); g.rotate(ang); g.fillStyle = 'rgba(255,170,40,.9)'; g.beginPath(); g.moveTo(-sz * 1.0, 0); g.lineTo(-sz * 2.4 - Math.random() * sz, -sz * .3); g.lineTo(-sz * 2.4 - Math.random() * sz, sz * .3); g.closePath(); g.fill(); g.fillStyle = '#e9edf2'; rr(g, -sz, -sz * .32, sz * 1.6, sz * .64, sz * .3); g.fill(); g.fillStyle = '#e5242c'; g.beginPath(); g.moveTo(sz * .6, -sz * .32); g.lineTo(sz * 1.1, 0); g.lineTo(sz * .6, sz * .32); g.closePath(); g.fill(); g.restore(); }
+    /* 경고창 */
+    if (fxWarn > 0) { const pu = .5 + .5 * Math.sin(T * 14); g.fillStyle = 'rgba(255,0,0,' + (.12 + .18 * pu) + ')'; g.fillRect(0, 0, W, L.dashY + 10); const rg3 = g.createRadialGradient(W / 2, L.hy, W * .25, W / 2, L.hy, W * .8); rg3.addColorStop(0, 'rgba(255,0,0,0)'); rg3.addColorStop(1, 'rgba(255,0,0,' + (.5 * pu) + ')'); g.fillStyle = rg3; g.fillRect(0, 0, W, L.dashY + 10);
+      const pw = W * .78, ph = H * .17, px = W / 2 - pw / 2, py = H * .17; g.fillStyle = 'rgba(30,0,0,.82)'; rr(g, px, py, pw, ph, 16); g.fill(); g.strokeStyle = '#ff3b30'; g.lineWidth = 3; g.stroke();
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ff6a5c'; g.font = '900 ' + Math.round(W * .062) + 'px ' + FONT; g.fillText('⚠ 미사일 경고!', W / 2, py + ph * .24);
+      g.fillStyle = '#fff'; g.font = '900 ' + Math.round(W * .17) + 'px ' + FONT; g.fillText(Math.ceil(fxWarn), W / 2, py + ph * .62);
+      const hasSh = P.items.indexOf('shield') >= 0 || P.shield > 0; g.font = '800 ' + Math.round(W * .035) + 'px ' + FONT; g.fillStyle = hasSh ? '#9ff0ff' : '#ffb0a8'; g.fillText(P.shield > 0 ? '방어막 작동 중!' : hasSh ? '🛡️ 방어권을 두 번 눌러 사용하세요!' : '방어권이 없습니다…', W / 2, py + ph * .9); }
+    /* 방어 성공: 깨지는 방어막 */
+    const bt = T - fxBlock; if (bt >= 0 && bt < .9) { const a = 1 - bt / .9; g.save(); g.globalAlpha = a; g.strokeStyle = 'rgba(200,245,255,.95)'; g.lineWidth = 2; const cx0 = W / 2, cy0 = L.hy + 40; for (let i = 0; i < 14; i++) { const ang = i / 14 * TAU + .3, r1 = W * .05, r2 = W * (.25 + hsh(i * 3.1) * .5) * (.6 + bt); g.beginPath(); g.moveTo(cx0 + Math.cos(ang) * r1, cy0 + Math.sin(ang) * r1 * .8); g.lineTo(cx0 + Math.cos(ang + .08) * r2 * .6, cy0 + Math.sin(ang + .08) * r2 * .5); g.lineTo(cx0 + Math.cos(ang) * r2, cy0 + Math.sin(ang) * r2 * .8); g.stroke(); } g.fillStyle = 'rgba(150,230,255,' + (.25 * a) + ')'; g.fillRect(0, 0, W, L.dashY + 10); g.restore(); }
+    /* 피격: 폭발 + 정지 */
+    const ht = T - fxHit; if (ht >= 0 && ht < .7) { const a = 1 - ht / .7; g.fillStyle = 'rgba(255,200,80,' + a * .85 + ')'; g.fillRect(0, 0, W, H); const rg4 = g.createRadialGradient(W / 2, L.hy + 60, 4, W / 2, L.hy + 60, W * (.2 + ht * 1.1)); rg4.addColorStop(0, 'rgba(255,255,220,' + a + ')'); rg4.addColorStop(.5, 'rgba(255,120,20,' + a * .8 + ')'); rg4.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = rg4; g.fillRect(0, 0, W, H); }
+    if (P.stun > 0) { g.fillStyle = 'rgba(40,10,0,' + .35 + ')'; g.fillRect(0, 0, W, L.dashY + 10); for (let i = 0; i < 8; i++) { const p = (T * 1.2 + i * .13) % 1; g.fillStyle = 'rgba(30,30,30,' + (.5 * (1 - p)) + ')'; g.beginPath(); g.arc(W * (.15 + i * .1), L.dashY - p * H * .3, 20 + p * 50, 0, TAU); g.fill(); }
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '900 ' + Math.round(W * .1) + 'px ' + FONT; g.fillStyle = '#ff6a4a'; g.strokeStyle = 'rgba(0,0,0,.7)'; g.lineWidth = 6; g.strokeText('격추! ' + P.stun.toFixed(1) + 's', W / 2, H * .3); g.fillText('격추! ' + P.stun.toFixed(1) + 's', W / 2, H * .3); }
   }
   function cockpit() {
     const L = Lc, P = sim.P, { W, H, hdr, dashY } = L;
@@ -570,7 +667,7 @@ export async function openRace(br) {
     /* 계기판 */
     const cx = L.spX, cy = L.spY, r = L.spR;
     g.fillStyle = '#0a0b0e'; rr(g, cx - r * 2.35, cy - r * 1.18, r * 4.7, r * 2.36, r * .5); g.fill(); g.strokeStyle = 'rgba(255,255,255,.1)'; g.lineWidth = 1; g.stroke();
-    dial(g, cx, cy, r, kmh, 300, { major: 20, sub: 2, nums: true, numEvery: 2, red: 250 });
+    dial(g, cx, cy, r, kmh, 360, { major: 20, sub: 2, nums: true, numEvery: 2, red: 300 });
     g.fillStyle = '#fff'; g.font = '800 ' + Math.round(r * .5) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(Math.round(kmh), cx, cy + r * .42);
     g.fillStyle = '#8fa0ba'; g.font = '700 ' + Math.round(r * .15) + 'px ' + FONT; g.fillText('km/h', cx, cy + r * .72);
     dial(g, cx - r * 1.65, cy + r * .05, r * .62, rpm * 8, 8, { major: 1, sub: 1, nums: true, red: 6.5, fmt: v => v });
@@ -582,9 +679,9 @@ export async function openRace(br) {
     /* 기어봉 */
     const gp = i => [((i >> 1) - 1) * 1, (i & 1) ? 1 : -1]; const A = gp(gearOld - 1), B = gp(gearNow - 1); const p = shiftT; let kx, ky;
     if (p >= 1) { kx = B[0]; ky = B[1]; } else { const q = p * 3; if (q < 1) { kx = A[0]; ky = A[1] * (1 - q); } else if (q < 2) { kx = A[0] + (B[0] - A[0]) * (q - 1); ky = 0; } else { kx = B[0]; ky = B[1] * (q - 2); } }
-    drawStick(g, W * .84, H * .905, W * .045, kx, ky, gearNow, Math.sin(T * 40) * clamp(kmh / 240, 0, 1) * .8);
+    drawStick(g, W * .885, H * .915, W * .045, kx, ky, gearNow, Math.sin(T * 40) * clamp(kmh / 240, 0, 1) * .8);
     /* 내비 화면 */
-    const nx0 = W * .035, ny0 = H * .83, nw = W * .2, nh = H * .1; g.fillStyle = '#05080c'; rr(g, nx0 - 3, ny0 - 3, nw + 6, nh + 6, 8); g.fill(); g.strokeStyle = '#27405e'; g.lineWidth = 1; g.stroke();
+    const nx0 = W * .03, ny0 = H * .66, nw = W * .2, nh = H * .085; g.fillStyle = '#05080c'; rr(g, nx0 - 3, ny0 - 3, nw + 6, nh + 6, 8); g.fill(); g.strokeStyle = '#27405e'; g.lineWidth = 1; g.stroke();
     g.fillStyle = '#0b1522'; rr(g, nx0, ny0, nw, nh, 6); g.fill(); g.save(); rr(g, nx0, ny0, nw, nh, 6); g.clip(); const sc = (nw - 10) / (2 * (CC + R)); mapPath(g, nx0 + nw / 2, ny0 + nh / 2, sc); g.strokeStyle = '#3d86d8'; g.lineWidth = 4; g.lineJoin = 'round'; g.stroke();
     for (const c of sim.cars) { pathAt(c.s + S0); const x = nx0 + nw / 2 + P3[0] * sc, y = ny0 + nh / 2 - P3[1] * sc; g.fillStyle = c === P ? '#ffcb2e' : CARS[c.id].c; g.beginPath(); g.arc(x, y, c === P ? 3.4 : 2, 0, TAU); g.fill(); } g.restore();
   }
@@ -601,16 +698,22 @@ export async function openRace(br) {
     g.font = '900 ' + Math.round(ph * .62) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = rk === 1 ? '#ffd54a' : '#fff'; g.fillText(rk + ' / ' + CFG.cars, W / 2, py + ph / 2 + 1);
     const lap = clamp(Math.floor(P.s / LAP) + 1, 1, CFG.laps); g.textAlign = 'left'; g.font = '800 ' + Math.round(hdr * .27) + 'px ' + FONT; g.fillStyle = '#cfe0ff'; g.fillText('LAP ' + lap + '/' + CFG.laps, 12, hdr * .5);
     g.textAlign = 'right'; const tt = Math.max(0, sim.t - 0); const mm = Math.floor(tt / 60), ss = tt % 60; g.fillStyle = '#a9bad8'; g.fillText((mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss.toFixed(1), W - 58, hdr * .5);
-    /* 드리프트 게이지 */
+    /* 드리프트 게이지 (1초 창) */
     if (phase === 'race' && P.fin < 0) { const z = sim.zone(), bw = W * .46, bx = W / 2 - bw / 2, by = L.dashY - H * .06;
-      if (z.arc >= 0 || z.toNext < 130) {
-        g.fillStyle = 'rgba(0,0,0,.32)'; rr(g, bx - 8, by - 19, bw + 16, 38, 12); g.fill();
-        g.font = '800 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = z.arc < 0 ? '#9fb6dd' : z.done ? '#6dff9f' : z.inWin ? '#ffe36a' : '#fff'; g.fillText(z.arc < 0 ? '커브 접근 중 · 준비!' : z.done ? '드리프트 성공 ✔' : z.inWin ? '지금 DRIFT!!' : '타이밍을 기다리세요', W / 2, by - 8);
-        g.fillStyle = '#1b2433'; rr(g, bx, by + 2, bw, 10, 5); g.fill(); g.fillStyle = z.done ? 'rgba(109,255,159,.55)' : 'rgba(255,214,60,.85)'; rr(g, bx + bw * WIN[0], by + 2, bw * (WIN[1] - WIN[0]), 10, 5); g.fill();
-        if (z.arc >= 0) { const mxp = bx + bw * z.fr; g.fillStyle = '#fff'; g.beginPath(); g.moveTo(mxp, by + 14); g.lineTo(mxp - 5, by + 22); g.lineTo(mxp + 5, by + 22); g.closePath(); g.fill(); g.fillRect(mxp - 1.5, by, 3, 12); }
+      const show = z.win || (z.arc < 0 && z.toNext < 260) || (z.arc >= 0 && z.fr < WIN0 && !z.done) || (z.arc >= 0 && z.done);
+      if (show) {
+        g.fillStyle = 'rgba(0,0,0,.34)'; rr(g, bx - 8, by - 19, bw + 16, 38, 12); g.fill();
+        g.font = '800 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle';
+        const lab = z.win ? '지금 DRIFT!! (' + z.left.toFixed(2) + '초)' : z.arc >= 0 && z.done ? (z.done === true ? '드리프트 성공 ✔' : '이번 커브 기회 끝') : z.arc < 0 ? '커브 접근 중 · 준비!' : '곧 창이 열립니다!';
+        g.fillStyle = z.win ? '#ffe36a' : z.done === true ? '#6dff9f' : z.done ? '#9aa6bd' : '#fff'; g.fillText(lab, W / 2, by - 8);
+        g.fillStyle = '#1b2433'; rr(g, bx, by + 2, bw, 10, 5); g.fill();
+        if (z.win) { const tp = clamp(z.tOpen / CFG.driftWin, 0, 1); g.save(); rr(g, bx, by + 2, bw, 10, 5); g.clip(); g.fillStyle = 'rgba(255,214,60,.85)'; g.fillRect(bx, by + 2, bw, 10); g.fillStyle = 'rgba(255,150,40,.95)'; g.fillRect(bx + bw * .2, by + 2, bw * .6, 10); g.fillStyle = '#6dfff0'; g.fillRect(bx + bw * .35, by + 2, bw * .3, 10); g.restore();
+          const mxp = bx + bw * tp; g.fillStyle = '#fff'; g.beginPath(); g.moveTo(mxp, by + 14); g.lineTo(mxp - 5, by + 22); g.lineTo(mxp + 5, by + 22); g.closePath(); g.fill(); g.fillRect(mxp - 1.5, by, 3, 12); }
+        else if (z.arc < 0) { g.fillStyle = 'rgba(255,255,255,.5)'; rr(g, bx, by + 2, bw * clamp(1 - z.toNext / 260, 0, 1), 10, 5); g.fill(); }
+        else if (!z.done) { g.fillStyle = 'rgba(255,255,255,.5)'; rr(g, bx, by + 2, bw * clamp(z.fr / WIN0, 0, 1), 10, 5); g.fill(); }
       } }
     /* 메시지 */
-    const ms = msgs.slice(-2); let yy = H * .2; ms.forEach((m, i) => { const a = m.t < .15 ? m.t / .15 : clamp(1 - (m.t - 1.2) / .6, 0, 1), sc = 1 + .25 * Math.max(0, 1 - m.t * 5); g.save(); g.globalAlpha = a; g.translate(W / 2, yy); g.scale(sc, sc); g.font = '900 ' + Math.round(W * .085) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,.65)'; g.fillStyle = m.col; g.strokeText(m.txt, 0, 0); g.fillText(m.txt, 0, 0); if (m.sub) { g.font = '800 ' + Math.round(W * .045) + 'px ' + FONT; g.strokeText(m.sub, 0, W * .075); g.fillStyle = '#fff'; g.fillText(m.sub, 0, W * .075); } g.restore(); yy += m.sub ? W * .24 : W * .13; });
+    const ms = msgs.slice(-2); let yy = H * (fxWarn > 0 || sim.P.stun > 0 ? .43 : .2); ms.forEach((m, i) => { const a = m.t < .15 ? m.t / .15 : clamp(1 - (m.t - 1.2) / .6, 0, 1), sc = 1 + .25 * Math.max(0, 1 - m.t * 5); g.save(); g.globalAlpha = a; g.translate(W / 2, yy); g.scale(sc, sc); g.font = '900 ' + Math.round(W * .085) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 5; g.strokeStyle = 'rgba(0,0,0,.65)'; g.fillStyle = m.col; g.strokeText(m.txt, 0, 0); g.fillText(m.txt, 0, 0); if (m.sub) { g.font = '800 ' + Math.round(W * .045) + 'px ' + FONT; g.strokeText(m.sub, 0, W * .075); g.fillStyle = '#fff'; g.fillText(m.sub, 0, W * .075); } g.restore(); yy += m.sub ? W * .24 : W * .13; });
   }
   function drawOverview() {
     const bg = g.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#101a2c'); bg.addColorStop(1, '#06090f'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
