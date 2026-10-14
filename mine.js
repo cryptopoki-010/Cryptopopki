@@ -11,12 +11,11 @@ const eio = t => { t = clamp(t, 0, 1); return t < .5 ? 2 * t * t : 1 - Math.pow(
 function mul32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 /* ---- 설정(한 곳에서 조절) ---- */
-export const CFG = { cycle: 10, min: 1, max: 3 };
+export const CFG = { cycle: 10, min: 1, max: 3, day: 864e5 };
 const W = 390, H = 300, GY = 240;            /* 논리 좌표계 */
 const CART_D = 192, CART_M = 238, MOUSE_GAP = 40, STRIKE_X = 306;
 const T_ = { take: 1.4, appr: 1.9, hit0: 2.3, hitD: .33, hitEnd: 5.6, put: 5.9, toss: 6.8, push: 8.2, dump: 9.3, reward: 9.4 };
 
-export function rollReward() { return Math.round((CFG.min + Math.random() * (CFG.max - CFG.min)) * 100) / 100; }
 
 /* 사이클 시간 t(0~10) → 자세/상태 (순수 함수) */
 function pose(t) {
@@ -160,48 +159,56 @@ export function mountMine(el, br) {
   if (!document.getElementById('mncss')) { const s = document.createElement('style'); s.id = 'mncss'; s.textContent = CSS; document.head.appendChild(s); }
   const root = document.createElement('div'); root.className = 'mn';
   root.innerHTML = '<div class="mnst"><button class="on" data-v="m">채굴장</button><button data-v="s">상점</button></div>' +
-    '<div class="mnv" id="mnm"><div class="mnc"><canvas></canvas></div><div class="mnin"><div><small>이번 접속 채굴</small><b id="mntot">0.00</b><i>USDT</i></div><div><small>완료 사이클</small><b id="mncyc">0</b><i>회</i></div><div><small>직전 보상</small><b id="mnlast">-</b></div></div><p class="mnnt">생쥐가 자동으로 일합니다. 1사이클 10초, 보상 1~3 USDT. 이 탭을 열어 둔 동안만 진행돼요.</p></div>' +
+    '<div class="mnv" id="mnm"><div class="mnhd"><div><b id="mnstt">대기 중</b><small id="mnrem">-</small></div><button id="mngo">채굴 시작</button></div><div class="mnc"><canvas></canvas></div><div class="mnin"><div><small>이번 24시간 채굴</small><b id="mntot">0.00</b><i>USDT</i></div><div><small>완료 사이클</small><b id="mncyc">0</b><i>회</i></div><div><small>직전 보상</small><b id="mnlast">-</b></div></div><p class="mnnt">시작 후 24시간 동안은 이 화면을 닫아도 채굴이 계속됩니다. 24시간이 지나면 채굴 시작 버튼을 다시 눌러야 해요. 1사이클 10초, 보상 1~3 USDT.</p><p class="mnnt" id="mnlg" style="color:#e8a070"></p></div>' +
     '<div class="mnv" id="mns" hidden><div class="mnsoon"><b>준비중입니다</b><span>상점은 곧 열립니다.</span></div></div>';
   el.appendChild(root);
   const cv = root.querySelector('canvas'), g = cv.getContext('2d'), $ = id => root.querySelector('#' + id);
   root.querySelector('.mnst').onclick = e => { const b = e.target.closest('button'); if (!b) return; [...root.querySelectorAll('.mnst button')].forEach(x => x.classList.toggle('on', x === b)); $('mnm').hidden = b.dataset.v !== 'm'; $('mns').hidden = b.dataset.v !== 's'; if (b.dataset.v === 'm') resize(); };
-  let dpr = 1, bg = null, alive = true, raf = 0, last = performance.now(), T = 0, ct = 0, cyc = 0, reward = rollReward(), credited = false, sum = 0, lastR = 0, lastHit = -1, lastToss = -1, lastTilt = 0, shake = 0, wc = 0, popT = -1, popV = 0;
-  const parts = [];
+  let dpr = 1, bg = null, alive = true, raf = 0, last = performance.now(), T = 0, ct = 0, curK = -2, lastHit = -1, lastToss = -1, shake = 0, wc = 0, popT = -1, popV = 0, active = false, uiT = 0;
+  const parts = [], mine = () => br.getMine ? br.getMine() : { start: 0, done: 0 };
   function resize() { const w = root.querySelector('.mnc').clientWidth; if (!w) return; dpr = Math.min(window.devicePixelRatio || 1, 2); cv.style.height = Math.round(w * H / W) + 'px'; cv.width = Math.round(w * dpr); cv.height = Math.round(w * H / W * dpr); bg = paintBG(Math.max(.5, dpr * w / W)); }
   resize(); const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (alive) resize(); }) : null; ro && ro.observe(root.querySelector('.mnc'));
-
+  const hms = ms => { ms = Math.max(0, Math.ceil(ms / 1000)); const z = n => (n < 10 ? '0' : '') + n; return z(Math.floor(ms / 3600)) + ':' + z(Math.floor(ms % 3600 / 60)) + ':' + z(ms % 60); };
+  function ui() {
+    const m = mine(), now = Date.now(); active = !!m.start && now < m.start + CFG.day;
+    $('mnstt').textContent = active ? '채굴 중' : (m.start ? '채굴 종료 · 다시 시작해 주세요' : '대기 중');
+    $('mnrem').textContent = active ? '남은 시간 ' + hms(m.start + CFG.day - now) : '채굴 시작 버튼을 눌러 주세요';
+    const b = $('mngo'); b.disabled = active; b.textContent = active ? '채굴 중' : (m.start ? '다시 시작' : '채굴 시작');
+    $('mncyc').textContent = String(m.done || 0) + ' / 8640'; $('mntot').textContent = fmt(br.sumDone ? br.sumDone() : 0); $('mnlg').textContent = br.loggedIn && !br.loggedIn() ? '로그인하지 않으면 접속을 종료한 뒤의 채굴은 저장되지 않습니다.' : '';
+  }
+  $('mngo').onclick = () => { if (br.start && br.start()) { sfx('rl_start'); curK = -2; ui(); } };
+  ui();
   function P(k, x, y, vx, vy, l, r, c, gv) { parts.push({ k, x, y, vx, vy, l, m: l, r, c, gv: gv == null ? 600 : gv }); }
+  function paid(c, amt) {
+    if (!alive) return; popT = 0; popV = amt; $('mnlast').textContent = '+' + fmt(amt); sfx('rl_win', 1); ui();
+    for (let i = 0; i < 12; i++) P('g', 44 + Math.random() * 16, GY - 40, (Math.random() - .5) * 110, -150 - Math.random() * 90, .9, 2.4 + Math.random() * 1.5, GEM[(Math.random() * 4) | 0], 500);
+  }
   function update(dt) {
-    T += dt; const prev = ct; ct += dt; if (ct >= CFG.cycle) { ct -= CFG.cycle; cyc++; reward = rollReward(); credited = false; lastHit = -1; lastToss = -1; }
+    T += dt; const now = Date.now(), m = mine(); active = !!m.start && now < m.start + CFG.day;
+    if (active) { const el = now - m.start, k = Math.floor(el / (CFG.cycle * 1000)); ct = (el % (CFG.cycle * 1000)) / 1000; if (k !== curK) { curK = k; const p0 = pose(ct); lastHit = p0.k >= 0 ? p0.hits : -1; lastToss = p0.toss > 0 ? Math.floor(p0.toss * 12) : -1; } } else { ct = 0; curK = -2; }
+    uiT += dt; if (uiT > .5) { uiT = 0; ui(); }
     const p = pose(ct);
-    if (p.walking) wc += dt * (p.step === '곡괭이 꺼내기' ? 0 : 1);
-    /* 곡괭이 타격 이벤트 */
-    if (p.k >= 0 && p.hits > lastHit) {
+    if (active && p.walking) wc += dt * (p.step === '곡괭이 꺼내기' ? 0 : 1);
+    if (active && p.k >= 0 && p.hits > lastHit) {
       lastHit = p.hits; shake = 3.2; sfx('dk_slam', .12);
       for (let i = 0; i < 9; i++) P('c', 322 + Math.random() * 6, GY - 22 - Math.random() * 14, 40 + Math.random() * 110, -90 - Math.random() * 120, .55, 1.4 + Math.random() * 1.8, ORE[(Math.random() * 4) | 0]);
       for (let i = 0; i < 6; i++) P('s', 324, GY - 26, 60 + Math.random() * 160, -80 - Math.random() * 140, .3, 1.1, '#ffe27a', 300);
       for (let i = 0; i < 3; i++) P('d', 322 + Math.random() * 20, GY - 8, 10 + Math.random() * 30, -10 - Math.random() * 12, .8, 5 + Math.random() * 6, '#b9a98f', -10);
     }
-    /* 광석 던지기(수레로) */
-    if (p.toss > 0 && p.toss < 1) { const n = Math.floor(p.toss * 12); while (lastToss < n) { lastToss++; const x0 = 322 + Math.random() * 24, y0 = GY - 8, tx = CART_M + (Math.random() - .5) * 20, ty = GY - 26, TT = .42, gv = 900; P('t', x0, y0, (tx - x0) / TT, (ty - y0 - .5 * gv * TT * TT) / TT, TT, 3 + Math.random() * 1.6, ORE[(Math.random() * 4) | 0], gv); } }
-    /* 수레 쏟기 파티클 */
-    if (p.tilt > .7 && p.fill > .02 && ct < 8.95) { for (let i = 0; i < 2; i++) P('o', CART_D - 26 + Math.random() * 6, GY - 40 + Math.random() * 6, -50 - Math.random() * 50, -30 + Math.random() * 20, .6, 2.2 + Math.random() * 2, ORE[(Math.random() * 4) | 0], 700); if (Math.random() < .4) sfx('dk_flip'); }
-    /* 보상 확정 */
-    if (ct >= T_.reward && !credited) { credited = true; setBal(+(getBal() + reward).toFixed(2)); sum = +(sum + reward).toFixed(2); lastR = reward; popT = 0; popV = reward; $('mntot').textContent = fmt(sum); $('mncyc').textContent = String(cyc + 1); $('mnlast').textContent = '+' + fmt(reward); sfx('rl_win', 1); for (let i = 0; i < 12; i++) P('g', 44 + Math.random() * 16, GY - 40, (Math.random() - .5) * 110, -150 - Math.random() * 90, .9, 2.4 + Math.random() * 1.5, GEM[(Math.random() * 4) | 0], 500); }
+    if (active && p.toss > 0 && p.toss < 1) { const n = Math.floor(p.toss * 12); while (lastToss < n) { lastToss++; const x0 = 322 + Math.random() * 24, y0 = GY - 8, tx = CART_M + (Math.random() - .5) * 20, ty = GY - 26, TT = .42, gv = 900; P('t', x0, y0, (tx - x0) / TT, (ty - y0 - .5 * gv * TT * TT) / TT, TT, 3 + Math.random() * 1.6, ORE[(Math.random() * 4) | 0], gv); } }
+    if (active && p.tilt > .7 && p.fill > .02 && ct < 8.95) { for (let i = 0; i < 2; i++) P('o', CART_D - 26 + Math.random() * 6, GY - 40 + Math.random() * 6, -50 - Math.random() * 50, -30 + Math.random() * 20, .6, 2.2 + Math.random() * 2, ORE[(Math.random() * 4) | 0], 700); if (Math.random() < .4) sfx('dk_flip'); }
     if (popT >= 0) { popT += dt; if (popT > 1.4) popT = -1; }
-    /* 정제기 진동/연기 */
-    if (ct > 8.4 && ct < 9.7 && Math.random() < .25) P('d', 130 + Math.random() * 6, 6 + 0, 4 + Math.random() * 6, -16 - Math.random() * 10, 1.4, 5, '#d9d9e0', -6);
-    if (ct > 8.4 && ct < 9.7 && Math.random() < .25) P('d', 125, 6 + 0, 4, -20, 1.2, 5, '#d9d9e0', -6);
+    if (active && ct > 8.4 && ct < 9.7 && Math.random() < .35) P('d', 125 + Math.random() * 8, 6, 4 + Math.random() * 6, -18 - Math.random() * 10, 1.3, 5, '#d9d9e0', -6);
     shake = Math.max(0, shake - dt * 14);
     for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.l -= dt; if (q.l <= 0) { parts.splice(i, 1); continue; } q.vy += q.gv * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.k === 'c' && q.y > GY - 2) { q.y = GY - 2; q.vy *= -.25; q.vx *= .6; } if (q.k === 'o' && q.y > GY - 28 && q.x < 168) q.l = Math.min(q.l, .05); if (q.k === 'd') { q.r += dt * 6; } }
   }
   function render() {
     const w = cv.width / dpr; g.setTransform(dpr * w / W, 0, 0, dpr * w / W, 0, 0); g.clearRect(0, 0, W, H); if (bg) g.drawImage(bg, 0, 0, W, H);
-    const p = pose(ct), flick = .85 + .15 * Math.sin(T * 9) * Math.sin(T * 3.7);
+    const p = pose(ct), mxp0 = () => p.m, flick = .85 + .15 * Math.sin(T * 9) * Math.sin(T * 3.7);
     /* 랜턴 */
     [[84, 38], [300, 60]].forEach((l, i) => { const f = flick + (i ? .05 : 0); g.fillStyle = 'rgba(255,200,110,' + .16 * f + ')'; g.beginPath(); g.arc(l[0], l[1] + 10, 46, 0, TAU); g.fill(); g.strokeStyle = '#2a1c10'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(l[0], 32); g.lineTo(l[0], l[1] - 6); g.stroke(); g.fillStyle = '#3a2a18'; rr(g, l[0] - 5, l[1] - 6, 10, 16, 3); g.fill(); g.fillStyle = 'rgba(255,220,130,' + f + ')'; g.fillRect(l[0] - 3, l[1] - 3, 6, 10); });
     /* 정제기 상태(창/램프/컨베이어) */
-    const run = ct > 8.4 && ct < 9.7, mx = 6, my = 66, jx = run ? (Math.random() - .5) * 1.2 : 0;
+    const run = active && ct > 8.4 && ct < 9.7, mx = 6, my = 66, jx = run ? (Math.random() - .5) * 1.2 : 0;
     g.save(); g.translate(jx, 0);
     g.save(); g.beginPath(); rr(g, mx + 16, my + 30, 76, 58, 8); g.clip(); g.fillStyle = run ? '#2a3a2e' : '#1b242d'; g.fillRect(mx + 14, my + 28, 80, 62);
     const ang = T * (run ? 7 : .5); g.translate(mx + 54, my + 59); g.rotate(ang); g.strokeStyle = run ? '#7affb0' : '#56697a'; g.lineWidth = 3; for (let i = 0; i < 4; i++) { g.rotate(PI / 2); g.beginPath(); g.moveTo(0, 0); g.lineTo(24, 0); g.stroke(); } g.beginPath(); g.arc(0, 0, 26, 0, TAU); g.stroke(); g.restore();
@@ -240,23 +247,25 @@ export function mountMine(el, br) {
     if (p.pant > .4) { const q = (T * 1.8) % 1; g.save(); g.globalAlpha = .85 * (1 - q); g.font = '900 11px ' + FONT; g.textAlign = 'center'; g.fillStyle = '#fff'; g.strokeStyle = '#000a'; g.lineWidth = 3; const bx = mxp - 22 + (face > 0 ? 40 : 0) * 0, by = GY - 50 - q * 10; g.strokeText('헉헉', bx, by); g.fillText('헉헉', bx, by); g.restore(); }
     /* 보상 팝업 */
     if (popT >= 0) { const q = popT / 1.4; g.save(); g.globalAlpha = 1 - q * q; g.font = '900 20px ' + FONT; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#2a1608'; g.fillStyle = '#ffd54a'; const y = GY - 70 - eo(q) * 32, s = '+$' + popV.toFixed(2); g.strokeText(s, 52, y); g.fillText(s, 52, y); g.restore(); }
+    if (!active) { g.fillStyle = 'rgba(8,5,3,.55)'; g.fillRect(0, 0, W, H); const q = (T * .6) % 1; g.save(); g.font = '900 13px ' + FONT; g.fillStyle = '#ffe9b0'; g.textAlign = 'center'; g.fillText('zzZ', mxp0() + 14, GY - 52 - q * 14); g.restore(); }
     /* 단계 표시 */
-    g.save(); g.font = '700 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; const tw = g.measureText(p.step).width + 20; g.fillStyle = 'rgba(0,0,0,.55)'; rr(g, W / 2 - tw / 2, 6, tw, 20, 10); g.fill(); g.fillStyle = '#ffe9b0'; g.fillText(p.step, W / 2, 16.5); g.restore();
+    g.save(); g.font = '700 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; const stp = active ? p.step : '휴식 중', tw = g.measureText(stp).width + 20; g.fillStyle = 'rgba(0,0,0,.55)'; rr(g, W / 2 - tw / 2, 6, tw, 20, 10); g.fill(); g.fillStyle = '#ffe9b0'; g.fillText(stp, W / 2, 16.5); g.restore();
     /* 진행 바 */
-    g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, H - 4, W, 4); g.fillStyle = '#e0a82e'; g.fillRect(0, H - 4, W * ct / CFG.cycle, 4);
+    g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, H - 4, W, 4); if (active) { g.fillStyle = '#e0a82e'; g.fillRect(0, H - 4, W * ct / CFG.cycle, 4); }
     const vg = g.createRadialGradient(W / 2, H * .5, H * .4, W / 2, H * .5, W * .75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.4)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   }
-  function frame(now) { if (!alive) return; raf = requestAnimationFrame(frame); const dt = Math.min(.05, (now - last) / 1000); last = now; if (!$('mnm').hidden || true) { update(dt); if (!$('mnm').hidden) render(); } }
+  function frame(now) { if (!alive) return; raf = requestAnimationFrame(frame); const dt = Math.min(.05, (now - last) / 1000); last = now; update(dt); if (!$('mnm').hidden) render(); }
   raf = requestAnimationFrame(frame);
   function stop() { if (!alive) return; alive = false; cancelAnimationFrame(raf); ro && ro.disconnect(); root.remove(); }
-  return { stop, root, get state() { return { ct, cyc, reward, sum, credited }; }, _t(v) { ct = v; lastHit = -1; lastToss = -1; credited = v > T_.reward; } };
+  return { stop, root, paid, ui, get state() { return { ct, active, parts: parts.length }; } };
 }
 
 const CSS = `
 .mn{grid-column:1/-1;display:flex;flex-direction:column;gap:10px;font-family:${FONT}}
 .mnst{display:flex;gap:6px;padding:4px;border-radius:12px;background:#1a110c;border:1px solid #4a3620}
-.mnst button{flex:1;height:36px;border-radius:9px;border:0;background:transparent;color:#bfa77a;font:700 14px ${FONT};cursor:pointer}
-.mnst button.on{background:linear-gradient(#d9a52e,#9a6c14);color:#1c1207}
+.mn .mnst button{flex:1 1 0!important;width:auto!important;height:36px;padding:0!important;margin:0!important;display:flex;align-items:center;justify-content:center;text-align:center;border-radius:9px;border:0;background:transparent;color:#bfa77a;font:700 14px ${FONT};cursor:pointer}
+.mn .mnst button.on{background:linear-gradient(#d9a52e,#9a6c14);color:#1c1207}
+.mnhd{display:flex;align-items:center;gap:10px;background:#1a110c;border:1px solid #4a3620;border-radius:12px;padding:10px 12px}.mnhd>div{flex:1;display:flex;flex-direction:column;line-height:1.3;min-width:0}.mnhd b{font-size:15px;color:#ffe9b0}.mnhd small{font-size:11px;color:#c9a15a;font-variant-numeric:tabular-nums}.mn .mnhd button{flex:none!important;width:auto!important;margin:0!important;white-space:nowrap;height:40px;padding:0 16px!important;border-radius:12px;border:1px solid #ffe08a;background:linear-gradient(#e8421f,#a8200f);color:#fff3d6;font:900 14px ${FONT};cursor:pointer}.mn .mnhd button:disabled{filter:grayscale(.8) brightness(.6);cursor:default;border-color:#6a4e2a}
 .mnc{border-radius:14px;overflow:hidden;border:1px solid #4a3620;background:#1c130d;line-height:0}
 .mnc canvas{width:100%;display:block}
 .mnin{display:flex;gap:8px}.mnin>div{flex:1;background:#1a110c;border:1px solid #4a3620;border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;line-height:1.2;min-width:0}
