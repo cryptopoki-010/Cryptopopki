@@ -729,7 +729,7 @@ export function openRR(br) {
       $('rc').disabled = true; $('rm').textContent = '방을 만드는 중…';
       try { const id = 'r' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), ph = await sha(id + ':' + p);
         const doc = { id, name: n, ph, host: { uid: me, n: myName }, guest: null, status: 'open', bet: 0, offer: null, ev: [], hb: Date.now(), t: Date.now() };
-        await net.createRoom(doc); roomId = id; isHost = true; enterRoom(); } catch (e) { console.error(e); $('rm').textContent = '방을 만들지 못했습니다 (네트워크/권한 확인)'; $('rc').disabled = false; }
+        await net.createRoom(doc); roomId = id; isHost = true; enterRoom(); } catch (e) { console.error(e); { const c = (e && e.code) || 'error'; $('rm').textContent = c === 'permission-denied' ? '방을 만들 수 없습니다: Firebase 규칙에 rooms 권한이 없습니다 (firestore.rules를 게시해 주세요)' : '방을 만들지 못했습니다 (' + c + ') — 네트워크를 확인해 주세요'; }; $('rc').disabled = false; }
     };
   }
   function drawJoin(pane) {
