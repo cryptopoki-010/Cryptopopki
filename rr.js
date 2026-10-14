@@ -1,131 +1,159 @@
-/* ===== 러시안 룰렛 (유저 vs 유저) : 프로토콜/로직 =====
-   공개 이벤트 로그(rooms/{id}.ev)만 공유하고, 체력/손패는 각 클라이언트 로컬에만 존재한다. */
+/* ===== 러시안 룰렛 (유저 vs 유저) : 프로토콜/로직 v2 =====
+   공개 이벤트 로그(rooms/{id}.ev)만 공유하고, 체력/손패/덱은 각 클라이언트 로컬에만 존재한다. */
 const CARDS = {
-  pistol: { n: '권총 꺼내기', ic: '🔫', d: '다음 턴에 발사됩니다. 총알이 들어있을 확률 50%, 명중하면 상대 체력 -30%. 빈 총이면 권총을 집어던집니다.' },
-  know: { n: '난 네 목숨을 알아', ic: '👁️', d: '즉시 상대의 체력을 확인합니다.' },
-  intercept: { n: '인터셉트', ic: '🖐️', d: '내 카드 1장을 고르면 상대가 팔을 내밀어요. 상대 카드 1장을 직접 뽑아 교체합니다.' },
-  bomb: { n: '자폭', ic: '💣', d: '받은 뒤 내 3번째 턴 시작에 터져 체력 -10%. 인터셉트로 넘기면 2턴 뒤. (사용 불가 · 넘기기만 가능)' },
-  food: { n: '술과 음식', ic: '🍷', d: '와인과 빵을 먹고 체력 +30%.' },
-  wrench: { n: '몽키스패너', ic: '🔧', d: '상대에게 던져 체력 -10%.' },
-  dodge: { n: '신들린 무빙', ic: '💨', d: '다음 턴 상대의 공격을 1회 회피합니다.' },
-  gulp: { n: '벌컥벌컥', ic: '🍺', d: '체력 +50%. 단, 다음 내 턴 1회는 진행할 수 없습니다.' },
-  poison: { n: '독이 든 술잔', ic: '☠️', d: '나와 상대 모두 술잔을 받아 마시기/버리기 선택(15초). 50% 독 -10% / 50% 회복 +20%.' },
-  knife: { n: '나이프 던지기', ic: '🔪', d: '상대에게 던져 체력 -10%.' }
+  pistol: { n: '권총 꺼내기', ic: '🔫', k: '공격 · 지연', d: '사용 즉시 권총을 꺼내 겨눕니다. 내 다음 턴 시작에 자동 발사되고(상대는 그 사이 대응 가능), 50% 확률로 실탄이 나가 상대 체력 -30. 빈 탄창이면 피해 없이 권총을 던집니다. 발사 후에도 그 턴에 행동할 수 있습니다.' },
+  know: { n: '난 네 목숨을 알아', ic: '👁️', k: '정보', d: '상대의 현재 체력을 즉시 확인합니다. 확인한 수치는 나에게만 보이고 이후 자동 갱신되지 않습니다.' },
+  intercept: { n: '인터셉트', ic: '🖐️', k: '전략', d: '내 카드 1장을 고르면 상대가 팔을 내밀어요. 내민 카드 중 한 장을 두 번 눌러 가져오며 서로 교환합니다. 상대 손패가 비었거나 내 다른 카드가 없으면 사용 불가.' },
+  bomb: { n: '자폭', ic: '💣', k: '함정 · 지연', d: '사용할 수 없습니다. 받은 뒤 내 턴이 3번 끝나면 폭발해 체력 -10(인터셉트로 받으면 2번). 인터셉트로 상대에게 넘기는 것만 가능합니다.' },
+  food: { n: '술과 음식', ic: '🍷', k: '회복', d: '와인과 빵을 먹고 체력 +30 (최대 100).' },
+  wrench: { n: '몽키스패너', ic: '🔧', k: '공격', d: '상대에게 던져 체력 -10. 회피당할 수 있습니다.' },
+  dodge: { n: '신들린 무빙', ic: '💨', k: '방어', d: '상대의 다음 턴에 들어오는 첫 공격 1회를 회피합니다. 공격이 없으면 상대 턴이 끝날 때 사라집니다.' },
+  gulp: { n: '벌컥벌컥', ic: '🍺', k: '회복 · 행동 제한', d: '체력 +50 (최대 100). 대신 내 다음 턴은 카드 사용·드로우를 할 수 없습니다.' },
+  poison: { n: '독이 든 술잔', ic: '☠️', k: '선택형', d: '두 사람 앞에 술잔이 놓입니다. 각자 15초 안에 마시기/버리기를 고르고(공개는 동시), 마신 사람만 50%로 독 -10 또는 회복제 +20. 시간 초과는 버리기.' },
+  knife: { n: '나이프 던지기', ic: '🔪', k: '공격', d: '상대에게 던져 체력 -10. 회피당할 수 있습니다.' }
 };
 const CKEYS = Object.keys(CARDS);
+const WEIGHTS = { pistol: 10, know: 8, intercept: 8, bomb: 8, food: 12, wrench: 12, dodge: 12, gulp: 8, poison: 10, knife: 12 };
 const CHAT = ['안녕하세요 :)', '쫄리면 뒈지시던가', '시작할게요.', '줴줴이~야', '티~원', '한번만 살려주세요.'];
-const HANDMAX = 10, CUP_MS = 15000, IDLE_MS = 60000;
+const HANDMAX = 10, CUP_MS = 15000, TURN_MS = 30000, PICK_MS = 10000, IDLE_MS = 60000;
 const other = (S, u) => (u === S.p[0] ? S.p[1] : S.p[0]);
 
-/* net: {push(roomId, evs[]) } / ui: {play(e,S,L,me) -> Promise, update()} */
 class RRGame {
   constructor(o) {
     this.me = o.me; this.opp = o.opp; this.room = o.room; this.net = o.net; this.ui = o.ui || { play: () => Promise.resolve(), update() { } };
-    this.rand = o.rand || Math.random; this.now = o.now || (() => Date.now()); this.setT = o.setT || ((f, ms) => setTimeout(f, ms)); this.clrT = o.clrT || (t => clearTimeout(t));
-    this.hostUid = o.hostUid;
-    this.S = { p: [o.hostUid, o.hostUid === o.me ? o.opp : o.me], turn: null, turnNo: 0, phase: 'init', n: {}, dodge: {}, pistol: {}, skip: {}, pend: null, resp: null, cup: {}, over: null, idx: 0, lastT: this.now(), first: null, ang: 0 };
-    this.L = { hp: 1 + Math.floor(this.rand() * 100), hand: [], nid: 1, know: null, bombPending: 0, autoFor: -1, cupAsked: false };
-    for (let i = 0; i < 5; i++) this.L.hand.push(this.mk());
-    this.q = []; this.busy = false; this.pending = 0; this.dead = false; this.cupT = null; this.log = [];
+    this.rand = o.rand || Math.random; this.now = o.now || (() => Date.now());
+    this.setT = o.setT || ((f, ms) => setTimeout(f, ms)); this.clrT = o.clrT || (t => clearTimeout(t));
+    this.hostUid = o.hostUid; this.gid = o.gid || 0;
+    this.S = { p: [o.hostUid, o.hostUid === o.me ? o.opp : o.me], turn: null, turnNo: 0, phase: 'init', n: {}, dodge: {}, pistol: {}, skip: {}, pend: null, resp: null, cc: {}, cr: {}, over: null, idx: 0, lastT: this.now(), turnT: this.now(), first: null, ang: 0, mood: {} };
+    this.L = { hp: 1 + Math.floor(this.rand() * 100), hand: [], nid: 1, know: null, deck: [], autoF: -1, autoS: -1, cupSecret: null, cupSent: false, cupRev: false, mood: 0 };
+    this.remood(); this.stat = { used: {}, got: {} };
+    for (let i = 0; i < 5; i++) this.L.hand.push(this.deal(-1));
+    this.q = []; this.busy = false; this.dead = false; this.tt = null; this.pt = null; this.ct = null; this.log = []; this.stat = { used: {}, got: {} };
   }
-  mk(c) { c = c || CKEYS[Math.floor(this.rand() * CKEYS.length)]; const k = { id: this.me.slice(0, 3) + (this.L ? this.L.nid++ : 0), c }; if (c === 'bomb') k.cd = 3; return k; }
+  /* ---- 덱: 100장(카드 비중대로) 셔플, 소진되면 다시 섞기 ---- */
+  refill() { const d = []; CKEYS.forEach(c => { for (let i = 0; i < WEIGHTS[c]; i++) d.push(c); }); for (let i = d.length - 1; i > 0; i--) { const j = Math.floor(this.rand() * (i + 1)); [d[i], d[j]] = [d[j], d[i]]; } this.L.deck = d; }
+  deal(gotTurn) { const L = this.L; if (!L.deck.length) this.refill(); const c = L.deck.pop(); this.stat.got[c] = (this.stat.got[c] || 0) + 1; return this.mk(c, c === 'bomb' ? 3 : undefined, gotTurn); }
+  mk(c, cd, got) { const k = { id: this.me.slice(0, 3) + (this.L.nid++), c }; if (c === 'bomb') { k.cd = cd == null ? 3 : cd; k.got = got == null ? -1 : got; } return k; }
+  recvCard(c, fromSteal) { const S = this.S; return this.mk(c, fromSteal ? 2 : 3, S.turn === this.me ? S.turnNo : -1); }
   uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3); }
-  emit(...evs) { evs.forEach(e => { e.i = this.uid(); e.by = this.me; }); this.net.push(this.room, evs); }
-  /* 로그 갱신 */
-  feed(ev) { if (this.dead) return; while (this.S.idx < ev.length) { this.q.push(ev[this.S.idx++]); } this.pump(); }
+  emit(...evs) { evs.forEach(e => { e.i = this.uid(); e.by = this.me; e.mo = this.L.mood; }); this.net.push(this.room, evs); }
+  /* 표정용 체력 구간 (일부러 완벽히 일치하지 않게 흔든다) */
+  remood() { const hp = this.L.hp; let m = hp > 70 ? 0 : hp > 40 ? 1 : hp > 20 ? 2 : 3; const r = this.rand(); if (r < .22) m = Math.min(3, m + 1); else if (r < .44) m = Math.max(0, m - 1); this.L.mood = m; }
+  async hash(s) { try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'f' + (h >>> 0).toString(16); } }
+  feed(ev) { if (this.dead) return; while (this.S.idx < ev.length) this.q.push(ev[this.S.idx++]); this.pump(); }
   async pump() {
     if (this.busy) return; this.busy = true;
     try { while (this.q.length && !this.dead) { const e = this.q.shift(); await this.handle(e); } } finally { this.busy = false; }
     this.ui.update();
   }
   get qbusy() { return this.busy || this.q.length > 0; }
-  canAct() { const S = this.S; return !S.over && S.phase === 'turn' && S.turn === this.me && !this.qbusy && !this.L.bombPending && !this.mustAuto(); }
   mustAuto() { const S = this.S; return S.turn === this.me && (S.skip[this.me] || S.pistol[this.me]); }
+  canAct() { const S = this.S; return !S.over && S.phase === 'turn' && S.turn === this.me && !this.qbusy && !this.mustAuto(); }
+  canDraw() { return this.S.n[this.me] < HANDMAX; }
+  clearTurn() { this.clrT(this.tt); this.tt = null; this.clrT(this.pt); this.pt = null; }
   startTurn() {
-    const S = this.S, L = this.L; S.phase = 'turn'; S.dodge[S.turn] = false; S.lastT = this.now();
-    if (S.turn === this.me) {
-      const boom = [];
-      L.hand.forEach(k => { if (k.c === 'bomb') { k.cd--; if (k.cd <= 0) boom.push(k); } });
-      L.bombPending = boom.length;
+    const S = this.S; S.phase = 'turn'; S.dodge[S.turn] = false; S.turnT = this.now(); S.lastT = this.now();
+    if (S.turn === this.me) { const no = S.turnNo; this.clrT(this.tt); this.tt = this.setT(() => this.onTurnTimeout(no), TURN_MS); }
+  }
+  onTurnTimeout(no) {
+    const S = this.S; if (S.over || S.turn !== this.me || S.turnNo !== no || S.phase !== 'turn') return;
+    if (this.qbusy || this.mustAuto()) { this.tt = this.setT(() => this.onTurnTimeout(no), 2000); return; }
+    this.emit(S.n[this.me] < HANDMAX ? { t: 'draw' } : { t: 'pass' });
+  }
+  endTurn() {
+    const S = this.S, L = this.L; if (S.over) return; this.clearTurn();
+    if (S.turn === this.me) { /* 턴 종료 시 자폭 카운트다운 */
+      const boom = []; L.hand.forEach(k => { if (k.c === 'bomb' && k.got !== S.turnNo) { k.cd--; if (k.cd <= 0) boom.push(k); } });
       boom.forEach(k => this.emit({ t: 'bombx', cid: k.id }));
     }
+    S.turn = other(S, S.turn); S.turnNo++; S.pend = null; S.resp = null; this.startTurn();
   }
-  endTurn() { const S = this.S; if (S.over) return; S.turn = other(S, S.turn); S.turnNo++; S.pend = null; S.resp = null; this.startTurn(); }
-  hurt(n) { const L = this.L; L.hp = Math.max(0, L.hp - n); }
-  heal(n) { const L = this.L; L.hp = Math.min(100, L.hp + n); }
+  hurt(n) { const L = this.L; L.hp = Math.max(0, L.hp - n); this.remood(); }
+  heal(n) { const L = this.L; L.hp = Math.min(100, L.hp + n); this.remood(); }
   checkDead() { if (this.L.hp <= 0 && !this.S.over && !this.deadSent) { this.deadSent = true; this.emit({ t: 'dead', hp: this.L.hp }); } }
   auto() {
-    const S = this.S, L = this.L; if (S.over || S.phase !== 'turn' || S.turn !== this.me || L.bombPending || L.autoFor === S.turnNo) return;
-    if (S.skip[this.me]) { L.autoFor = S.turnNo; this.setT(() => this.emit({ t: 'skip' }), 700); }
-    else if (S.pistol[this.me]) { L.autoFor = S.turnNo; this.setT(() => this.emit({ t: 'fire', b: this.rand() < .5 }), 900); }
+    const S = this.S, L = this.L; if (S.over || S.phase !== 'turn' || S.turn !== this.me) return; const key = S.turnNo;
+    if (S.pistol[this.me]) { if (L.autoF !== key) { L.autoF = key; this.setT(() => this.emit({ t: 'fire', b: this.rand() < .5 }), 900); } }
+    else if (S.skip[this.me] && L.autoS !== key) { L.autoS = key; this.setT(() => this.emit({ t: 'skip' }), 700); }
   }
   async play(e) { try { await this.ui.play(e, this.S, this.L, this.me); } catch (x) { console.error('[rr ui]', x); } }
   async handle(e) {
     const S = this.S, L = this.L, me = this.me, isMe = e.by === me, by = e.by, ot = other(S, by);
-    S.lastT = this.now(); this.log.push(e.t);
+    S.lastT = this.now(); this.log.push(e.t); if (e.mo != null) S.mood[by] = e.mo;
     if (S.over && e.t !== 'chat') return;
     switch (e.t) {
       case 'start': S.first = e.first; S.ang = e.ang; S.n[S.p[0]] = 5; S.n[S.p[1]] = 5; S.turn = e.first; S.turnNo = 1; await this.play(e); this.startTurn(); break;
       case 'draw': {
         const c = Math.min(2, HANDMAX - S.n[by]); S.n[by] += c;
-        if (isMe) for (let i = 0; i < c; i++) L.hand.push(this.mk());
+        if (isMe) for (let i = 0; i < c; i++) L.hand.push(this.deal(S.turnNo));
         await this.play(e); this.endTurn(); break;
       }
+      case 'pass': await this.play(e); this.endTurn(); break;
       case 'use': {
-        S.n[by]--;
-        if (isMe) L.hand = L.hand.filter(k => k.id !== e.cid);
+        S.n[by]--; if (isMe) { L.hand = L.hand.filter(k => k.id !== e.cid); this.stat.used[e.c] = (this.stat.used[e.c] || 0) + 1; }
         switch (e.c) {
           case 'pistol': S.pistol[by] = true; await this.play(e); this.endTurn(); break;
           case 'know': S.phase = 'res'; S.resp = ot; S.pend = { k: 'know' }; await this.play(e); if (!isMe) this.emit({ t: 'res', k: 'know', hp: L.hp }); break;
-          case 'intercept': S.n[by]--; if (isMe) L.hand = L.hand.filter(k => k.id !== e.gid); S.phase = 'pick'; S.pend = { k: 'pick', g: e.g }; await this.play(e); break;
+          case 'intercept': S.n[by]--; if (isMe) L.hand = L.hand.filter(k => k.id !== e.gid); S.phase = 'pick'; S.pend = { k: 'pick', g: e.g }; await this.play(e);
+            if (isMe) { this.clrT(this.pt); this.pt = this.setT(() => { if (!this.S.over && this.S.phase === 'pick' && this.S.turn === me) this.emit({ t: 'pick', k: Math.floor(this.rand() * Math.max(1, this.S.n[this.opp])) }); }, PICK_MS); } break;
           case 'food': if (isMe) this.heal(30); await this.play(e); this.endTurn(); break;
           case 'gulp': if (isMe) this.heal(50); S.skip[by] = true; await this.play(e); this.endTurn(); break;
           case 'dodge': S.dodge[by] = true; await this.play(e); this.endTurn(); break;
-          case 'wrench': case 'knife': await this.atk(e, by, ot, 10); break;
-          case 'poison': S.phase = 'cup'; S.cup = {}; L.cupAsked = true; await this.play(e); this.askCup(); break;
+          case 'wrench': case 'knife': await this.atk(e, by, ot, 10, e.c); break;
+          case 'poison': S.phase = 'cup'; S.cc = {}; S.cr = {}; L.cupSecret = null; L.cupSent = false; L.cupRev = false; await this.play(e); this.askCup(); break;
           default: await this.play(e); this.endTurn();
         }
         break;
       }
       case 'fire':
         S.pistol[by] = false;
-        if (e.b) await this.atk(e, by, ot, 30); else { await this.play(e); this.endTurn(); }
+        if (e.b) await this.atk(e, by, ot, 30, 'fire');
+        else { await this.play(e); S.phase = 'turn'; S.resp = null; S.pend = null; } /* 발사 후에도 이번 턴 행동 가능 */
         break;
       case 'skip': S.skip[by] = false; await this.play(e); this.endTurn(); break;
       case 'pick': {
+        this.clrT(this.pt); this.pt = null;
         S.phase = 'res'; S.resp = ot; S.pend = { k: 'steal', g: S.pend && S.pend.g, kk: e.k };
         await this.play(e);
-        if (!isMe) { /* 내가 뺏기는 쪽 */
-          const idx = Math.max(0, Math.min(L.hand.length - 1, e.k | 0)), take = L.hand.splice(idx, 1)[0], g = Object.assign({}, S.pend.g, { id: this.mk('knife').id });
-          if (g.c === 'bomb') g.cd = 2; L.hand.push(g);
-          this.emit({ t: 'res', k: 'steal', take: take ? { c: take.c, cd: take.cd } : null });
+        if (!isMe) {
+          const idx = Math.max(0, Math.min(L.hand.length - 1, e.k | 0)), take = L.hand.splice(idx, 1)[0], g = this.recvCard(S.pend.g.c, true);
+          L.hand.push(g); this.emit({ t: 'res', k: 'steal', take: take ? { c: take.c } : null });
         }
         break;
       }
       case 'res': {
-        if (e.k === 'know') { if (!isMe) L.know = e.hp; S.n; await this.play(e); this.endTurn(); }
-        else if (e.k === 'steal') { S.n[ot]++; if (!isMe && e.take) { const t = Object.assign({}, e.take, { id: this.mk('knife').id }); if (t.c === 'bomb') t.cd = 2; L.hand.push(t); } await this.play(e); this.endTurn(); }
-        else if (e.k === 'atk') { if (e.dodged) S.dodge[by] = false; await this.play(e); this.endTurn(); }
+        if (e.k === 'know') { if (!isMe) L.know = e.hp; await this.play(e); this.endTurn(); }
+        else if (e.k === 'steal') { S.n[ot]++; if (!isMe && e.take) L.hand.push(this.recvCard(e.take.c, true)); await this.play(e); this.endTurn(); }
+        else if (e.k === 'atk') {
+          if (e.dodged) S.dodge[by] = false; const fromFire = S.pend && S.pend.src === 'fire'; await this.play(e);
+          if (fromFire) { S.phase = 'turn'; S.resp = null; S.pend = null; } else this.endTurn();
+        }
         break;
       }
-      case 'cup': {
-        S.cup[by] = e; if (isMe) { if (e.r === 'p') this.hurt(10); else if (e.r === 'h') this.heal(20); }
-        await this.play(e);
-        if (isMe) { this.clrT(this.cupT); this.cupT = null; this.checkDead(); }
-        if (S.cup[S.p[0]] && S.cup[S.p[1]]) this.endTurn();
+      case 'cupc': S.cc[by] = true; await this.play({ t: 'cupc', by });
+        if (S.cc[S.p[0]] && S.cc[S.p[1]] && !L.cupRev) { L.cupRev = true; const s = L.cupSecret; if (s) this.emit({ t: 'cupr', d: s.d, r: s.r, n: s.n, dead: s.dead }); }
+        break;
+      case 'cupr': {
+        S.cr[by] = e; if (isMe) { if (e.r === 'p') this.hurt(10); else if (e.r === 'h') this.heal(20); }
+        if (S.cr[S.p[0]] && S.cr[S.p[1]]) {
+          const a = S.cr[me], b = S.cr[this.opp]; await this.play({ t: 'cup2', a, b, by: me });
+          const da = !!a.dead, db = !!b.dead;
+          if (da && db) { S.over = { draw: true }; S.phase = 'over'; } else if (da || db) { S.over = { loser: da ? me : this.opp }; S.phase = 'over'; } else this.endTurn();
+        }
         break;
       }
-      case 'bombx': S.n[by]--; if (isMe) { L.hand = L.hand.filter(k => k.id !== e.cid); this.hurt(10); L.bombPending = Math.max(0, L.bombPending - 1); } await this.play(e); if (isMe) this.checkDead(); break;
+      case 'bombx': S.n[by]--; if (isMe) { L.hand = L.hand.filter(k => k.id !== e.cid); this.hurt(10); } await this.play(e); if (isMe) this.checkDead(); break;
       case 'chat': await this.play(e); break;
       case 'dead': S.over = { loser: by, hp: e.hp }; S.phase = 'over'; await this.play(e); break;
-      case 'resign': S.over = { loser: by, hp: null, resign: 1 }; S.phase = 'over'; await this.play(e); break;
-      case 'claim': S.over = { loser: ot, hp: null, claim: 1 }; S.phase = 'over'; await this.play(e); break;
+      case 'resign': S.over = { loser: by, resign: 1 }; S.phase = 'over'; await this.play(e); break;
+      case 'claim': S.over = { loser: ot, claim: 1 }; S.phase = 'over'; await this.play(e); break;
+      case 'abort': S.over = { abort: 1 }; S.phase = 'over'; await this.play(e); break;
     }
     if (!S.over) this.auto();
     this.ui.update();
   }
-  async atk(e, by, ot, dmg) {
-    const S = this.S, L = this.L, isMe = e.by === this.me; S.phase = 'res'; S.resp = ot; S.pend = { k: 'atk', dmg, src: e.c || 'pistol' };
+  async atk(e, by, ot, dmg, src) {
+    const S = this.S, L = this.L, isMe = e.by === this.me; S.phase = 'res'; S.resp = ot; S.pend = { k: 'atk', dmg, src };
     await this.play(e);
     if (!isMe) {
       if (S.dodge[this.me]) this.emit({ t: 'res', k: 'atk', dodged: true });
@@ -133,27 +161,31 @@ class RRGame {
     }
   }
   /* ---- 사용자 액션 ---- */
-  actDraw() { if (!this.canAct()) return false; this.emit({ t: 'draw' }); return true; }
+  actDraw() { if (!this.canAct() || !this.canDraw()) return false; this.emit({ t: 'draw' }); return true; }
+  canUse(k) { if (!k || k.c === 'bomb') return false; if (k.c === 'pistol' && this.S.pistol[this.me]) return false; if (k.c === 'intercept' && (this.L.hand.length < 2 || this.S.n[this.opp] < 1)) return false; return true; }
   actUse(cid, gid) {
-    if (!this.canAct()) return false; const L = this.L, k = L.hand.find(x => x.id === cid); if (!k || k.c === 'bomb') return false;
-    if (k.c === 'pistol' && this.S.pistol[this.me]) return false;
+    if (!this.canAct()) return false; const L = this.L, k = L.hand.find(x => x.id === cid); if (!this.canUse(k)) return false;
     const ev = { t: 'use', c: k.c, cid };
-    if (k.c === 'intercept') { const g = L.hand.find(x => x.id === gid && x.id !== cid); if (!g || this.S.n[this.opp] < 1) return false; ev.gid = gid; ev.g = { c: g.c, cd: g.cd }; }
+    if (k.c === 'intercept') { const g = L.hand.find(x => x.id === gid && x.id !== cid); if (!g) return false; ev.gid = gid; ev.g = { c: g.c }; }
     this.emit(ev); return true;
   }
-  canUse(k) { if (!k || k.c === 'bomb') return false; if (k.c === 'pistol' && this.S.pistol[this.me]) return false; if (k.c === 'intercept' && (this.L.hand.length < 2 || this.S.n[this.opp] < 1)) return false; return true; }
   actPick(k) { const S = this.S; if (S.over || S.phase !== 'pick' || S.turn !== this.me || this.qbusy) return false; if (!(k >= 0 && k < S.n[this.opp])) return false; this.emit({ t: 'pick', k }); return true; }
-  askCup() {
-    const S = this.S; if (S.cup[this.me]) return; this.ui.cup && this.ui.cup(CUP_MS);
-    this.clrT(this.cupT); this.cupT = this.setT(() => this.actCup(false), CUP_MS + 200);
+  askCup() { const S = this.S; if (L_has(this, S)) return; this.ui.cup && this.ui.cup(CUP_MS); this.clrT(this.ct); this.ct = this.setT(() => this.actCup(false), CUP_MS + 200); }
+  async actCup(drink) {
+    const S = this.S, L = this.L; if (S.over || S.phase !== 'cup' || L.cupSent) return false; L.cupSent = true; this.clrT(this.ct); this.ct = null;
+    const d = !!drink, r = d ? (this.rand() < .5 ? 'p' : 'h') : null, n = this.uid(), after = L.hp + (r === 'p' ? -10 : r === 'h' ? 20 : 0);
+    L.cupSecret = { d, r, n, dead: after <= 0 }; const h = await this.hash(d + '|' + r + '|' + n);
+    this.emit({ t: 'cupc', h }); return true;
   }
-  actCup(drink) { const S = this.S; if (S.over || S.phase !== 'cup' || S.cup[this.me]) return false; this.clrT(this.cupT); this.cupT = null; const r = drink ? (this.rand() < .5 ? 'p' : 'h') : null; this.emit({ t: 'cup', d: !!drink, r }); return true; }
   actChat(i) { if (this.S.over) return false; this.emit({ t: 'chat', m: i | 0 }); return true; }
   actResign() { if (this.S.over) return false; this.emit({ t: 'resign' }); return true; }
-  canClaim() { const S = this.S; if (S.over || S.phase === 'init') return false; if (this.now() - S.lastT < IDLE_MS) return false; const waiting = (S.phase === 'turn' && S.turn !== this.me) || (S.phase === 'res' && S.resp === this.opp) || (S.phase === 'pick' && S.turn === this.opp) || (S.phase === 'cup' && !S.cup[this.opp]); return waiting; }
+  actAbort() { if (this.S.over) return false; this.emit({ t: 'abort' }); return true; }
+  canClaim() { const S = this.S; if (S.over || S.phase === 'init') return false; if (this.now() - S.lastT < IDLE_MS) return false; return (S.phase === 'turn' && S.turn === this.opp) || (S.phase === 'res' && S.resp === this.opp) || (S.phase === 'pick' && S.turn === this.opp) || (S.phase === 'cup' && !S.cc[this.opp]); }
   actClaim() { if (!this.canClaim()) return false; this.emit({ t: 'claim' }); return true; }
-  destroy() { this.dead = true; this.clrT(this.cupT); }
+  turnLeft() { const S = this.S, el = this.now() - S.turnT; if (S.over || S.phase === 'init') return null; if (S.phase === 'turn') return Math.max(0, Math.ceil((TURN_MS - el) / 1000)); return null; }
+  destroy() { this.dead = true; this.clearTurn(); this.clrT(this.ct); }
 }
+function L_has(g, S) { return g.L.cupSent || !!S.cc[g.me]; }
 
 /* ===== 장면 그리기 (낡은 펍 / 원탁 / 상대 캐릭터 / 내 팔) ===== */
 const W = 390, H = 620, TAU = Math.PI * 2, PI = Math.PI;
@@ -237,7 +269,7 @@ function hand(g, x, y, r, skin, ang, fist) { g.save(); g.translate(x, y); g.rota
 
 /* ---------- 상대 캐릭터 ---------- */
 function drawOpp(g, P, role, T, part) {
-  const C = ROLE[role] || ROLE.host, lean = P.lean || 0, tilt = P.tilt || 0, br = Math.sin(T * 2.2) * 1.6, dy = (P.dy || 0) + br * .5;
+  const C = ROLE[role] || ROLE.host, lean = P.lean || 0, tilt = P.tilt || 0, br = Math.sin(T * (2.2 + (P.cond | 0) * 1.3)) * (1.6 + (P.cond | 0) * .4), dy = (P.dy || 0) + br * .5;
   if (part !== 'arms') { g.save(); g.translate(195 + lean, 0);
   /* 의자 등받이 */
   g.fillStyle = '#2a190c'; rrect(g, -78, 190, 156, 190, 18); g.fill(); g.fillStyle = '#3a2412'; rrect(g, -68, 200, 136, 170, 14); g.fill();
@@ -272,6 +304,10 @@ function drawOpp(g, P, role, T, part) {
   else { g.moveTo(-8, 25); g.lineTo(8, 25); g.stroke(); }
   if (fc === 'sick') { g.fillStyle = 'rgba(120,200,90,.35)'; g.beginPath(); g.ellipse(0, 6, 33, 38, 0, 0, TAU); g.fill(); }
   if (fc === 'hurt') { g.fillStyle = 'rgba(220,40,30,.22)'; g.beginPath(); g.ellipse(0, 0, 33, 38, 0, 0, TAU); g.fill(); }
+  const cd = P.cond | 0;
+  if (cd >= 1 && fc === 'idle') { g.strokeStyle = '#2a1a10'; g.lineWidth = 3; g.beginPath(); g.moveTo(-20, -14 - cd); g.lineTo(-7, -19 - cd); g.moveTo(20, -14 - cd); g.lineTo(7, -19 - cd); g.stroke(); g.strokeStyle = 'rgba(255,255,255,.0)'; }
+  if (cd >= 2) { for (let i = 0; i < cd * 2 - 1; i++) { const ph = (T * .8 + i * .37) % 1; g.fillStyle = 'rgba(170,220,255,' + (.85 - ph * .6) + ')'; const sx = (i % 2 ? 1 : -1) * (22 + (i % 3) * 3), sy = -22 + ph * 40; g.beginPath(); g.ellipse(sx, sy, 2.2, 3.4, 0, 0, TAU); g.fill(); } }
+  if (cd >= 3) { g.fillStyle = 'rgba(210,225,235,.28)'; g.beginPath(); g.ellipse(0, 0, 33, 38, 0, 0, TAU); g.fill(); g.fillStyle = 'rgba(70,40,90,.25)'; g.beginPath(); g.ellipse(-13, 3, 9, 4, 0, 0, TAU); g.ellipse(13, 3, 9, 4, 0, 0, TAU); g.fill(); }
   /* 모자 */
   g.fillStyle = C.hatC;
   if (C.hat === 'fedora') { g.beginPath(); g.ellipse(0, -26, 54, 14, 0, 0, TAU); g.fill(); rrect(g, -30, -62, 60, 40, 14); g.fill(); g.fillStyle = '#2a190c'; g.fillRect(-30, -36, 60, 9); g.fillStyle = 'rgba(255,255,255,.12)'; g.beginPath(); g.ellipse(-8, -30, 30, 6, 0, PI, TAU); g.fill(); }
@@ -321,6 +357,9 @@ class Scene {
     const T = this.T, b = Math.sin(T * 2) * 2;
     this.P = { me: { l: [SEAT.me.hand0[0], SEAT.me.hand0[1] + b], r: [SEAT.me.hand1[0], SEAT.me.hand1[1] + b], fist: false }, op: { lean: 0, tilt: Math.sin(T * .7) * .02, dy: 0, l: [SEAT.op.hand0[0], SEAT.op.hand0[1] + b * .5], r: [SEAT.op.hand1[0], SEAT.op.hand1[1] + b * .5], face: 'idle', look: Math.sin(T * .4), fist: false } };
     this.hold = { me: null, op: null };
+    const S = this.S; let cd = 0; try { if (S && S.mood && S.p) cd = S.mood[this.uidOf('op')] | 0; } catch (x) { } this.P.op.cond = cd;
+    if (cd >= 2) { const tr = Math.sin(T * 38) * .7 * (cd - 1), tr2 = Math.cos(T * 33) * .7 * (cd - 1); this.P.op.l = [this.P.op.l[0] + tr, this.P.op.l[1] + tr2]; this.P.op.r = [this.P.op.r[0] + tr2, this.P.op.r[1] + tr]; }
+    if (cd >= 1 && this.P.op.face === 'idle') this.P.op.look = Math.sin(T * (1 + cd)) * 1.2;
   }
   uidOf(side) { const S = this.S; return side === 'me' ? this.me : (S.p[0] === this.me ? S.p[1] : S.p[0]); }
   P_(side) { return this.P[side]; }
@@ -331,7 +370,7 @@ class Scene {
   say(side, i) { this.bub[side] = { i, t: 3.4 }; }
   /* ---- 이벤트 -> 애니메이션 ---- */
   play(e, S, L, me) {
-    this.S = S; const sd = e.by === me ? 'me' : 'op', tg = sd === 'me' ? 'op' : 'me'; let d = 0, k = e.t; const data = { e, sd, tg, S, L };
+    this.S = S; const sd = e.by === me ? 'me' : 'op', tg = sd === 'me' ? 'op' : 'me'; let d = 0, k = e.t, sd_; const data = { e, sd, tg, S, L }; if (e.t === 'cup2') { sd_ = 'me'; }
     switch (e.t) {
       case 'start': d = 3.9; this.bottle.show = true; break;
       case 'draw': d = 1.15; break;
@@ -343,7 +382,9 @@ class Scene {
       case 'skip': d = 1.0; break;
       case 'pick': d = 1.0; break;
       case 'res': k = 'res_' + e.k; d = e.k === 'steal' ? 1.2 : e.k === 'know' ? 1.5 : (e.dodged ? 1.1 : 1.0); break;
-      case 'cup': d = e.d ? 2.0 : 1.1; break;
+      case 'cup2': d = 2.3; break;
+      case 'pass': d = .9; break;
+      case 'cupc': case 'abort': return Promise.resolve();
       case 'bombx': d = 1.8; break;
       case 'dead': d = 2.4; break;
       case 'resign': case 'claim': d = .5; break;
@@ -367,6 +408,16 @@ class Scene {
     this.shake = Math.max(0, this.shake - dt * 22); if (this.flash) { this.flash.a -= dt * 1.6; if (this.flash.a <= 0) this.flash = null; }
     ['me', 'op'].forEach(s => { const b = this.bub[s]; if (b) { b.t -= dt; if (b.t <= 0) this.bub[s] = null; } });
     if (this.dead) { this.dead.t += dt; }
+    /* 감정표현 제스처 */
+    ['op', 'me'].forEach(sd2 => { const b = this.bub[sd2]; if (!b || a) return; const q = P[sd2], t = 3.4 - b.t, w = Math.sin(t * 9), op = sd2 === 'op';
+      switch (b.i) {
+        case 0: q.r = op ? [284 + w * 14, 330 - 30] : [300 + w * 10, 520]; if (op) q.stretch = 1; break; /* 손 흔들기 */
+        case 1: if (op) { q.face = 'smug'; q.tilt = .12 + w * .03; q.lean = 10; } else q.r = [260, 540 + w * 6]; break; /* 도발 */
+        case 2: q.l = op ? [160 + w * 8, 440] : [150 + w * 8, 560]; q.r = op ? [230 - w * 8, 440] : [240 - w * 8, 560]; break; /* 카드 정리 */
+        case 3: if (op) { q.face = 'laugh'; q.lean = w * 12; q.tilt = w * .06; } else { q.l = [120, 560 + w * 6]; q.r = [270, 560 - w * 6]; } break; /* 장난 */
+        case 4: q.r = op ? [250, 400 + w * 3] : [240, 450 + w * 3]; if (op) q.face = 'angry'; break; /* 삿대질 */
+        case 5: q.l = op ? [185, 330 + w * 2] : [185, 540]; q.r = op ? [205, 330 - w * 2] : [205, 540]; if (op) { q.face = 'sick'; q.tilt = .06; } break; /* 기도 */
+      } });
     /* 상대 장전된 권총 */
     if (a) {
       a.t += dt; const u = clamp(a.t / a.d, 0, 1), { e, sd, tg } = a.data, SP = P[sd], iT = SEAT[sd].item;
@@ -377,7 +428,8 @@ class Scene {
           this.bottle.ang = fin + sp * TAU * 7; if (u < .8 && Math.floor(a.t * 14) !== a.tk) { a.tk = Math.floor(a.t * 14); this.sfx('rr_tick'); }
           this.once('stop', u >= .8, () => { this.sfx('rr_stop'); this.burst(195, 452, 8, { c: '#ffe27a', v: 90, l: .5, r: 2 }); this.banner = { s: first === 'me' ? '내가 선공!' : '상대가 선공', t: 0, c: first === 'me' ? '#ffe27a' : '#ff9a8a' }; });
           if (this.banner) this.banner.t += dt; if (u > .96) this.banner = null;
-          SP.l = mixp(SP.l, [150, 470], .0); break;
+          if (u < .85 && e.by) { const hs = (sd === 'me' ? 'me' : 'op'); P[hs].r = sd === 'me' ? [200, 478] : [196, 436]; P[hs].fist = true; }
+          break;
         }
         case 'draw': {
           const deck = [92, 480]; reach('r', sd === 'me' ? [deck[0] + 20, deck[1] + 12] : [deck[0] + 30, deck[1] - 20], u < .35 ? u / .35 : 1 - (u - .35) / .65 * .6);
@@ -453,15 +505,18 @@ class Scene {
           this.once('r', u > .1, () => { if (e.hp != null && a.data.e.by !== this.me) { this.pop = { t: 0, s: '상대 체력 ' + e.hp + '%', sub: '확인했습니다' }; } });
           if (this.pop) this.pop.t += dt; if (u > .98) this.pop = null; break;
         }
-        case 'cup': {
-          const cp = this.cups && this.cups[sd]; if (!cp) break;
-          if (e.d) {
-            const up = u < .25 ? u / .25 : u > .7 ? 1 - (u - .7) / .3 : 1; cp.lift = up; SP.r = mixp([SEAT[sd].cup[0] + 24, SEAT[sd].cup[1]], sd === 'me' ? [210, 598] : [200, 226], eo(up)); if (sd === 'op') { P.op.tilt = -.14 * up; P.op.face = u > .55 ? (e.r === 'p' ? 'sick' : 'smug') : 'eat'; }
-            this.once('g', u > .35, () => this.sfx('rr_gulp'));
-            this.once('res', u > .62, () => { const p = sd === 'op' ? [195, 190] : [195, 560]; if (e.r === 'p') { this.sfx('rr_poison'); this.burst(p[0], p[1], 20, { c: ['#7acc3a', '#b9e86a', '#3a7a1a'], v: 100, l: 1, r: 4, gv: -50 }); this.text(195, sd === 'op' ? 130 : 500, '독이다! -10%', '#b9e86a', true); this.spawn({ x: p[0], y: p[1], k: 'skull', l: 1, r: 1 }); if (sd === 'me') { this.flash = { c: '60,160,30', a: .4 }; this.shake = 6; } } else { this.sfx('rr_heal'); this.burst(p[0], p[1], 18, { c: ['#7affb0', '#fff', '#ffe27a'], v: 80, l: 1, r: 3, gv: -60, k: 'star' }); this.text(195, sd === 'op' ? 130 : 500, '회복제! +20%', '#7affb0', true); } });
-          } else { const sw = u < .4 ? u / .4 : 1; SP.r = mixp([SEAT[sd].cup[0] + 24, SEAT[sd].cup[1]], [SEAT[sd].cup[0] + 4, SEAT[sd].cup[1]], eo(sw)); cp.tip = eo(u / .6); this.once('pour', u > .3, () => { this.sfx('rr_pour'); this.burst(SEAT[sd].cup[0] + 10, SEAT[sd].cup[1] + 12, 10, { c: '#e0a63a', v: 60, l: .8, r: 3, gv: 400 }); this.text(195, sd === 'op' ? 150 : 520, '버렸다', '#ccc', false, 1.0); }); }
-          if (u > .97) cp.done = true; break;
+        case 'cup2': {
+          [['me', e.a], ['op', e.b]].forEach(([side, r]) => {
+            const cp = this.cups && this.cups[side]; if (!cp || !r) return; const SPs = P[side], k = side + '_';
+            if (r.d) {
+              const up = u < .25 ? u / .25 : u > .7 ? 1 - (u - .7) / .3 : 1; cp.lift = up; SPs.r = mixp([SEAT[side].cup[0] + 24, SEAT[side].cup[1]], side === 'me' ? [210, 598] : [200, 226], eo(up)); if (side === 'op') { P.op.tilt = -.14 * up; P.op.face = u > .55 ? (r.r === 'p' ? 'sick' : 'smug') : 'eat'; }
+              this.once(k + 'g', u > .35, () => this.sfx('rr_gulp'));
+              this.once(k + 'res', u > .62, () => { const p = side === 'op' ? [195, 190] : [195, 560]; if (r.r === 'p') { this.sfx('rr_poison'); this.burst(p[0], p[1], 20, { c: ['#7acc3a', '#b9e86a', '#3a7a1a'], v: 100, l: 1, r: 4, gv: -50 }); this.text(side === 'op' ? 110 : 280, side === 'op' ? 130 : 500, '독이다! -10%', '#b9e86a', true); this.spawn({ x: p[0], y: p[1], k: 'skull', l: 1, r: 1 }); if (side === 'me') { this.flash = { c: '60,160,30', a: .4 }; this.shake = 6; } } else { this.sfx('rr_heal'); this.burst(p[0], p[1], 18, { c: ['#7affb0', '#fff', '#ffe27a'], v: 80, l: 1, r: 3, gv: -60, k: 'star' }); this.text(side === 'op' ? 110 : 280, side === 'op' ? 130 : 500, '회복제! +20%', '#7affb0', true); } });
+            } else { const sw = u < .4 ? u / .4 : 1; SPs.r = mixp([SEAT[side].cup[0] + 24, SEAT[side].cup[1]], [SEAT[side].cup[0] + 4, SEAT[side].cup[1]], eo(sw)); cp.tip = eo(u / .6); this.once(k + 'pour', u > .3, () => { this.sfx('rr_pour'); this.burst(SEAT[side].cup[0] + 10, SEAT[side].cup[1] + 12, 10, { c: '#e0a63a', v: 60, l: .8, r: 3, gv: 400 }); this.text(side === 'op' ? 110 : 280, side === 'op' ? 150 : 520, '버렸다', '#ccc', false, 1.0); }); }
+            if (u > .97) cp.done = true;
+          }); break;
         }
+        case 'pass': { if (sd === 'op') { P.op.face = 'sick'; P.op.lean = Math.sin(u * PI) * 6; } this.once('z', u > .1, () => this.text(195, sd === 'op' ? 150 : 520, '패스 (손패 가득)', '#cfe', false, 1.0)); break; }
         case 'poison': {
           reach('r', [iT[0] + 30, iT[1]], Math.min(1, u * 1.4)); this.once('c', u > .3, () => { this.cups = { me: { lift: 0, tip: 0 }, op: { lift: 0, tip: 0 } }; this.sfx('rr_clink'); }); break;
         }
@@ -479,7 +534,7 @@ class Scene {
     if (this.ext) { this.ext.t += dt; const sdE = this.ext.side, pos = SEAT[sdE === 'me' ? 'me' : 'op']; const tgtPt = sdE === 'op' ? [195, 506] : [195, 392], e = eo(this.ext.t / .5);
       P[sdE].r = mixp(P[sdE].r, tgtPt, e); if (sdE === 'op') P.op.stretch = 1 + .8 * e; void pos; }
     if (this.cups && !(S && S.phase === 'cup')) { const cu = this.cups; if (cu.me.done !== undefined || true) { /* 정리 */ } }
-    if (this.cups && S && S.phase !== 'cup' && S.phase !== 'init' && !(this.an && this.an.k === 'cup')) this.cups = null;
+    if (this.cups && S && S.phase !== 'cup' && S.phase !== 'init' && !(this.an && this.an.k === 'cup2')) this.cups = null;
     if (this.proj && !this.an && this.proj.hold === false) this.proj = null;
     /* 파티클 */
     for (let i = this.fx.length - 1; i >= 0; i--) { const q = this.fx[i]; q.l -= dt; if (q.l <= 0) { this.fx.splice(i, 1); continue; } q.vy += q.gv * dt; q.x += q.vx * dt; q.y += q.vy * dt; }
@@ -534,7 +589,7 @@ class Scene {
     /* 먹기: 손에 든 빵 */
     if (this.food && this.food.side === side) { const u = this.food.u; if (u > .2 && u < .8) drawBread(g, hp[0], hp[1] - 4, side === 'me' ? 1.0 : .7); }
     /* 컵 들기 */
-    if (this.cups && this.cups[side] && this.cups[side].lift > 0.05 && an && an.k === 'cup') { const cp = this.cups[side]; drawGoblet(g, hp[0], hp[1] + 6, side === 'me' ? 1.4 : 1, '#7a2a8a', -.3 * cp.lift); }
+    if (this.cups && this.cups[side] && this.cups[side].lift > 0.05 && an && an.k === 'cup2') { const cp = this.cups[side]; drawGoblet(g, hp[0], hp[1] + 6, side === 'me' ? 1.4 : 1, '#7a2a8a', -.3 * cp.lift); }
   }
   drawTableItems(g, S) {
     ['op', 'me'].forEach(side => {
@@ -600,7 +655,9 @@ const RRCSS = `
 .rrbox{width:100%;max-width:340px;background:#1a110c;border:2px solid #d9a52e;border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:12px;text-align:center}
 .rrbox h3{margin:0;font-size:19px;color:#ffe27a}.rrbox p{margin:0;font-size:12.5px;color:#c9b88a;line-height:1.5}
 .rrbox .tm{font-size:34px;font-weight:900;color:#ff8a6a;font-variant-numeric:tabular-nums}
-.rrbox.w{border-color:#ffd54a;box-shadow:0 0 30px #ffd54a66}.rrbox.l{border-color:#6a6f7a}
+.rrbox.w{border-color:#ffd54a;box-shadow:0 0 30px #ffd54a66}.rrbox.l{border-color:#6a6f7a}.rrbox.d{border-color:#8aa6c9}
+.rrbdg{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;min-height:0}.rrbdg span{font-size:11px;font-weight:800;border-radius:8px;padding:3px 8px;background:#2a1c12;border:1px solid #6a4e2a;color:#ffe9b0}.rrbdg span.r{border-color:#ff6a5a;color:#ff9a8a;background:#3a1410;animation:rrp 1s infinite}
+.rrc.warn{border-color:#ff4a3a;box-shadow:0 0 0 2px #ff4a3a88}.rrbox small.sub{font-size:11px;color:#9fb4cc}
 `;
 function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -615,7 +672,7 @@ export function openRR(br) {
   const ov = el('div', 'rro'); ov.id = 'rrov'; document.body.appendChild(ov); document.body.style.overflow = 'hidden';
   ov.innerHTML = '<div class="rrtop"><b>🍺 러시안 룰렛 · 멀티플레이</b><button class="x" id="rrx">✕</button></div><div class="rrbody" id="rrb"></div>';
   const body = ov.querySelector('#rrb'), $ = id => ov.querySelector('#' + id);
-  let alive = true, view = '', unsub = null, room = null, roomId = null, isHost = false, game = null, scene = null, raf = 0, last = performance.now(), hb = 0, lobT = 0, tab = 'create', gameStarted = false, paid = false, settled = false, hudEls = null, selCard = null, giveMode = false, giveSel = null, chatOpen = false, chatSel = -1, chatT = 0, lastOver = false, modalEl = null, rolled = false;
+  let alive = true, view = '', unsub = null, room = null, roomId = null, isHost = false, game = null, scene = null, raf = 0, last = performance.now(), hb = 0, lobT = 0, tab = 'create', gameStarted = false, paid = false, settled = false, hudEls = null, selCard = null, giveMode = false, giveSel = null, chatOpen = false, chatSel = -1, chatT = 0, lastOver = false, modalEl = null, rolled = false, curGid = 0, rmDo = false, giveT = 0, lastTick = 0, gone = false, lastBdg = '';
   const bal = () => br.getBal(), setBal = v => br.setBal(+(+v).toFixed(2));
   const logged = () => me && me !== 'guest' && br.loggedIn && br.loggedIn();
 
@@ -626,7 +683,7 @@ export function openRR(br) {
   }
   function close() {
     if (game && !game.S.over && gameStarted) { if (!confirm('게임 중에 나가면 항복(패배) 처리되고 배팅금을 잃습니다. 나갈까요?')) return; game.actResign(); }
-    alive = false; cancelAnimationFrame(raf); clearInterval(lobT); cleanup(!(room && room.status === 'playing')); if (game) game.destroy(); window.removeEventListener('resize', onResize); ov.remove(); document.body.style.overflow = ''; br.onClose && br.onClose();
+    leaveNote(); alive = false; cancelAnimationFrame(raf); clearInterval(lobT); cleanup(!(room && room.status === 'playing')); if (game) game.destroy(); window.removeEventListener('resize', onResize); ov.remove(); document.body.style.overflow = ''; br.onClose && br.onClose();
   }
   $('rrx').onclick = close;
   const onResize = () => { if (scene) scene.resize(); }; window.addEventListener('resize', onResize);
@@ -637,6 +694,7 @@ export function openRR(br) {
     const tabs = el('div', 'rrtabs', '<button data-t="create">방 생성</button><button data-t="join">방 입장</button>'); body.appendChild(tabs);
     const pane = el('div'); pane.style.cssText = 'display:flex;flex-direction:column;gap:10px'; body.appendChild(pane);
     if (msg) body.insertBefore(el('div', 'rrmsg', esc(msg)), pane);
+    { const st = br.getStat ? br.getStat() : null; if (st) body.insertBefore(el('div', 'rrpn', '<h4>🏅 내 전적</h4><div style="display:flex;gap:14px;font-weight:800;font-size:15px"><span style="color:#7affb0">' + (st.w | 0) + '승</span><span style="color:#ff9a8a">' + (st.l | 0) + '패</span><span style="color:#9fb4cc">' + (st.d | 0) + '무</span></div>'), tabs); }
     const draw = () => { [...tabs.children].forEach(b => b.classList.toggle('on', b.dataset.t === tab)); clearInterval(lobT); if (tab === 'create') drawCreate(pane); else drawJoin(pane); };
     tabs.onclick = e => { const b = e.target.closest('button'); if (!b) return; tab = b.dataset.t; draw(); }; draw();
   }
@@ -685,55 +743,73 @@ export function openRR(br) {
   let lastRoomKey = '';
   function onRoom(d) {
     if (!alive) return;
-    if (!d) { if (view === 'room' || (view === 'game' && !(game && game.S.over))) { if (view === 'game' && game) { /* 방이 사라짐 */ } cleanup(false); if (game) { game.destroy(); game = null; } stopScene(); showLobby(isHost ? '' : '방이 닫혔습니다'); } return; }
+    if (!d) { if (view === 'game' && game && game.S.over) { gone = true; updateRematch(); return; } if (view === 'room' || (view === 'game' && !(game && game.S.over))) { cleanup(false); if (game) { game.destroy(); game = null; } stopScene(); showLobby(isHost ? '' : '방이 닫혔습니다'); } return; }
     room = d;
     if (view === 'room') {
       if (!isHost && d.guest && d.guest.uid !== me) { cleanup(false); showLobby('다른 유저가 입장한 방입니다'); return; }
       if (d.status === 'playing' || (d.status === 'done' && d.ev && d.ev.length)) { if (!gameStarted) startGame(); }
       else drawRoom();
     }
-    if (view === 'game' && game) game.feed(d.ev || []);
+    if (view === 'game' && game && (d.gid || 0) > curGid) { restartRound(); return; }
+    if (view === 'game' && game) { game.feed(d.ev || []); updateRematch(); }
   }
+  function restartRound() { if (modalEl) { modalEl.remove(); modalEl = null; } const o = ov.querySelector('.rrmodal'); if (o) o.remove(); if (game) game.destroy(); game = null; stopScene(); startGame(); }
+  function updateRematch() {
+    const b = ov.querySelector('#orm'); if (!b || !room) return; const mine = isHost ? room.rmh : room.rmg, theirs = isHost ? room.rmg : room.rmh, sg = ov.querySelector('#orsg'), left = room.lf && room.lf !== me;
+    if (left || gone) { b.disabled = true; b.textContent = '재대결 불가'; if (sg) sg.textContent = '상대가 방을 나갔습니다'; return; }
+    if (mine === curGid) { b.disabled = true; b.textContent = '상대 수락 대기…'; }
+    if (sg && theirs === curGid && mine !== curGid) sg.textContent = '상대가 재대결을 원합니다!';
+    if (isHost && room.rmh === curGid && room.rmg === curGid && !rmDo) { rmDo = true; doRematch(); }
+  }
+  async function doRematch() {
+    const bet = +room.bet, first = Math.random() < .5 ? room.host.uid : room.guest.uid, ang = (Math.random() - .5) * .7;
+    try { await net.patch(roomId, { gid: curGid + 1, ev: [], status: 'playing', bet, rmh: null, rmg: null }); await net.push(roomId, [{ t: 'start', first, ang, i: 'st' + Date.now(), by: me }]); } catch (e) { console.error(e); toast('재대결을 시작하지 못했습니다'); rmDo = false; }
+  }
+  const leaveNote = () => { if (roomId && game && game.S.over) net.patch(roomId, { lf: me }).catch(() => { }); };
   function drawRoom() {
-    const d = room, key = JSON.stringify([d.status, d.guest && d.guest.uid, d.offer, bal()]); if (key === lastRoomKey && $('rrroomp')) return; lastRoomKey = key;
+    const d = room, key = JSON.stringify([d.status, d.guest && d.guest.uid, d.offer, d.gr, d.note, bal()]); if (key === lastRoomKey && $('rrroomp')) return; lastRoomKey = key;
     const g = d.guest; let h = '<div class="rrpn" id="rrroomp"><h4>🔒 ' + esc(d.name) + '</h4><p>방장 ' + esc(d.host.n) + (g ? ' · 상대 ' + esc(g.n) : '') + '</p></div>';
     if (isHost) {
       if (!g) h += '<div class="rrpn"><h4>상대를 기다리는 중…</h4><p>다른 유저가 방 목록에서 이 방을 찾아 비밀번호로 입장하면 배팅금을 정할 수 있어요.</p></div><button class="rrbtn g" id="rl">방 닫기</button>';
       else if (d.status === 'offer') h += '<div class="rrpn"><h4>상대의 응답을 기다리는 중…</h4><div class="rrbig">' + money(d.offer.bet) + ' USDT</div><p>상대가 OK를 누르면 게임이 시작됩니다. X를 누르면 배팅금을 다시 정해야 합니다.</p></div><button class="rrbtn g" id="rl">방 닫기</button>';
       else if (d.status === 'ok') h += '<div class="rrpn"><h4>상대가 수락했습니다</h4><p>게임을 시작하는 중…</p></div>';
+      else if (!d.gr) h += '<div class="rrpn"><h4>상대 ' + esc(g.n) + ' 님이 입장했습니다</h4><p>상대가 “준비 완료”를 누르면 배팅금을 정할 수 있어요.</p></div><button class="rrbtn g" id="rl">방 닫기</button>';
       else { const mx = Math.floor(Math.min(bal(), +g.bal || 0)); h += '<div class="rrpn"><h4>배팅금 정하기</h4><p>상대 보유 ' + money(g.bal) + ' USDT · 내 보유 ' + money(bal()) + ' USDT<br>1 ~ ' + money(mx) + ' USDT 까지 입력할 수 있어요.</p>' + (d.note ? '<div class="rrmsg">상대가 배팅금을 거절했습니다. 다시 정해 주세요.</div>' : '') + '<input id="bt" inputmode="numeric" placeholder="배팅금 (USDT)" value=""><div class="rrmsg" id="bm"></div><button class="rrbtn" id="bo"' + (mx < 1 ? ' disabled' : '') + '>이 금액으로 제안</button></div><button class="rrbtn g" id="rl">방 닫기</button>'; }
     } else {
       if (d.status === 'offer') h += '<div class="rrpn"><h4>방장이 제안한 배팅금</h4><div class="rrbig">' + money(d.offer.bet) + ' USDT</div><p>OK를 누르면 게임이 시작되고 배팅금이 즉시 차감됩니다. 이긴 사람이 양쪽 배팅금을 모두 가져가요.<br>내 보유 ' + money(bal()) + ' USDT</p><div class="rrrow"><button class="rrbtn g" id="bx">X (거절)</button><button class="rrbtn ok" id="bk">OK</button></div></div><button class="rrbtn g" id="rl">방 나가기</button>';
       else if (d.status === 'ok') h += '<div class="rrpn"><h4>수락했습니다</h4><p>방장이 게임을 시작하는 중…</p></div>';
+      else if (!d.gr) h += '<div class="rrpn"><h4>준비가 되면 눌러주세요</h4><p>내 보유 ' + money(bal()) + ' USDT · 준비 완료를 누르면 방장이 배팅금을 제안할 수 있어요.</p><button class="rrbtn ok" id="gr">준비 완료</button></div><button class="rrbtn g" id="rl">방 나가기</button>';
       else h += '<div class="rrpn"><h4>방장이 배팅금을 정하는 중…</h4><p>잠시만 기다려 주세요.</p></div><button class="rrbtn g" id="rl">방 나가기</button>';
     }
     body.innerHTML = h;
-    const rl = $('rl'); if (rl) rl.onclick = async () => { if (isHost) { cleanup(true); } else { cleanup(false); await net.patch(roomId, { guest: null, status: 'open', offer: null }).catch(() => { }); } showLobby(); };
+    const rl = $('rl'); if (rl) rl.onclick = async () => { if (isHost) { cleanup(true); } else { cleanup(false); await net.patch(roomId, { guest: null, status: 'open', offer: null, gr: false }).catch(() => { }); } showLobby(); };
+    if ($('gr')) $('gr').onclick = async () => { $('gr').disabled = true; try { await net.patch(roomId, { gr: true, guest: { uid: me, n: myName, bal: +bal() } }); sfx('rl_tick'); } catch (e) { toast('전송 실패'); $('gr').disabled = false; } };
     if ($('bo')) $('bo').onclick = async () => {
       const mx = Math.floor(Math.min(bal(), +d.guest.bal || 0)), v = Math.floor(+$('bt').value); if (!(v >= 1)) return $('bm').textContent = '1 USDT 이상 입력해 주세요'; if (v > mx) return $('bm').textContent = '최대 ' + money(mx) + ' USDT 까지 가능합니다';
       $('bo').disabled = true; try { await net.patch(roomId, { status: 'offer', offer: { bet: v, t: Date.now() }, note: null }); sfx('rl_tick'); } catch (e) { $('bm').textContent = '제안하지 못했습니다'; $('bo').disabled = false; }
     };
-    if ($('bk')) $('bk').onclick = async () => { const b = +d.offer.bet; if (bal() < b) { toast('잔액이 부족합니다'); return; } $('bk').disabled = true; $('bx').disabled = true; try { await net.patch(roomId, { status: 'ok' }); sfx('rl_start'); } catch (e) { toast('전송 실패'); } };
+    if ($('bk')) $('bk').onclick = async () => { const b = +d.offer.bet; if (bal() < b) { toast('잔액이 부족합니다'); return; } $('bk').disabled = true; $('bx').disabled = true; try { await net.patch(roomId, { status: 'ok', okv: d.offer.t, okBal: +bal() }); sfx('rl_start'); } catch (e) { toast('전송 실패'); } };
     if ($('bx')) $('bx').onclick = async () => { try { await net.patch(roomId, { status: 'joined', offer: null, note: 'x' + Date.now() }); } catch (e) { toast('전송 실패'); } };
     /* 방장: 상대가 OK 하면 시작 */
     if (isHost && d.status === 'ok' && !rolled) beginGame(d);
   }
   async function beginGame(d) {
-    rolled = true; const b = +d.offer.bet;
+    if (d.okv !== d.offer.t) return; rolled = true; const b = +d.offer.bet;
+    if ((+d.okBal || 0) < b) { toast('상대 잔액이 부족해 시작할 수 없습니다'); rolled = false; await net.patch(roomId, { status: 'joined', offer: null, note: 'x' + Date.now() }); return; }
     if (bal() < b) { toast('잔액이 부족해 시작할 수 없습니다'); rolled = false; await net.patch(roomId, { status: 'joined', offer: null, note: 'x' + Date.now() }); return; }
     const first = Math.random() < .5 ? d.host.uid : d.guest.uid, ang = (Math.random() - .5) * .7;
     try { await net.patch(roomId, { status: 'playing', bet: b }); await net.push(roomId, [{ t: 'start', first, ang, i: 'st' + Date.now(), by: me }]); } catch (e) { console.error(e); toast('시작하지 못했습니다'); rolled = false; }
   }
 
   /* ---------------- 게임 ---------------- */
-  function pay() { if (paid) return true; const k = 'rr_pay_' + me + '_' + roomId; try { if (localStorage.getItem(k)) { paid = true; return true; } } catch (e) { } const b = +room.bet; if (bal() < b) { return false; } setBal(bal() - b); paid = true; try { localStorage.setItem(k, '1'); } catch (e) { } return true; }
+  function pay() { if (paid) return true; const k = 'rr_pay_' + me + '_' + roomId + '_' + curGid; try { if (localStorage.getItem(k)) { paid = true; return true; } } catch (e) { } const b = +room.bet; if (bal() < b) { return false; } setBal(bal() - b); paid = true; try { localStorage.setItem(k, '1'); } catch (e) { } return true; }
   function startGame() {
-    gameStarted = true; view = 'game'; clearInterval(hb);
+    gameStarted = true; view = 'game'; clearInterval(hb); curGid = room.gid || 0; rmDo = false; lastOver = false; settled = false; paid = false; selCard = null; giveMode = false; giveSel = null; chatOpen = false; lastBdg = '';
     const d = room, oppU = isHost ? d.guest : d.host;
-    if (!pay()) { toast('잔액이 부족해 항복 처리됩니다'); }
+    if (!pay()) { toast('잔액이 부족해 게임이 취소됩니다 (상대 배팅금은 반환)'); }
     body.style.padding = '0'; body.style.gap = '0'; body.innerHTML = '';
     const g = el('div', 'rrg'); body.appendChild(g);
-    g.innerHTML = '<div class="rrhud"><div class="c"><small id="rop">상대</small><b id="rophp">체력 ???</b></div><div class="c" style="flex:1.2"><small id="rmy">내 체력</small><b id="rmyhp">-</b><div class="rrhp" id="rhpb"><i style="width:100%"></i></div></div><div class="c" style="flex:.8"><small>배팅</small><b>' + money(d.bet) + '</b></div></div><div class="rrcv" id="rcv"><canvas></canvas></div><div class="rrtray"><div class="rrst" id="rst"></div><div id="rdesc"></div><div class="rract" id="ract"></div><div class="rrhand" id="rhand"></div></div>';
+    g.innerHTML = '<div class="rrhud"><div class="c"><small id="rop">상대</small><b id="rophp">체력 ???</b></div><div class="c" style="flex:1.2"><small id="rmy">내 체력</small><b id="rmyhp">-</b><div class="rrhp" id="rhpb"><i style="width:100%"></i></div></div><div class="c" style="flex:.8"><small>배팅</small><b>' + money(d.bet) + '</b></div></div><div class="rrcv" id="rcv"><canvas></canvas></div><div class="rrtray"><div class="rrbdg" id="rbdg"></div><div class="rrst" id="rst"><span id="rstt"></span><span id="rtm"></span></div><div id="rdesc"></div><div class="rract" id="ract"></div><div class="rrhand" id="rhand"></div></div>';
     const cv = g.querySelector('canvas');
     const roleMe = isHost ? 'host' : 'guest', roleOp = isHost ? 'guest' : 'host';
     scene = new Scene(cv, { roleMe, roleOp, me, sfx });
@@ -744,11 +820,11 @@ export function openRR(br) {
     cv.addEventListener('pointerdown', onCanvasTap);
     setTimeout(() => { scene.resize(); }, 60);
     game.feed(room.ev || []);
-    if (!paid) setTimeout(() => game && game.actResign(), 500);
+    if (!paid) setTimeout(() => game && game.actAbort(), 500);
   }
   function stopScene() { cancelAnimationFrame(raf); scene = null; }
-  function loop(now) { if (!alive || !scene) return; raf = requestAnimationFrame(loop); const dt = Math.min(.05, (now - last) / 1000); last = now; scene.step(dt); scene.render(); if (game && !game.S.over && ((now | 0) % 20 < 3)) tickIdle(); }
-  function tickIdle() { if (!game) return; const b = $('rclaim'); if (b) b.disabled = !game.canClaim(); }
+  function loop(now) { if (!alive || !scene) return; raf = requestAnimationFrame(loop); const dt = Math.min(.05, (now - last) / 1000); last = now; scene.step(dt); scene.render(); if (game && now - lastTick > 250) { lastTick = now; tickIdle(); } }
+  function tickIdle() { if (!game) return; const b = $('rclaim'); if (b) b.disabled = !game.canClaim(); const t = game.S.over ? null : game.turnLeft(), tm = $('rtm'); if (tm) { tm.textContent = (t != null && !game.qbusy) ? ' · ⏱ ' + t + '초' : ''; tm.style.color = t != null && t <= 10 ? '#ff8a6a' : ''; } }
   function onCanvasTap(ev) {
     if (!game || !scene || !scene.ext || game.S.phase !== 'pick' || game.S.turn !== me || game.qbusy) return;
     const [x, y] = scene.toLogic(ev.clientX, ev.clientY), ps = scene.extPos(scene.ext.n); let hit = -1;
@@ -764,33 +840,34 @@ export function openRR(br) {
     let st = '', cls = ''; const busy = game.qbusy;
     if (S.over) st = ''; else if (S.phase === 'init') st = '게임을 준비하는 중…';
     else if (busy && S.phase !== 'init') { st = '진행 중…'; }
-    else if (S.phase === 'turn') { if (my) { st = game.mustAuto() ? (S.skip[me] ? '벌컥벌컥의 여파… 이번 턴은 쉽니다' : '권총을 발사합니다…') : (game.L.bombPending ? '자폭 카드가 터집니다…' : '내 차례 · 카드를 사용하거나 2장을 뽑으세요'); cls = 'me'; } else st = '상대의 차례…'; }
+    else if (S.phase === 'turn') { if (my) { st = game.mustAuto() ? (S.skip[me] ? '벌컥벌컥의 여파… 이번 턴은 쉽니다' : '권총을 발사합니다…') : '내 차례 · 카드를 사용하거나 2장을 뽑으세요 (30초)'; cls = 'me'; } else st = '상대의 차례…'; }
     else if (S.phase === 'pick') { st = my ? '상대가 내민 카드 한 장을 두 번 눌러 가져오세요' : '상대가 내 카드를 고르는 중…'; cls = my ? 'me' : ''; }
-    else if (S.phase === 'cup') st = S.cup[me] ? '상대의 선택을 기다리는 중…' : '술잔을 마실지 버릴지 선택하세요';
+    else if (S.phase === 'cup') st = (S.cc[me] || L.cupSent) ? '상대의 선택을 기다리는 중…' : '술잔을 마실지 버릴지 선택하세요';
     else st = '진행 중…';
-    const stE = $('rst'); stE.textContent = st; stE.className = 'rrst ' + cls;
+    const stE = $('rst'); $('rstt').textContent = st; stE.className = 'rrst ' + cls;
     if (giveMode && !(game.canAct() || false)) { giveMode = false; giveSel = null; }
     /* 액션 */
     const ract = $('ract'), canAct = game.canAct();
-    const key = [canAct, giveMode, S.over ? 1 : 0, S.phase, S.turn === me, game.qbusy].join();
-    if (ract.dataset.k !== key) { ract.dataset.k = key; ract.innerHTML = ''; if (!S.over) { if (giveMode) { const c = el('button', 'g', '취소'); c.onclick = () => { giveMode = false; giveSel = null; renderHUD(); }; ract.appendChild(c); } else { const dr = el('button', '', '🃏 카드 2장 뽑기'); dr.disabled = !canAct; dr.onclick = () => { if (game.actDraw()) sfx('rl_tick'); }; ract.appendChild(dr); } const ch = el('button', 'g', '💬 대화'); ch.onclick = () => { chatOpen = !chatOpen; chatSel = -1; renderChat(); }; ract.appendChild(ch); const cl = el('button', 'g', '⏱ 승리 선언'); cl.id = 'rclaim'; cl.style.display = 'none'; cl.onclick = () => { if (game.actClaim()) toast('상대 무응답으로 승리를 선언했습니다'); }; ract.appendChild(cl); const rs = el('button', 'g', '🏳 항복'); rs.style.flex = '.7'; rs.onclick = () => { if (confirm('항복하면 배팅금을 잃습니다. 항복할까요?')) game.actResign(); }; ract.appendChild(rs); } }
+    const key = [canAct, giveMode, S.over ? 1 : 0, S.phase, S.turn === me, game.qbusy, L.hand.length].join();
+    if (ract.dataset.k !== key) { ract.dataset.k = key; ract.innerHTML = ''; if (!S.over) { if (giveMode) { const c = el('button', 'g', '취소'); c.onclick = () => { giveMode = false; giveSel = null; renderHUD(); }; ract.appendChild(c); } else { const hn = S.n[me] | 0, dr = el('button', '', hn >= 10 ? '🃏 손패 가득 (10장)' : hn === 9 ? '🃏 카드 1장 뽑기' : '🃏 카드 2장 뽑기'); dr.disabled = !canAct || !game.canDraw(); dr.onclick = () => { if (game.actDraw()) sfx('rl_tick'); }; ract.appendChild(dr); } const ch = el('button', 'g', '💬 대화'); ch.onclick = () => { chatOpen = !chatOpen; chatSel = -1; renderChat(); }; ract.appendChild(ch); const cl = el('button', 'g', '⏱ 승리 선언'); cl.id = 'rclaim'; cl.style.display = 'none'; cl.onclick = () => { if (game.actClaim()) toast('상대 무응답으로 승리를 선언했습니다'); }; ract.appendChild(cl); const rs = el('button', 'g', '🏳 항복'); rs.style.flex = '.7'; rs.onclick = () => { if (confirm('항복하면 배팅금을 잃습니다. 항복할까요?')) game.actResign(); }; ract.appendChild(rs); } }
     const cl = $('rclaim'); if (cl) { const can = game.canClaim(); cl.style.display = can ? '' : 'none'; }
     /* 손패 */
     const hand = $('rhand'), hk = JSON.stringify([L.hand.map(k => [k.id, k.cd]), selCard, giveMode, giveSel, canAct]); if (hand.dataset.k !== hk) {
       hand.dataset.k = hk; hand.innerHTML = '';
-      L.hand.forEach(k => { const C = CARDS[k.c], ok = game.canUse(k) && canAct; const c = el('div', 'rrc' + (selCard === k.id && !giveMode ? ' sel' : '') + ((giveMode && k.id !== selCard) ? ' give' : '') + (giveMode && giveSel === k.id ? ' sel' : '') + (!ok && !giveMode ? ' dis' : ''), '<div class="i">' + C.ic + '</div><div class="n">' + C.n + '</div>' + (k.c === 'bomb' ? '<div class="cd">⏱' + k.cd + '</div>' : ''));
+      L.hand.forEach(k => { const C = CARDS[k.c], ok = game.canUse(k) && canAct; const c = el('div', 'rrc' + (selCard === k.id && !giveMode ? ' sel' : '') + ((giveMode && k.id !== selCard) ? ' give' : '') + (giveMode && giveSel === k.id ? ' sel' : '') + (!ok && !giveMode ? ' dis' : '') + (k.c === 'bomb' && k.cd <= 1 ? ' warn' : ''), '<div class="i">' + C.ic + '</div><div class="n">' + C.n + '</div>' + (k.c === 'bomb' ? '<div class="cd">⏱' + k.cd + '</div>' : ''));
         c.onclick = () => onCardTap(k); hand.appendChild(c); });
       if (!L.hand.length) hand.innerHTML = '<div style="font-size:12px;color:#a89873;align-self:center;padding:0 8px">카드가 없습니다. 2장을 뽑으세요.</div>';
     }
     const ds = $('rdesc'), sk = L.hand.find(k => k.id === selCard);
     if (giveMode) ds.innerHTML = '<div class="rrdesc"><div>🖐️ <b>넘길 카드를 두 번 눌러 선택</b>하세요. 상대가 팔을 내밀면 상대 카드 한 장을 뽑아 교체합니다.</div></div>';
-    else if (sk && !S.over) { const C = CARDS[sk.c]; ds.innerHTML = '<div class="rrdesc"><div><b>' + C.ic + ' ' + C.n + '</b><br>' + C.d + (sk.c === 'bomb' ? ' (남은 ' + sk.cd + '턴)' : '') + '</div>' + (sk.c === 'bomb' ? '' : '<button id="ruse">사용</button>') + '</div>'; const u = $('ruse'); if (u) { u.disabled = !(game.canUse(sk) && canAct); u.onclick = () => useCard(sk); } }
+    else if (sk && !S.over) { const C = CARDS[sk.c]; ds.innerHTML = '<div class="rrdesc"><div><b>' + C.ic + ' ' + C.n + '</b> <small style="color:#c9a15a">[' + (C.k || '') + ']</small><br>' + C.d + (sk.c === 'bomb' ? ' (남은 ' + sk.cd + '턴)' : '') + '</div>' + (sk.c === 'bomb' ? '' : '<button id="ruse">사용</button>') + '</div>'; const u = $('ruse'); if (u) { u.disabled = !(game.canUse(sk) && canAct); u.onclick = () => useCard(sk); } }
     else ds.innerHTML = '';
+    { const opp = game.opp, bd = []; if (S.pistol[me]) bd.push('<span class="r">🔫 내 권총 · 다음 내 턴 시작에 격발</span>'); if (S.pistol[opp]) bd.push('<span class="r">🔫 상대 권총 장전됨 · 상대 턴 시작에 격발(50%)</span>'); if (S.dodge[me]) bd.push('<span>💨 회피 대기</span>'); if (S.dodge[opp]) bd.push('<span>💨 상대 회피 대기</span>'); if (S.skip[me]) bd.push('<span>😵 다음 턴 쉼</span>'); if (L.hand.some(k => k.c === 'bomb' && k.cd <= 1)) bd.push('<span class="r">💣 이번 턴 끝에 자폭!</span>'); const bh = bd.join(''); if (bh !== lastBdg) { lastBdg = bh; $('rbdg').innerHTML = bh; } }
     if (S.over && !lastOver) { lastOver = true; setTimeout(showOver, 1200); }
     if (chatOpen) renderChat();
   }
-  function onCardTap(k) { if (giveMode) { if (k.id === selCard) return; if (giveSel === k.id) { if (game.actUse(selCard, k.id)) { giveMode = false; giveSel = null; selCard = null; sfx('rl_tick'); } } else { giveSel = k.id; sfx('rl_tick'); } renderHUD(); return; } selCard = selCard === k.id ? null : k.id; sfx('rl_tick'); renderHUD(); }
-  function useCard(k) { if (!game.canAct() || !game.canUse(k)) return; if (k.c === 'intercept') { giveMode = true; giveSel = null; renderHUD(); return; } if (game.actUse(k.id)) { selCard = null; sfx('rl_tick'); } renderHUD(); }
+  function onCardTap(k) { if (giveMode) { if (k.id === selCard) return; if (giveSel === k.id) { if (game.actUse(selCard, k.id)) { clearTimeout(giveT); giveMode = false; giveSel = null; selCard = null; sfx('rl_tick'); } } else { giveSel = k.id; sfx('rl_tick'); } renderHUD(); return; } selCard = selCard === k.id ? null : k.id; sfx('rl_tick'); renderHUD(); }
+  function useCard(k) { if (!game.canAct() || !game.canUse(k)) return; if (k.c === 'intercept') { giveMode = true; giveSel = null; clearTimeout(giveT); giveT = setTimeout(() => { if (giveMode) { giveMode = false; giveSel = null; toast('선택 시간(10초)이 지나 취소되었습니다'); renderHUD(); } }, 10000); renderHUD(); return; } if (game.actUse(k.id)) { selCard = null; sfx('rl_tick'); } renderHUD(); }
   function renderChat() {
     let p = ov.querySelector('.rrchat'); if (!chatOpen) { if (p) p.remove(); return; }
     if (!p) { p = el('div', 'rrchat'); ov.querySelector('.rrg').appendChild(p); }
@@ -800,20 +877,27 @@ export function openRR(br) {
   }
   function showCup(ms) {
     if (modalEl) modalEl.remove(); const m = el('div', 'rrmodal'); modalEl = m; const t0 = Date.now();
-    m.innerHTML = '<div class="rrbox"><h3>☠️ 독이 든 술잔</h3><p>나와 상대 모두에게 술잔이 놓였습니다.<br>50% 확률로 독(-10%) 또는 회복제(+20%)가 들어 있어요.</p><div class="tm" id="ct">15</div><div class="rrrow"><button class="rrbtn g" id="cd">버리기</button><button class="rrbtn" id="cm">마시기</button></div></div>'; ov.querySelector('.rrg').appendChild(m);
+    m.innerHTML = '<div class="rrbox"><h3>☠️ 독이 든 술잔</h3><p>나와 상대 모두에게 술잔이 놓였습니다.<br>50% 확률로 독(-10%) 또는 회복제(+20%). 두 사람 모두 고르기 전까지 서로의 선택은 보이지 않고, 15초가 지나면 자동으로 버립니다.</p><div class="tm" id="ct">15</div><div class="rrrow"><button class="rrbtn g" id="cd">버리기</button><button class="rrbtn" id="cm">마시기</button></div></div>'; ov.querySelector('.rrg').appendChild(m);
     const done = () => { if (modalEl === m) modalEl = null; m.remove(); clearInterval(iv); };
-    const iv = setInterval(() => { const r = Math.max(0, Math.ceil((ms - (Date.now() - t0)) / 1000)); const c = m.querySelector('#ct'); if (c) c.textContent = r; if (!alive || !game || game.S.cup[me] || game.S.over || game.S.phase !== 'cup') done(); }, 200);
-    m.querySelector('#cm').onclick = () => { if (game.actCup(true)) done(); }; m.querySelector('#cd').onclick = () => { if (game.actCup(false)) done(); };
+    const iv = setInterval(() => { const r = Math.max(0, Math.ceil((ms - (Date.now() - t0)) / 1000)); const c = m.querySelector('#ct'); if (c) c.textContent = r; if (!alive || !game || game.S.cc[me] || game.L.cupSent || game.S.over || game.S.phase !== 'cup') done(); }, 200);
+    m.querySelector('#cm').onclick = () => { game.actCup(true); done(); }; m.querySelector('#cd').onclick = () => { game.actCup(false); done(); };
   }
   function showOver() {
-    if (!alive || !game) return; const S = game.S, d = room, bet = +d.bet, won = S.over.loser !== me; if (modalEl) { modalEl.remove(); modalEl = null; }
+    if (!alive || !game) return; const S = game.S, d = room, bet = +d.bet, O = S.over, draw = !!O.draw, ab = !!O.abort, won = !draw && !ab && O.loser !== me; if (modalEl) { modalEl.remove(); modalEl = null; }
     let cr = 0;
-    if (won && !settled) { settled = true; const k = 'rr_set_' + me + '_' + roomId; let dup = false; try { dup = !!localStorage.getItem(k); localStorage.setItem(k, '1'); } catch (e) { } if (!dup && paid) { cr = bet * 2; setBal(bal() + cr); } }
+    if (!settled) { settled = true; const k = 'rr_set_' + me + '_' + roomId + '_' + curGid; let dup = false; try { dup = !!localStorage.getItem(k); localStorage.setItem(k, '1'); } catch (e) { } if (!dup) {
+      if (paid) { if (won) cr = bet * 2; else if (draw || ab) cr = bet; if (cr) setBal(bal() + cr); }
+      if (!ab && br.getStat && br.setStat) { const st = Object.assign({ w: 0, l: 0, d: 0 }, br.getStat()); if (won) st.w++; else if (draw) st.d++; else st.l++; br.setStat(st); } } }
     if (isHost || won) net.patch(roomId, { status: 'done' }).catch(() => { });
-    sfx(won ? 'rr_win' : 'rr_lose');
-    const m = el('div', 'rrmodal'); const why = S.over.resign ? (won ? '상대가 항복했습니다' : '항복했습니다') : S.over.claim ? (won ? '상대가 응답하지 않았습니다' : '시간 초과') : (won ? '상대의 체력이 모두 소진되었습니다' : '체력이 모두 소진되었습니다');
-    m.innerHTML = '<div class="rrbox ' + (won ? 'w' : 'l') + '"><h3>' + (won ? '🏆 승리!' : '💀 패배…') + '</h3><p>' + why + '</p><div class="rrbig" style="color:' + (won ? '#7affb0' : '#ff8a7a') + '">' + (won ? '+' + money(bet) : '-' + money(bet)) + ' USDT</div><p>' + (won ? '양쪽 배팅금 ' + money(bet * 2) + ' USDT 를 가져갔습니다.' : '배팅금을 잃었습니다.') + '<br>내 최종 체력 ' + Math.max(0, Math.round(game.L.hp)) + '%</p><button class="rrbtn" id="ob">나가기</button></div>'; ov.querySelector('.rrg').appendChild(m);
-    m.querySelector('#ob').onclick = () => { game.destroy(); game = null; stopScene(); cleanup(isHost); alive = false; clearInterval(lobT); window.removeEventListener('resize', onResize); ov.remove(); document.body.style.overflow = ''; br.onClose && br.onClose(); };
+    sfx(won ? 'rr_win' : draw ? 'rl_tick' : 'rr_lose');
+    const m = el('div', 'rrmodal');
+    const why = ab ? '상대의 잔액이 부족해 게임이 취소되었습니다' : draw ? '두 사람의 체력이 동시에 0이 되어 무승부입니다' : O.resign ? (won ? '상대가 항복했습니다' : '항복했습니다') : O.claim ? (won ? '상대가 응답하지 않았습니다' : '시간 초과') : (won ? '상대의 체력이 모두 소진되었습니다' : '체력이 모두 소진되었습니다');
+    const ttl = ab ? '⚠️ 게임 취소' : draw ? '🤝 무승부' : won ? '🏆 승리!' : '💀 패배…', amt = ab || draw ? '±0' : (won ? '+' + money(bet) : '-' + money(bet)), col = ab || draw ? '#cfe0f5' : won ? '#7affb0' : '#ff8a7a';
+    const st = br.getStat ? br.getStat() : null;
+    m.innerHTML = '<div class="rrbox ' + (won ? 'w' : draw || ab ? 'd' : 'l') + '"><h3>' + ttl + '</h3><p>' + why + '</p><div class="rrbig" style="color:' + col + '">' + amt + ' USDT</div><p>' + (ab || draw ? '배팅금 ' + money(bet) + ' USDT 가 반환되었습니다.' : won ? '양쪽 배팅금 ' + money(bet * 2) + ' USDT 를 가져갔습니다.' : '배팅금을 잃었습니다.') + '<br>내 최종 체력 ' + Math.max(0, Math.round(game.L.hp)) + '%' + (st ? '<br><small class="sub">전적 ' + (st.w | 0) + '승 ' + (st.l | 0) + '패 ' + (st.d | 0) + '무</small>' : '') + '</p><div class="rrmsg" id="orsg" style="color:#ffe27a;text-align:center"></div><div class="rrrow"><button class="rrbtn g" id="ob">나가기</button><button class="rrbtn" id="orm"' + (ab || bal() < bet ? ' disabled' : '') + '>🔁 재대결</button></div></div>'; ov.querySelector('.rrg').appendChild(m);
+    m.querySelector('#ob').onclick = () => { leaveNote(); game.destroy(); game = null; stopScene(); cleanup(isHost); alive = false; clearInterval(lobT); window.removeEventListener('resize', onResize); ov.remove(); document.body.style.overflow = ''; br.onClose && br.onClose(); };
+    m.querySelector('#orm').onclick = async () => { const b = m.querySelector('#orm'); b.disabled = true; b.textContent = '상대 수락 대기…'; try { await net.patch(roomId, isHost ? { rmh: curGid } : { rmg: curGid }); } catch (e) { toast('전송 실패'); b.disabled = false; b.textContent = '🔁 재대결'; } };
+    updateRematch();
   }
   showLobby();
   return { close, get game() { return game; }, get scene() { return scene; }, get room() { return room; } };
