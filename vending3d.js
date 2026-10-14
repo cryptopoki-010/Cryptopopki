@@ -6,7 +6,7 @@
    prize drawer and the hand pinches it out.  Rewards are decided BEFORE this runs: nothing here changes them.
    Hand / camera / timeline are plain math (no three.js) so they can be unit-tested without WebGL. */
 import * as THREE from './vendor/three.module.js';
-import { createVendAssets, makeCoin as makeAssetCoin, LAYOUT as LY, GRADES as GRADE_IDS } from './vend-assets.js';
+import { createVendAssets, makeCoin as makeAssetCoin, LAYOUT as LY, GRADE_BY_SLOT } from './vend-assets.js';
 export const REVISION = THREE.REVISION;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -42,7 +42,7 @@ const supportH = rz => COIN.t / 2 * Math.abs(Math.sin(rz + CH.th)) + COIN.r * Ma
 export const onChuteY = (x, rz) => chuteY(x) + (supportH(rz) - .0004) / CH.cos;
 const RZ_LIE = -(Math.PI / 2 + CH.th);                        /* coin lying face-down on the chute */
 export function keyPos(k) { for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) if (KEYS[r][c] === k) return [FX, KY[r], KZ[c]]; return [FX, KY[0], KZ[0]]; }
-export const SLOTS_BY_GRADE = { R: [0, 1, 2, 3, 4], SR: [5, 6, 7, 8, 9], UR: [10, 11, 12, 13, 14] };   /* row = grade (same as the package) */
+export const SLOTS_BY_GRADE = { N: [], R: [], SR: [], UR: [], LR: [] }; GRADE_BY_SLOT.forEach((g, i) => SLOTS_BY_GRADE[g].push(i));   /* slot rule: package table (top rows rarer) */
 
 
 /* ======================= tiny 4x4 math (column-major arrays) ======================= */
@@ -105,7 +105,8 @@ export function handSolve(tip, yaw, pitch, roll, pose) {
   return { p: [tip[0] - f0.idxTip[0], tip[1] - f0.idxTip[1], tip[2] - f0.idxTip[2]], yaw, pitch, roll };
 }
 /* ======================= timeline ======================= */
-const GRADES = { R: { c: '#C9D1DB', t: '#8A94A3', hold: 1.0, sweep: 1.5 }, SR: { c: '#D9C8FF', t: '#7A4BC4', hold: 1.3, sweep: 1.9 }, UR: { c: '#FFE9A6', t: '#FF7A1F', hold: 2.8, sweep: 2.6 } };
+const GRADES = { N: { c: '#C9D1DB', t: '#8A94A3', hold: 1.0, sweep: 1.5 }, R: { c: '#BFE0FF', t: '#3E8EDE', hold: 1.1, sweep: 1.7 }, SR: { c: '#D9C8FF', t: '#7A4BC4', hold: 1.3, sweep: 1.9 }, UR: { c: '#FFE9A6', t: '#FF7A1F', hold: 2.8, sweep: 2.6 }, LR: { c: '#FFC0CE', t: '#E5384F', hold: 3.6, sweep: 3.2 } };
+const TOP = g => g === 'UR' || g === 'LR';
 export const GRIDS = GRADES;
 const YAW0 = Math.PI + .38, PITCH0 = -.16;           /* index finger points to −x, slightly toward +z, a little downward */
 const GRAB = { yaw: Math.PI, pitch: -1.40, roll: 0 };
@@ -128,7 +129,7 @@ export function makeVendTimeline(rs) {
   const dirOf = (yaw, pitch) => [Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch), -Math.cos(pitch) * Math.sin(yaw)];
   const hoverOf = (b, back) => { const d = dirOf(YAW0, PITCH0); return [b[0] - d[0] * back, b[1] - d[1] * back, b[2] - d[2] * back]; };
   rs.forEach((e, c) => {
-    const fast = c > 0, g = GRADES[e.g] || GRADES.R, k = fast ? .45 : 1;
+    const fast = c > 0, g = GRADES[e.g] || GRADES.N, k = fast ? .45 : 1;
     const num = 1 + Math.floor(Math.random() * 999), digs = String(num).split(''), ucrd = c == N - 1;
     const cy = { c, e, g: e.g, num, digs, t0: T, press: [], fast };
     /* --- A. hand arrives, camera pushes from the wide shot to the keypad --- */
@@ -153,8 +154,8 @@ export function makeVendTimeline(rs) {
     const dRet = fast ? .35 : .9;
     hv(t + dRet, exitP, YAW0, PITCH0 + .25, 0, OP, 'i');
     cm(t + (fast ? .08 : .12), 'pad'); cm(t + (fast ? .4 : .85), 'win');
-    const tS = t + (fast ? .1 : .35), nHop = Math.round((fast ? 10 : 15) + g.sweep * 2), dS = (fast ? .62 : 1.55) * (e.g == 'UR' ? 1.5 : 1) * (e.g == 'SR' && !fast ? 1.15 : 1);
-    const pool = SLOTS_BY_GRADE[e.g] || SLOTS_BY_GRADE.R, slot = pool[((num * 7) % pool.length + pool.length) % pool.length], path = [];
+    const tS = t + (fast ? .1 : .35), nHop = Math.round((fast ? 10 : 15) + g.sweep * 2), dS = (fast ? .62 : 1.55) * (TOP(e.g) ? 1.5 : 1) * (e.g == 'SR' && !fast ? 1.15 : 1);
+    const pool = SLOTS_BY_GRADE[e.g] || SLOTS_BY_GRADE.N, slot = pool[((num * 7) % pool.length + pool.length) % pool.length], path = [];
     for (let h = 0; h <= nHop; h++) { const u = h / nHop, tt = tS + dS * (1 - Math.pow(1 - u, 2.2)); path.push({ t: tt, s: h == nHop ? slot : (slot + 1 + Math.floor(Math.random() * 14) + h) % 15 }); if (h && path[h].s === path[h - 1].s) path[h].s = (path[h].s + 4) % 15; }
     if (path[nHop - 1].s === slot) path[nHop - 1].s = (slot + 6) % 15;
     cy.sweep = path; cy.tLand = tS + dS; cy.slot = slot; path.forEach((p, i) => { if (i) ev.push({ t: p.t, n: 'vd_roll', a: i / nHop }); });
@@ -163,7 +164,7 @@ export function makeVendTimeline(rs) {
     const yLand = onChuteY(COIN.xPop, 0);
     const tFall = Math.sqrt(2 * Math.max(.05, y0 - yLand) / G), tPop = fast ? .12 : .25, tRamp = fast ? .20 : .32, tDrop = fast ? .14 : .20, tSettle = fast ? .28 : .5;
     cy.coin = { tD, z0, y0, tPop, tFall, tRamp, tDrop, tSettle, G, tFallEnd: tD + tPop + tFall, tRampEnd: tD + tPop + tFall + tRamp, tLandT: tD + tPop + tFall + tRamp + tDrop, tSettleEnd: tD + tPop + tFall + tRamp + tDrop + tSettle };
-    ev.push({ t: tD, n: 'vd_pop', a: 1 }); ev.push({ t: cy.coin.tFallEnd, n: 'vd_drop', a: 1 }); ev.push({ t: cy.coin.tLandT, n: 'vd_clunk', a: e.g == 'UR' ? 1.4 : 1 });
+    ev.push({ t: tD, n: 'vd_pop', a: 1 }); ev.push({ t: cy.coin.tFallEnd, n: 'vd_drop', a: 1 }); ev.push({ t: cy.coin.tLandT, n: 'vd_clunk', a: TOP(e.g) ? 1.4 : 1 });
     ev.push({ t: cy.coin.tLandT + (fast ? .09 : .15), n: 'vd_drop', a: .6 });
     cm(cy.coin.tFallEnd - .1, 'win'); cm(cy.coin.tLandT + (fast ? .1 : .35), 'bin');
     /* --- D. hand reaches down into the drawer, pinches the coin, lifts it to the camera --- */
@@ -185,7 +186,7 @@ export function makeVendTimeline(rs) {
     hv(tShow + hold, exitP, YAW0, PITCH0 + .25, 0, OP, 'i');
     cy.grab = { tG0, tClose: tCl, tLift0: tL0, tShow, tTip: tipOn }; cy.tShow = tShow;
     { const dO = fast ? .3 : .55, tO0 = cy.coin.tD - (fast ? .1 : .35), tC0 = tL0 + dLift * .55; cy.drawer = { tO0, tO1: tO0 + dO, tC0, tC1: tC0 + (fast ? .3 : .5) }; ev.push({ t: tO0, n: 'vd_roll', a: .25 }); ev.push({ t: cy.drawer.tO1, n: 'vd_clunk', a: .55 }); ev.push({ t: cy.drawer.tC1, n: 'vd_clunk', a: .45 }); } cy.hold = hold; cy.tEnd = tShow + hold;
-    ev.push({ t: tCl, n: 'vd_take', a: 1 }); ev.push({ t: tShow, n: e.g == 'UR' ? 'rl_jackpot' : 'rl_win', a: e.g == 'UR' ? 1 : (e.g == 'SR' ? 2 : 1) });
+    ev.push({ t: tCl, n: 'vd_take', a: 1 }); ev.push({ t: tShow, n: TOP(e.g) ? 'rl_jackpot' : 'rl_win', a: TOP(e.g) ? 1 : (e.g == 'SR' ? 2 : 1) });
     cm(tG0 - .05, 'bin'); cm(tShow - .25, 'show'); cm(tShow + hold, 'show');
     cyc.push(cy); T = cy.tEnd - (fast ? .1 : .25);
   });
@@ -400,7 +401,7 @@ export function createVendScene(opt) {
 
   /* ---- travelling coins: one per cubby, built with the package's makeCoin and sharing that cubby coin's face texture ---- */
   const trav = A.coins.map((c, i) => {
-    const tc = makeAssetCoin(THREE, GRADE_IDS[Math.floor(i / 5)], i, { tex: c.userData.texture }); tc.rotation.set(0, Math.PI / 2, Math.PI / 2); tc.scale.setScalar(RIG.s * LY.coin.scale); tc.name = 'travel_' + tc.name;
+    const tc = makeAssetCoin(THREE, GRADE_BY_SLOT[i], i, { tex: c.userData.texture }); tc.rotation.set(0, Math.PI / 2, Math.PI / 2); tc.scale.setScalar(RIG.s * LY.coin.scale); tc.name = 'travel_' + tc.name;
     const pv = new THREE.Group(); pv.add(tc); pv.visible = false; tune(tc, true); scene.add(pv); return pv;
   });
   let coin = trav[0];
@@ -454,7 +455,7 @@ export function createVendScene(opt) {
     if (ui.phase === 'type') L.push({ s: (en ? 'ENTER NUMBER  ' : '번호 입력  ') + (ui.disp || '—'), x: cx, y: y0, a: 1, big: big * .8 });
     else if (ui.phase === 'sweep') L.push({ s: (en ? 'PICKING A COIN…  No.' : '코인 추첨 중…  No.') + cy.num, x: cx, y: y0, a: 1, big: big * .8 });
     else if (ui.phase === 'drop') L.push({ s: (en ? 'COIN DROPPED!' : '코인 배출!') + '  No.' + cy.num, x: cx, y: y0, a: 1, big });
-    else if (ui.phase === 'grab' || ui.phase === 'show') { const u = clamp((tt - cy.tShow + .1) / .3, 0, 1); if (ui.phase === 'show' && u > 0) L.push({ s: (cy.g === 'UR' ? 'UR' : cy.g === 'SR' ? 'SR' : 'R') + (en ? ' COIN!' : ' 코인!'), x: cx, y: H * .22, a: easeO(u), big: big * 1.5 * (cy.g === 'UR' ? 1.2 : 1) }); else L.push({ s: (en ? 'TAKE YOUR COIN' : '코인을 꺼내세요') + '  No.' + cy.num, x: cx, y: y0, a: 1, big: big * .8 }); }
+    else if (ui.phase === 'grab' || ui.phase === 'show') { const u = clamp((tt - cy.tShow + .1) / .3, 0, 1); if (ui.phase === 'show' && u > 0) L.push({ s: cy.g + (en ? ' COIN!' : ' 코인!'), x: cx, y: H * .22, a: easeO(u), big: big * 1.5 * (cy.g === 'UR' ? 1.2 : 1) }); else L.push({ s: (en ? 'TAKE YOUR COIN' : '코인을 꺼내세요') + '  No.' + cy.num, x: cx, y: y0, a: 1, big: big * .8 }); }
     return L;
   }
   function update(time, dt) {
@@ -484,8 +485,8 @@ export function createVendScene(opt) {
     const cs = sampleCoin(tl, t, hdata);
     if (cs && cs.vis) {
       if (trav[cs.cy.slot] !== coin) { coin.visible = false; coin = trav[cs.cy.slot]; } coin.visible = true; coin.position.set(cs.p[0], cs.p[1], cs.p[2]); coin.rotation.set(cs.rx, cs.ry, cs.rz); const g = cs.cy.g;
-      const gr = GRADES[g] || GRADES.R;
-      const glow = g === 'UR' ? .6 : g === 'SR' ? .35 : .15; coinL.position.set(cs.p[0] + .08, cs.p[1] + .02, cs.p[2]); coinL.color.set(gr.c); coinL.intensity = (cs.stage === 'rest' || cs.stage === 'hand' ? glow * 1.1 : glow * .5);
+      const gr = GRADES[g] || GRADES.N;
+      const glow = g === 'LR' ? .8 : g === 'UR' ? .6 : g === 'SR' ? .35 : g === 'R' ? .22 : .12; coinL.position.set(cs.p[0] + .08, cs.p[1] + .02, cs.p[2]); coinL.color.set(gr.c); coinL.intensity = (cs.stage === 'rest' || cs.stage === 'hand' ? glow * 1.1 : glow * .5);
       binL.intensity = (cs.stage === 'rest' || cs.stage === 'hand' || cs.stage === 'drop') ? .3 : 0;
       if (cs.stage === 'fall' && frames % 2 == 0) spark.emit(cs.p[0] - .004, cs.p[1] + rnd(-.03, .03), cs.p[2] + rnd(-.03, .03), rnd(-.05, .05), rnd(.1, .3), rnd(-.05, .05), .35, .008, hexRGB(gr.c));
       lastCoin = cs;
@@ -494,20 +495,20 @@ export function createVendScene(opt) {
     tl.cyc.forEach(c => {
       const K = c.c + ':'; const cross = (k, tt) => { const key = K + k; if (!trigged.has(key) && t >= tt && prevT < tt + .3) { trigged.add(key); return true; } return false; };
       if (cross('pop', c.coin.tD)) burst([COIN.xPop - .006, c.coin.y0, c.coin.z0], 12, [hexRGB('#aef'), [1, 1, 1]], .5, .5, .01);
-      if (cross('land', c.coin.tLandT)) { burst([c.rest[0], BIN.y0 + .02, c.rest[2]], c.g === 'UR' ? 40 : 18, [hexRGB(GRADES[c.g].c), [1, 1, 1]], .6, .6, .012); out.flash = Math.max(out.flash, .08); }
+      if (cross('land', c.coin.tLandT)) { burst([c.rest[0], BIN.y0 + .02, c.rest[2]], TOP(c.g) ? 40 : 18, [hexRGB(GRADES[c.g].c), [1, 1, 1]], .6, .6, .012); out.flash = Math.max(out.flash, .08); }
       if (cross('take', c.grab.tClose)) burst([c.rest[0], c.rest[1] + .04, c.rest[2]], 10, [[1, 1, 1]], .35, .4, .008);
-      if (cross('show', c.tShow)) { const U = c.g === 'UR'; out.flash = Math.max(out.flash, U ? 1 : c.g === 'SR' ? .65 : .4); const p = lastCoin ? lastCoin.p : [.9, -.2, 0]; burst(p, U ? 120 : c.g === 'SR' ? 60 : 30, [hexRGB(GRADES[c.g].c), hexRGB(GRADES[c.g].t), [1, 1, 1]], U ? 1.6 : 1.0, 1.1, .02); }
+      if (cross('show', c.tShow)) { const U = TOP(c.g); out.flash = Math.max(out.flash, U ? 1 : c.g === 'SR' ? .65 : .4); const p = lastCoin ? lastCoin.p : [.9, -.2, 0]; burst(p, U ? 120 : c.g === 'SR' ? 60 : 30, [hexRGB(GRADES[c.g].c), hexRGB(GRADES[c.g].t), [1, 1, 1]], U ? 1.6 : 1.0, 1.1, .02); }
     });
     /* medals (2D overlay is drawn by the page) */
     const cx = W / 2, rowY = H * .135, rowR = Math.min(W * .042, 26);
     tl.cyc.forEach(c => {
       if (t < c.tShow) return; const last = c.c === tl.N - 1, pu = clamp((t - c.tShow) / (last ? 1.1 : .9), 0, 1);
       const ex = c.tEnd - (last ? 0 : .5), fu = last ? 0 : ease((t - ex) / .5), rx = cx + (c.c - (tl.N - 1) / 2) * Math.min(W * .09, rowR * 2.5), cen = [cx, H * .42, Math.min(W * .15, H * .11)];
-      const sx = lerp(cen[0], rx, fu), sy = lerp(cen[1], rowY, fu), r = lerp(cen[2] * (c.g === 'UR' ? 1.2 : 1), rowR, fu);
+      const sx = lerp(cen[0], rx, fu), sy = lerp(cen[1], rowY, fu), r = lerp(cen[2] * (TOP(c.g) ? 1.2 : 1), rowR, fu);
       out.med.push({ sx, sy, r, pu: fu >= 1 ? 1 : pu, g: c.g });
     });
     out.txt = textsFor(ui, cy, t);
-    if (cy && cy.g === 'UR' && t >= cy.tShow && t < cy.tShow + .8) out.flash = Math.max(out.flash, .35 * (1 - (t - cy.tShow) / .8));
+    if (cy && TOP(cy.g) && t >= cy.tShow && t < cy.tShow + .8) out.flash = Math.max(out.flash, .35 * (1 - (t - cy.tShow) / .8));
     /* ambience */
     cyan.intensity = .48 + Math.sin(t * 2.3) * .04; magenta.intensity = .44 + Math.sin(t * 1.9 + 1) * .04;
     sign.material.opacity = .40 + .05 * Math.sin(t * 3.1);

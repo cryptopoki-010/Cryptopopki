@@ -19,11 +19,15 @@
  * Units are metres (P space, front faces +Z, +X is the viewer's right).
  */
 
-export const GRADES = ['R', 'SR', 'UR'];
+export const GRADES = ['N', 'R', 'SR', 'UR', 'LR'];
+/* grade of each of the 15 cubbies (index = row*5+col): top rows are the rarest */
+export const GRADE_BY_SLOT = ['LR', 'UR', 'UR', 'SR', 'SR', 'SR', 'R', 'R', 'R', 'R', 'N', 'N', 'N', 'N', 'N'];
 export const GRADE_STYLE = {
-  R:  { metal: 0xb7c0ca, accent: 0x627487, emissive: 0x14202b, roughness: 0.32, base: '#aeb8c4', dark: '#485663', bright: '#f0f5fa' },
+  N:  { metal: 0xb7c0ca, accent: 0x627487, emissive: 0x14202b, roughness: 0.34, base: '#aeb8c4', dark: '#485663', bright: '#f0f5fa' },
+  R:  { metal: 0x8fc0f0, accent: 0x2f6fb5, emissive: 0x0d2540, roughness: 0.3, base: '#8fb8e6', dark: '#2f5f95', bright: '#e4f1ff' },
   SR: { metal: 0xcbb8ff, accent: 0x6a3fc4, emissive: 0x24104a, roughness: 0.26, base: '#cdbcf5', dark: '#5a3aa3', bright: '#f4edff' },
   UR: { metal: 0xf3c85a, accent: 0xb8560a, emissive: 0x402007, roughness: 0.22, base: '#e8b64a', dark: '#8a4a12', bright: '#fff3c0' },
+  LR: { metal: 0xff6f8e, accent: 0x8f1030, emissive: 0x500818, roughness: 0.2, base: '#ff8aa3', dark: '#8f1030', bright: '#ffe0e8' },
 };
 const NAMES = ['NOVA', 'ORBIT', 'LUX', 'ASTRA', 'SOL', 'VANTA', 'AETHER', 'PRIME', 'ZENITH', 'QUANTA', 'HELIX', 'ONYX', 'FLUX', 'APEX', 'CORE'];
 
@@ -155,7 +159,7 @@ export function makeCoin(THREE, grade, index, opts = {}) {
   const group = new THREE.Group();
   group.name = `coin_${grade}_${String(index + 1).padStart(2, '0')}`;
   const tex = opts.tex || makeCoinTexture(THREE, grade, index, opts.size || 512);
-  const faceMat = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.88, roughness: style.roughness, envMapIntensity: 1.0, emissive: style.emissive, emissiveIntensity: grade === 'UR' ? 0.55 : grade === 'SR' ? 0.28 : 0.1 });
+  const faceMat = new THREE.MeshStandardMaterial({ map: tex, metalness: 0.88, roughness: style.roughness, envMapIntensity: 1.0, emissive: style.emissive, emissiveIntensity: grade === 'LR' ? 0.7 : grade === 'UR' ? 0.55 : grade === 'SR' ? 0.28 : grade === 'R' ? 0.16 : 0.08 });
   const edgeMat = material(THREE, style.metal, { metalness: 0.95, roughness: 0.2 });
   const coin = new THREE.Mesh(G.body, [edgeMat, faceMat, faceMat]);
   coin.rotation.x = Math.PI / 2; coin.name = 'coin_body'; coin.castShadow = true; coin.receiveShadow = true;
@@ -254,7 +258,7 @@ export function createVendAssets(THREE, opts = {}) {
   /* ---- 15 independent hollow cubbies (3 rows x 5 columns), each with its own coin standing INSIDE ---- */
   const sd = S.z1 - S.z0, sz = (S.z0 + S.z1) / 2, tier = opts.tier ?? 1, texSize = opts.texSize ?? 512;
   for (let row = 0; row < 3; row++) for (let col = 0; col < 5; col++) {
-    const idx = row * 5 + col, grade = GRADES[row];
+    const idx = row * 5 + col, grade = GRADE_BY_SLOT[idx];
     const slot = new THREE.Group(); slot.name = `coin_slot_${String(idx + 1).padStart(2, '0')}`;
     slot.position.set(S.xs[col], S.ys[row], 0);
     const floor = box(THREE, 'cubby_floor', [S.w, S.floor, sd], cubbyMat, [0, -S.h / 2 + S.floor / 2, sz]);
@@ -327,7 +331,7 @@ export function createVendAssets(THREE, opts = {}) {
     outerSize: { width: spanX, height: H, depth },
     slots: { count: 15, rows: 3, columns: 5, independentlyAddressable: true },
     keys: { count: 12, labels: L.keys.labels, travel: L.keys.travel },
-    coins: { count: 15, uniqueProceduralDesigns: true, gradesByRow: GRADES, diameter: 2 * L.coin.r, thickness: 2 * L.coin.half },
+    coins: { count: 15, uniqueProceduralDesigns: true, gradesBySlot: GRADE_BY_SLOT, diameter: 2 * L.coin.r, thickness: 2 * L.coin.half },
     noExternalAssets: true,
   };
   assets.dispose = () => {
