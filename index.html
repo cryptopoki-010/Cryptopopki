@@ -776,7 +776,7 @@ function playFish3D(rs,done){
   var el=ld.firstChild;el.querySelector('b').textContent=t;el.querySelector('p').textContent=c;el.querySelector('pre').textContent=det;
   var bs=el.querySelectorAll('button');bs[0].textContent=en?'Retry':'다시 시도';bs[1].textContent=en?'Play 2D version':'2D 버전으로 보기';bs[2].textContent=en?'Skip to result':'건너뛰고 결과 보기';
   bs[0].onclick=function(){F3.err=null;go()};
-  bs[1].onclick=function(){if(ended)return;ended=true;document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(x){}document.body.removeChild(o);playFish(rs,done);var n=document.querySelector('.fx');if(n)fxFrame(rs,n)};
+  bs[1].onclick=function(){if(ended)return;ended=true;document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(x){}document.body.removeChild(o);var rs2=L2U(rs);playFish(rs2,done);var n=document.querySelector('.fx');if(n)fxFrame(rs2,n)};
   bs[2].onclick=function(){fxSk=true;end()};
   console.error('[fish3d]',t,c,det)}
  function size(){W=box.clientWidth;H=box.clientHeight;ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+'px';ov.style.height=H+'px'}
@@ -811,8 +811,10 @@ function playFish3D(rs,done){
    for(i=0;i<tl.fs.length;i++){f=tl.fs[i];c=f.c;var sx=out.fish[i].sx,sy=out.fish[i].sy;
     if(t>=f.tb&&t<f.tb+.55){var u2=(t-f.tb)/.55,sc2=fxSp(Math.min(1,u2*1.3))*(1-fxI2((u2-.7)/.3));oc.save();oc.translate(sx,sy-38-u2*8);oc.scale(sc2,sc2);oc.fillStyle=c.tn==1?'#FFD35A':'#FF6A5A';oc.shadowColor=oc.fillStyle;oc.shadowBlur=10;oc.font='800 28px sans-serif';oc.textAlign='center';oc.fillText('!',0,0);oc.restore()}
     var mu=C((t-f.tl-c.l*.45)/(c.l*.7+.35),0,1);
-    if(mu>0){var jh=H*(c.ur?.26:.24+c.tn*.1),my=Math.max(40,fxL(sy-jh*.9,sy-jh*1.15,fxO3(mu))+Math.sin(t*3)*2.5);fxMedal(oc,sx,my,12+c.fl*10+c.tn*8,Math.cos(mu*Math.PI*4),fxBack(mu)*1.05,f.g)}
+    if(mu>0&&!c.lr){var jh=H*(c.ur?.26:.24+c.tn*.1),my=Math.max(40,fxL(sy-jh*.9,sy-jh*1.15,fxO3(mu))+Math.sin(t*3)*2.5);fxMedal(oc,sx,my,12+c.fl*10+c.tn*8,Math.cos(mu*Math.PI*4),fxBack(mu)*1.05,f.g)}
     if(c.fl&&t>=f.tl&&!fired[i]){fired[i]=1;flash=Math.max(flash,c.fl)}}
+   if(out.lrFlash)flash=Math.max(flash,out.lrFlash);
+   if(out.lr&&out.lr.on&&out.lr.a>.01){var lb=out.lr,pr=Math.max(14,lb.r);oc.save();oc.globalAlpha=Math.min(1,lb.a);oc.translate(lb.sx,lb.sy);var lgr=oc.createRadialGradient(0,0,pr*.2,0,0,pr*1.9);lgr.addColorStop(0,'rgba(255,90,100,.55)');lgr.addColorStop(1,'rgba(255,40,60,0)');oc.fillStyle=lgr;oc.beginPath();oc.arc(0,0,pr*1.9,0,6.283);oc.fill();oc.font='900 '+Math.round(pr*.95)+'px sans-serif';oc.textAlign='center';oc.textBaseline='middle';oc.lineWidth=Math.max(3,pr*.14);oc.strokeStyle='#5a0612';oc.strokeText('LR',0,pr*.04);oc.fillStyle='#FFE9B0';oc.shadowColor='#ff3a50';oc.shadowBlur=pr*.4;oc.fillText('LR',0,pr*.04);oc.restore()}
    flash*=Math.pow(.03,dt);dFl.style.opacity=flash>.01?Math.min(.9,flash):0;
    /* cinematic bars */
    var bh=H*.05*fxIO(t/.6);b1.style.height=b2.style.height=Math.round(bh+6)+'px';
@@ -825,7 +827,7 @@ function playFish3D(rs,done){
    if(showT>0){var h=Math.round(H*.048*1.15);tT.style.display=tB.style.display='block';tT.style.opacity=tB.style.opacity=showT;tT.style.height=tB.style.height=h+'px';
     tT.style.transform='translateY('+(H*.05-(1-sl)*h*1.8)+'px) perspective(520px) rotateX(-14deg)';tB.style.transform='translateY('+(H*.95-h+(1-sl)*h*1.8)+'px) perspective(520px) rotateX(14deg)';
     trT.style.transform='translateX('+(-((t*150)%190))+'px)';trB.style.transform='translateX('+(-190+((t*150)%190))+'px)'}else tT.style.display=tB.style.display='none';
-   if(pop>0.01){var bw=Math.min(W*.82,300);bub.style.display='block';bub.firstChild.textContent=en?'It must be a HUGE catch!!':'엄청난 대어를 낚았나봐!!';bub.style.width=bw+'px';
+   if(pop>0.01){var bw=Math.min(W*.82,300);bub.style.display='block';var isLR=tl.fs.some(function(q){return q.c.lr});bub.firstChild.textContent=isLR?(en?'A LEGENDARY RED DRAGON!!':'전설의 붉은 용이 걸렸다!!'):(en?'It must be a HUGE catch!!':'엄청난 대어를 낚았나봐!!');bub.style.width=bw+'px';
     var bhh=bub.offsetHeight||40,tx=C(out.head.x-10,26,bw-40);bub.style.setProperty('--tx',tx+'px');bub.style.left='10px';bub.style.top=Math.max(H*.08,out.head.y-bhh-26)+'px';bub.style.transformOrigin=tx+'px 100%';bub.style.transform='scale('+pop+')'}else bub.style.display='none';
    if(showDbg){dbgT+=dt;if(dbgT>.4){dbgT=0;var inf=sc.info();dbg.textContent='r'+inf.rev+' tier'+inf.tier+' dpr'+inf.dpr.toFixed(2)+' '+(1000/Math.max(1,inf.fpsMs)).toFixed(0)+'fps calls'+inf.drawCalls+' tri'+inf.triangles}}
    F3.fps=sc.info().fpsMs;
@@ -856,7 +858,7 @@ function playSkip3D(rs,done){
   var el=ld.firstChild;el.querySelector('b').textContent=t;el.querySelector('p').textContent=c;el.querySelector('pre').textContent=det;
   var bs=el.querySelectorAll('button');bs[0].textContent=en?'Retry':'다시 시도';bs[1].textContent=en?'Play 2D version':'2D 버전으로 보기';bs[2].textContent=en?'Skip to result':'건너뛰고 결과 보기';
   bs[0].onclick=function(){F3.err=null;go()};
-  bs[1].onclick=function(){if(ended)return;ended=true;document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(x){}document.body.removeChild(o);playSkip(rs,done);var n=document.querySelector('.fx');if(n)fxFrame(rs,n)};
+  bs[1].onclick=function(){if(ended)return;ended=true;document.removeEventListener('keydown',kd);window.removeEventListener('resize',onR);try{sc&&sc.dispose()}catch(x){}document.body.removeChild(o);var rs2=L2U(rs);playSkip(rs2,done);var n=document.querySelector('.fx');if(n)fxFrame(rs2,n)};
   bs[2].onclick=function(){fxSk=true;end()};
   console.error('[skip3d]',t,c,det)}
  function size(){W=box.clientWidth;H=box.clientHeight;ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+'px';ov.style.height=H+'px'}
@@ -888,6 +890,7 @@ function playSkip3D(rs,done){
     for(i=0;i<tl.st.length;i++){s=tl.st[i];var md=out.med[i];
      if(md){fxMedal(oc,md.sx,md.sy,md.r,Math.cos(md.pu*Math.PI*4+.6),fxBack(md.pu)*1.05,s.g)}}
     if(out.ac){var pp=1+Math.max(0,1-out.ac.since/.2)*.35;oc.save();oc.translate(W/2,H*.16);oc.scale(pp,pp);oc.fillStyle=out.ac.col;oc.shadowColor=out.ac.col;oc.shadowBlur=14;oc.font='800 '+(30+out.ac.hits*2)+'px sans-serif';oc.textAlign='center';oc.fillText('×'+out.ac.hits,0,0);oc.restore()}
+    if(out.lrT>.01){oc.save();oc.globalAlpha=out.lrT;oc.translate(W/2,H*.2);oc.font='900 '+Math.round(Math.min(W*.085,40))+'px sans-serif';oc.textAlign='center';oc.textBaseline='middle';oc.lineWidth=6;oc.strokeStyle='#5a0612';oc.strokeText('LEGENDARY',0,0);oc.fillStyle='#FFE9B0';oc.shadowColor='#ff3a50';oc.shadowBlur=18;oc.fillText('LEGENDARY',0,0);oc.font='800 '+Math.round(Math.min(W*.045,22))+'px sans-serif';oc.shadowBlur=10;oc.fillStyle='#ff9aa6';oc.fillText(en?'RED  LR  COIN':'레전더리 레드 · LR',0,Math.min(W*.08,38));oc.restore()}
     flash=Math.max(flash,out.flash);flash*=Math.pow(.03,dt);dFl.style.opacity=flash>.01?Math.min(.9,flash):0;dDim.style.opacity=out.dim;
     var bh=H*.05*fxIO(t/.6);b1.style.height=b2.style.height=Math.round(bh+6)+'px';
     if(showDbg){dbgT+=dt;if(dbgT>.4){dbgT=0;var inf=sc.info();dbg.textContent='r'+inf.rev+' tier'+inf.tier+' dpr'+inf.dpr.toFixed(2)+' '+(1000/Math.max(1,inf.fpsMs)).toFixed(0)+'fps calls'+inf.drawCalls}}
@@ -1428,7 +1431,9 @@ resize();hit.disabled=true;ovl('');drawSlots(0);cn.textContent='0 / '+CAP;
 window.__cc={acts:acts,spawn:function(g,cy){var o=newAct(g,cy);o.X=0;o.Z=Zr;o.Y=.3;o.st='stay';o.t=0;o.stay=5;o.ox=0;o.oz=Zr;return o},get acc(){return acc},set acc(v){acc=v},get state(){return state},get heart(){return heart},get caught(){return caught},hit:doHit,fin:finish,set time(v){time=v},get slots(){return slots},ring:function(){return acts.filter(function(a){return(a.st=='stay')&&inRing(a)})}};
 last=performance.now();rq=requestAnimationFrame(frame)}
 
-function play(rs,done,t){SFX.unlock();var ui=-1;if(rs.length>10){var RKk=RK5;rs=[rs.slice().sort(function(a,b){return RKk[b.g]-RKk[a.g]||b.v-a.v})[0]]}rs.forEach(function(e,k){if(ui<0&&RK5[e.g]>=4)ui=k});if(ui>=0)rs=rs.slice(0,ui+1);var R3=t=='v'?rs:rs.map(function(e){return{g:T3(e.g),x:e.x,v:e.v}});t=='v'?playVend3(R3,done):t=='w'?(/[?&]wall2d=1/.test(location.search)?playWall(R3,done):playWall3(R3,done)):t=='s'?(/[?&]skip2d=1/.test(location.search)?playSkip(R3,done):playSkip3D(R3,done)):t=='f'?(/[?&]fish2d=1/.test(location.search)?playFish(R3,done):playFish3D(R3,done)):(/[?&]cannon2d=1/.test(location.search)?playCannon(R3,done):playCannon3(R3,done));var o=document.querySelector('.fx');if(!o)return;
+function L2U(rs){return rs.map(function(e){return{g:e.g=='LR'?'UR':e.g,x:e.x,v:e.v}})}
+/* the 3D fishing + skipping engines have a dedicated LR sequence, so they get the real grade; every 2D fallback / other theme keeps the UR mapping */
+function play(rs,done,t){SFX.unlock();var ui=-1;if(rs.length>10){var RKk=RK5;rs=[rs.slice().sort(function(a,b){return RKk[b.g]-RKk[a.g]||b.v-a.v})[0]]}rs.forEach(function(e,k){if(ui<0&&RK5[e.g]>=4)ui=k});if(ui>=0)rs=rs.slice(0,ui+1);var R3=t=='v'?rs:rs.map(function(e){return{g:T3(e.g),x:e.x,v:e.v}}),R3L=rs.map(function(e){return{g:e.g=='LR'?'LR':T3(e.g),x:e.x,v:e.v}});t=='v'?playVend3(R3,done):t=='w'?(/[?&]wall2d=1/.test(location.search)?playWall(R3,done):playWall3(R3,done)):t=='s'?(/[?&]skip2d=1/.test(location.search)?playSkip(R3,done):playSkip3D(R3L,done)):t=='f'?(/[?&]fish2d=1/.test(location.search)?playFish(R3,done):playFish3D(R3L,done)):(/[?&]cannon2d=1/.test(location.search)?playCannon(R3,done):playCannon3(R3,done));var o=document.querySelector('.fx');if(!o)return;
  var R={UR:3,SR:2,R:1},b='R',d=document.createElement('div');rs.forEach(function(e){var g3=T3(e.g);if(R[g3]>R[b])b=g3});
  d.className='fb '+b.toLowerCase();d.innerHTML=['a','b','c','d'].map(function(k){return '<svg class="cn '+k+'" viewBox="0 0 64 64"><use href="#orn"/></svg>'}).join('');o.firstChild.appendChild(d)}
 /* ===== wall breaker v2 (theme w): curved, organic ===== */
