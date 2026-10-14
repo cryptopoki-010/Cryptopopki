@@ -1,9 +1,12 @@
 /* CRYPTO GACHA — coin vending machine minigame 3D engine. Three.js r160, local vendor build (./vendor/three.module.js).
-   Standalone: needs ./vendor/three.module.js and ./vending.glb (the supplied tripo vending machine, textures re-encoded to 2048px).
-   A hand (procedural, real-world scale: 1 unit = 1 m) walks up to the keypad, taps a random 1..999 number with the index finger,
-   the machine picks a coin, the coin drops down the window into the pickup tray and the hand pinches it out.
-   Everything about the hand / camera / timeline is plain math (no three.js) so it can be unit-tested without WebGL. */
+   The machine is the supplied "vending3d-assets" package (patched copy: ./vend-assets.js): body panels, front frame, glass, 15 hollow coin cubbies,
+   15 distinct coins, LED + 12 keys, sliding prize drawer.  Needs only ./vendor/three.module.js and ./vend-assets.js (no download, no CDN).
+   A jointed hand (procedural, real scale: 1 unit = 1 m) walks up to the keypad, taps a random 1..999 number with the index finger, the machine
+   picks a coin of the drawn grade (R = top row, SR = middle row, UR = bottom row), the coin drops down the window, tips onto the chute, falls into the
+   prize drawer and the hand pinches it out.  Rewards are decided BEFORE this runs: nothing here changes them.
+   Hand / camera / timeline are plain math (no three.js) so they can be unit-tested without WebGL. */
 import * as THREE from './vendor/three.module.js';
+import { createVendAssets, makeCoin as makeAssetCoin, LAYOUT as LY, GRADES as GRADE_IDS } from './vend-assets.js';
 export const REVISION = THREE.REVISION;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -18,16 +21,29 @@ export function pickTier() {
 }
 const TIERS = [{ dpr: 1, aa: false, parts: 140, tex: 1024 }, { dpr: 1.75, aa: true, parts: 300, tex: 2048 }, { dpr: 2, aa: true, parts: 480, tex: 2048 }];
 
-/* ======================= machine geometry constants (model space, front faces +x) ======================= */
-export const FX = .2299;                                   /* front plane of keypad + body */
-export const KEYS = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['C', '0', 'OK']];
-export const KZ = [-.2787, -.3058, -.332], KY = [.198, .169, .139, .110];   /* button columns (screen-left → right) / rows (top → bottom) */
-export const SZ = [.262, .157, .053, -.050, -.154], SY = [.298, .104, -.086];  /* coin slots in the window */
-export const BIN = { z0: -.24, z1: .30, y0: -.365, y1: -.256, d: .16, zc: .03 };  /* pickup drawer: slides out by d (open) in front of the body; closed it is flush */
-export const DRW_X = FX + .012;                                /* front face of the drawer panel when CLOSED */
-export const COIN = { r: .046, t: .009 };
-const WIN_FLOOR = -.19;                                      /* top of the window's lower lip */
+/* ======================= machine geometry (scene space T: front faces +x, viewer's right = -z).  The package lives in its own space P (metres, front +z,
+   right +x); the rig group (rotation.y = π/2, scale 1.6, position (0,.05,.106)) maps P → T:  T = [Pz·1.6, Py·1.6+.05, −Px·1.6+.106] ======================= */
+export const RIG = { s: 1.6, y: .05, z: .106 };
+export const pt = (px, py, pz) => [pz * RIG.s, py * RIG.s + RIG.y, -px * RIG.s + RIG.z];
+export const FX = LY.body.zf * RIG.s;                         /* front plane of the body */
+export const KEYS = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['0', 'CLR', 'OK']];
+export const KZ = LY.keys.xs.map(x => -x * RIG.s + RIG.z), KY = LY.keys.ys.map(y => y * RIG.s + RIG.y);   /* key columns (screen-left → right) / rows (top → bottom) */
+export const SZ = LY.slot.xs.map(x => -x * RIG.s + RIG.z), SY = LY.slot.ys.map(y => y * RIG.s + RIG.y);     /* cubby centres */
+export const KEYCAP = { h: LY.keys.capTop * RIG.s - FX, travel: LY.keys.travel * RIG.s };               /* cap top above the body front / press travel */
+export const COIN = { r: LY.coin.r * RIG.s, t: 2 * LY.coin.half * RIG.s, yRel: LY.coin.yRel * RIG.s, xRest: LY.coin.zRest * RIG.s, xPop: LY.coin.zPop * RIG.s };
+const DR = LY.drawer;
+export const BIN = { xOpen: (DR.z + DR.openDz) * RIG.s, xClosed: (DR.z + DR.closedDz) * RIG.s, zc: RIG.z, y0: (DR.y + .006) * RIG.s + RIG.y /* floor top */, xRest: (DR.z + DR.openDz + .006) * RIG.s };
+export const CH = (() => {   /* dispense chute: top-surface line y(x) in scene space, lip position */
+  const c = LY.chute, th = Math.atan2(c.y0 - c.y1, c.z1 - c.z0), Ln = Math.hypot(c.z1 - c.z0, c.y1 - c.y0), zc = (c.z0 + c.z1) / 2 - .001, yc = (c.y0 + c.y1) / 2 - .0017;
+  return { th, tan: Math.tan(th), cos: Math.cos(th), xt: (zc + .002 * Math.sin(th)) * RIG.s, yt: (yc + .002 * Math.cos(th)) * RIG.s + RIG.y, xEnd: (zc + Ln / 2 * Math.cos(th)) * RIG.s, xStart: (zc - Ln / 2 * Math.cos(th)) * RIG.s };
+})();
+export const chuteY = x => CH.yt - CH.tan * (x - CH.xt);
+const supportH = rz => COIN.t / 2 * Math.abs(Math.sin(rz + CH.th)) + COIN.r * Math.abs(Math.cos(rz + CH.th));   /* distance centre → chute plane for a coin tilted by rz about z */
+export const onChuteY = (x, rz) => chuteY(x) + (supportH(rz) - .0004) / CH.cos;
+const RZ_LIE = -(Math.PI / 2 + CH.th);                        /* coin lying face-down on the chute */
 export function keyPos(k) { for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) if (KEYS[r][c] === k) return [FX, KY[r], KZ[c]]; return [FX, KY[0], KZ[0]]; }
+export const SLOTS_BY_GRADE = { R: [0, 1, 2, 3, 4], SR: [5, 6, 7, 8, 9], UR: [10, 11, 12, 13, 14] };   /* row = grade (same as the package) */
+
 
 /* ======================= tiny 4x4 math (column-major arrays) ======================= */
 const mI = () => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
@@ -94,11 +110,11 @@ export const GRIDS = GRADES;
 const YAW0 = Math.PI + .38, PITCH0 = -.16;           /* index finger points to −x, slightly toward +z, a little downward */
 const GRAB = { yaw: Math.PI, pitch: -1.40, roll: 0 };
 export const CAMS = {
-  wide: { z: .0, y: -.02, w: 1.0, h: 1.25, az: .10, el: .05 },
-  pad: { z: -.335, y: .15, w: .36, h: .50, az: .12, el: .08 },
-  win: { z: .06, y: .10, w: .74, h: .95, az: -.12, el: .06 },
-  bin: { z: .03, y: -.27, w: .66, h: .46, az: -.10, el: .24 },
-  show: { z: .02, y: -.22, w: .62, h: .5, az: 0, el: .12 }
+  wide: { z: 0, y: .03, w: 1.32, h: 1.46, az: .10, el: .05 },
+  pad: { z: KZ[1], y: .29, w: .44, h: .50, az: .12, el: .08 },
+  win: { z: RIG.z, y: .13, w: .80, h: 1.0, az: -.12, el: .06 },
+  bin: { z: RIG.z, y: -.27, x: .42, w: .74, h: .54, az: -.10, el: .24 },
+  show: { z: .09, y: -.2, w: .46, h: .5, az: 0, el: .12 }
 };
 function grabPose() { return POSES.pinch; }
 export function grabPoseInfo() { return { pose: POSES.pinch.slice(), err: 0 }; }
@@ -123,9 +139,9 @@ export function makeVendTimeline(rs) {
     let t = T + dEnter;
     const seq = digs.concat(['OK']);
     seq.forEach((key, i) => {
-      const b = keyPos(key), hov = hoverOf(b, .05), hov2 = hoverOf(b, .02), tr = i == 0 ? (fast ? .04 : .14) : (fast ? .10 : .26), pd = fast ? .10 : .17, pu = fast ? .08 : .13;
+      const b = keyPos(key), hov = hoverOf(b, .05), hov2 = hoverOf(b, .035), tr = i == 0 ? (fast ? .04 : .14) : (fast ? .10 : .26), pd = fast ? .10 : .17, pu = fast ? .08 : .13;
       hv(t + tr, hov, YAW0, PITCH0, 0, PT);
-      const tc = t + tr + pd, dd = dirOf(YAW0, PITCH0), ct = [b[0] + .0062 - dd[0] * .002, b[1] - dd[1] * .002, b[2] - dd[2] * .002];
+      const tc = t + tr + pd, dd = dirOf(YAW0, PITCH0), ct = [b[0] + KEYCAP.h - KEYCAP.travel + .0066 - dd[0] * .002, b[1] - dd[1] * .002, b[2] - dd[2] * .002];
       hv(tc, ct, YAW0, PITCH0, 0, PT, 'o');
       cy.press.push({ t: tc, key, i });
       ev.push({ t: tc, n: key === 'OK' ? 'vd_ok' : 'vd_beep', a: key === 'OK' ? 1 : (key === '0' ? 0 : +key) / 9 });
@@ -136,21 +152,22 @@ export function makeVendTimeline(rs) {
     /* --- B. hand leaves, machine shuffles through the slots --- */
     const dRet = fast ? .35 : .9;
     hv(t + dRet, exitP, YAW0, PITCH0 + .25, 0, OP, 'i');
-    cm(t + (fast ? .1 : .25), 'pad'); cm(t + (fast ? .55 : 1.15), 'win');
+    cm(t + (fast ? .08 : .12), 'pad'); cm(t + (fast ? .4 : .85), 'win');
     const tS = t + (fast ? .1 : .35), nHop = Math.round((fast ? 10 : 15) + g.sweep * 2), dS = (fast ? .62 : 1.55) * (e.g == 'UR' ? 1.5 : 1) * (e.g == 'SR' && !fast ? 1.15 : 1);
-    const slot = ((num * 7) % 15 + 15) % 15, path = [];
+    const pool = SLOTS_BY_GRADE[e.g] || SLOTS_BY_GRADE.R, slot = pool[((num * 7) % pool.length + pool.length) % pool.length], path = [];
     for (let h = 0; h <= nHop; h++) { const u = h / nHop, tt = tS + dS * (1 - Math.pow(1 - u, 2.2)); path.push({ t: tt, s: h == nHop ? slot : (slot + 1 + Math.floor(Math.random() * 14) + h) % 15 }); if (h && path[h].s === path[h - 1].s) path[h].s = (path[h].s + 4) % 15; }
     if (path[nHop - 1].s === slot) path[nHop - 1].s = (slot + 6) % 15;
     cy.sweep = path; cy.tLand = tS + dS; cy.slot = slot; path.forEach((p, i) => { if (i) ev.push({ t: p.t, n: 'vd_roll', a: i / nHop }); });
-    /* --- C. coin pops out, falls down the window, slides over the lip, drops into the tray --- */
-    const tD = cy.tLand + (fast ? .14 : .42), sr = Math.floor(slot / 5), sc = slot % 5, z0 = SZ[sc], y0 = SY[sr], G = 3.6;
-    const tFall = Math.sqrt(2 * Math.max(.05, y0 - WIN_FLOOR) / G), tPop = fast ? .12 : .25, tRamp = fast ? .10 : .16, tDrop = fast ? .10 : .14, tSettle = fast ? .28 : .5;
+    /* --- C. coin pops out of its cubby, falls down the window, tips onto the chute, slides off the lip and drops into the prize drawer --- */
+    const tD = cy.tLand + (fast ? .14 : .42), sr = Math.floor(slot / 5), sc = slot % 5, z0 = SZ[sc], y0 = SY[sr] + COIN.yRel, G = 3.6;
+    const yLand = onChuteY(COIN.xPop, 0);
+    const tFall = Math.sqrt(2 * Math.max(.05, y0 - yLand) / G), tPop = fast ? .12 : .25, tRamp = fast ? .20 : .32, tDrop = fast ? .14 : .20, tSettle = fast ? .28 : .5;
     cy.coin = { tD, z0, y0, tPop, tFall, tRamp, tDrop, tSettle, G, tFallEnd: tD + tPop + tFall, tRampEnd: tD + tPop + tFall + tRamp, tLandT: tD + tPop + tFall + tRamp + tDrop, tSettleEnd: tD + tPop + tFall + tRamp + tDrop + tSettle };
     ev.push({ t: tD, n: 'vd_pop', a: 1 }); ev.push({ t: cy.coin.tFallEnd, n: 'vd_drop', a: 1 }); ev.push({ t: cy.coin.tLandT, n: 'vd_clunk', a: e.g == 'UR' ? 1.4 : 1 });
     ev.push({ t: cy.coin.tLandT + (fast ? .09 : .15), n: 'vd_drop', a: .6 });
     cm(cy.coin.tFallEnd - .1, 'win'); cm(cy.coin.tLandT + (fast ? .1 : .35), 'bin');
-    /* --- D. hand reaches down into the tray, pinches the coin, lifts it to the camera --- */
-    const cx = DRW_X + BIN.d * .5 + .014, cyy = BIN.y0 + .004 + COIN.r;      /* standing coin centre */
+    /* --- D. hand reaches down into the drawer, pinches the coin, lifts it to the camera --- */
+    const cx = BIN.xRest, cyy = BIN.y0 + COIN.r + .0004;      /* standing coin centre */
     cy.rest = [cx, cyy, BIN.zc];
     const tipOn = [cx - .0075, cyy + COIN.r - .012, BIN.zc], tipHi = [cx - .0075 + .01, cyy + COIN.r + .13, BIN.zc + .02], tipOut = [cx + .12, cyy + COIN.r + .24, BIN.zc - .24];
     const tG0 = cy.coin.tLandT + (fast ? .1 : .3), dG = fast ? .42 : .8, dDown = fast ? .22 : .42, dCl = fast ? .16 : .3, dLift = fast ? .5 : .9;
@@ -159,7 +176,7 @@ export function makeVendTimeline(rs) {
     hv(tG0 + dG, tipHi, GRAB.yaw, GRAB.pitch, 0, OP, 'io');
     hv(tG0 + dG + dDown, tipOn, GRAB.yaw, GRAB.pitch, 0, OP, 'io');
     const tCl = tG0 + dG + dDown + dCl; hv(tCl, tipOn, GRAB.yaw, GRAB.pitch, 0, HOLD, 'io');
-    const tL0 = tCl + (fast ? .06 : .12), tShow = tL0 + dLift, show = [FX + .85, -.17, BIN.zc - .02];
+    const tL0 = tCl + (fast ? .06 : .12), tShow = tL0 + dLift, show = [FX + .62, -.17, BIN.zc - .02];
     hv(tL0, tipOn, GRAB.yaw, GRAB.pitch, 0, HOLD, 'io');
     hv(tL0 + dLift * .38, tipHi, GRAB.yaw, GRAB.pitch, 0, HOLD, 'o');
     hv(tShow, show, GRAB.yaw + .1, GRAB.pitch + .3, 0, HOLD, 'io');
@@ -192,7 +209,7 @@ export function sampleHand(tl, t) {
 }
 export function camPose(k, aspect) {
   const fov = k.fov || 34, tf = Math.tan(fov * Math.PI / 360), d = Math.max(k.w / (2 * tf * aspect), k.h / (2 * tf)), az = k.az || 0, el = k.el || 0;
-  const tgt = [FX - .02, k.y, k.z]; return { pos: [tgt[0] + d * Math.cos(az) * Math.cos(el), tgt[1] + d * Math.sin(el), tgt[2] + d * Math.sin(az) * Math.cos(el)], tgt, fov, d };
+  const tgt = [k.x != null ? k.x : FX - .02, k.y, k.z]; return { pos: [tgt[0] + d * Math.cos(az) * Math.cos(el), tgt[1] + d * Math.sin(el), tgt[2] + d * Math.sin(az) * Math.cos(el)], tgt, fov, d };
 }
 export function sampleCam(tl, t, aspect) {
   const [a, b, u0] = bracket(tl.ck, t), u = ease(u0), A = camPose(a, aspect), B = camPose(b, aspect);
@@ -202,13 +219,19 @@ export function sampleCam(tl, t, aspect) {
 export function sampleCoin(tl, t, hand) {
   for (const cy of tl.cyc) {
     const C = cy.coin; if (t < C.tD || t > cy.tShow) continue;
-    if (t < C.tFallEnd) {
-      const u = t - C.tD, pu = clamp(u / C.tPop, 0, 1), fu = Math.max(0, u - C.tPop), x = lerp(.1935, .207, easeO(pu)), y = C.y0 - .5 * C.G * fu * fu;
-      return { cy, p: [x, y, C.z0], rx: 0, ry: Math.sin(u * 9) * .10 * (1 - pu * .5) * Math.min(1, fu * 5), rz: Math.sin(u * 6) * .05 * Math.min(1, fu * 6), vis: true, stage: 'fall' };
+    if (t < C.tFallEnd) {                                                   /* pop out of the cubby (x), then free fall down the window */
+      const u = t - C.tD, pu = clamp(u / C.tPop, 0, 1), fu = Math.max(0, u - C.tPop), x = lerp(COIN.xRest, COIN.xPop, easeO(pu)), y = C.y0 - .5 * C.G * fu * fu;
+      return { cy, p: [x, y, C.z0], rx: 0, ry: Math.sin(u * 9) * .05 * Math.min(1, fu * 5), rz: Math.sin(u * 6) * .03 * Math.min(1, fu * 6), vis: true, stage: 'fall' };
     }
-    if (t < C.tRampEnd) { const u = (t - C.tFallEnd) / C.tRamp; return { cy, p: [lerp(.207, .27, ease(u)), WIN_FLOOR - .035 * u - .01 * u, C.z0], rx: 0, ry: -.5 * u, rz: -.35 * u, vis: true, stage: 'ramp' }; }
-    if (t < C.tLandT) { const u = (t - C.tRampEnd) / C.tDrop, y0 = WIN_FLOOR - .045, yEnd = cy.rest[1] + .01; return { cy, p: [lerp(.27, cy.rest[0] + .004, u), lerp(y0, yEnd, u * u), lerp(C.z0, C.z0 + (cy.rest[2] - C.z0) * .15, u)], rx: 0, ry: -.5 * (1 - u), rz: -.35 * (1 - u) + u * .12, vis: true, stage: 'drop' }; }
-    if (t < C.tSettleEnd) { const u = (t - C.tLandT) / C.tSettle, d = Math.exp(-u * 3.2), bz = lerp(C.z0 + (cy.rest[2] - C.z0) * .15, cy.rest[2], easeO(Math.min(1, u * 1.15))); return { cy, p: [cy.rest[0] + .004 * (1 - u), cy.rest[1] + .01 * d * Math.abs(Math.cos(u * 11)) * (1 - u) * 0 + Math.abs(Math.sin(u * 14)) * .012 * d, bz], rx: (1 - easeO(u * 1.2)) * (bz - cy.rest[2]) * 30, ry: 0, rz: Math.sin(u * 19) * .10 * d, vis: true, stage: 'rest' }; }
+    if (t < C.tRampEnd) {                                                   /* lands on the chute edge, tips forward onto its face, slides to the lip */
+      const u = (t - C.tFallEnd) / C.tRamp, x = lerp(COIN.xPop, CH.xEnd, .25 * u + .75 * u * u), rz = RZ_LIE * ease(clamp(u / .4, 0, 1));
+      return { cy, p: [x, onChuteY(x, rz), C.z0], rx: 0, ry: 0, rz, vis: true, stage: 'ramp' };
+    }
+    if (t < C.tLandT) {                                                     /* over the lip, one forward flip, lands upright in the open drawer */
+      const u = (t - C.tRampEnd) / C.tDrop, ys = onChuteY(CH.xEnd, RZ_LIE);
+      return { cy, p: [lerp(CH.xEnd, cy.rest[0], easeO(u)), lerp(ys, cy.rest[1], u * u), lerp(C.z0, cy.rest[2], ease(u))], rx: 0, ry: 0, rz: lerp(RZ_LIE, -Math.PI * 2, ease(u)), vis: true, stage: 'drop' };
+    }
+    if (t < C.tSettleEnd) { const u = (t - C.tLandT) / C.tSettle, d = Math.exp(-u * 3.2); return { cy, p: [cy.rest[0], cy.rest[1] + Math.abs(Math.sin(u * 14)) * .008 * d, cy.rest[2]], rx: 0, ry: 0, rz: Math.sin(u * 19) * .10 * d, vis: true, stage: 'rest' }; }
     if (t < cy.grab.tLift0) return { cy, p: cy.rest.slice(), rx: 0, ry: 0, rz: 0, vis: true, stage: 'rest' };
     if (t < cy.tShow + .0001) { const f = hand.fk, P = f.idxTip, Q = f.thTip, m = [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2, (P[2] + Q[2]) / 2]; return { cy, p: [m[0], m[1] - COIN.r + .012, m[2]], rx: 0, ry: 0, rz: 0, vis: true, stage: 'hand', held: true }; }
   }
@@ -219,13 +242,15 @@ export function sampleDrawer(tl, t) {
   let u = 0; for (const cy of tl.cyc) { const D = cy.drawer; if (!D) continue; if (t >= D.tO0 && t < D.tC0) u = Math.max(u, easeO(clamp((t - D.tO0) / (D.tO1 - D.tO0), 0, 1))); else if (t >= D.tC0 && t < D.tC1) u = Math.max(u, 1 - ease(clamp((t - D.tC0) / (D.tC1 - D.tC0), 0, 1))); }
   return u;
 }
+/* key cap depth 0..1: dips just before the fingertip arrives, stays down, springs back */
+export function keyDepth(pr) { if (!pr) return 0; return pr.dt < 0 ? ease((pr.dt + .09) / .09) : 1 - ease((pr.u - .2) / .6); }
 /* shelf-cursor + display state */
 export function sampleUI(tl, t) {
   const o = { disp: '', cursor: -1, pressed: null, cyc: null, phase: 'idle' };
   for (const cy of tl.cyc) {
     if (t < cy.t0 || t >= cy.tEnd) continue; o.cyc = cy;
     const typed = cy.press.filter(p => p.key !== 'OK' && t >= p.t); o.disp = typed.map(p => p.key).join('');
-    cy.press.forEach(p => { const dt = t - p.t; if (dt >= -.02 && dt < .26) o.pressed = { key: p.key, u: clamp(dt / .26, 0, 1) }; });
+    cy.press.forEach(p => { const dt = t - p.t; if (dt >= -.09 && dt < .26) o.pressed = { key: p.key, u: clamp(dt / .26, 0, 1), dt }; });
     if (t < cy.tOK) o.phase = 'type'; else if (t < cy.tLand) o.phase = 'sweep'; else if (t < cy.coin.tLandT) o.phase = 'drop'; else if (t < cy.tShow) o.phase = 'grab'; else o.phase = 'show';
     if (t >= cy.tOK) o.disp = String(cy.num);
     if (t >= cy.tOK + .04 && t < cy.tLand + .5) {
@@ -235,38 +260,9 @@ export function sampleUI(tl, t) {
   return o;
 }
 
-/* ======================= asset loading (own GLB parser: no GLTFLoader / no CDN) ======================= */
-let ASSET = null;
-async function decodeImg(bytes, mime, size) {
-  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-  try {
-    const img = new Image(); img.decoding = 'async'; img.src = url;
-    if (img.decode) await img.decode(); else await new Promise((ok, no) => { img.onload = ok; img.onerror = () => no(new Error('이미지 디코드 실패')); });
-    const w = Math.min(size, img.naturalWidth || size), h = Math.min(size, img.naturalHeight || size), c = document.createElement('canvas'); c.width = w; c.height = h;
-    c.getContext('2d').drawImage(img, 0, 0, w, h); return c;
-  } finally { URL.revokeObjectURL(url); }
-}
-export async function loadAssets(tier, onProg) {
-  const tex = TIERS[tier == null ? 1 : tier].tex;
-  if (ASSET && ASSET.tex === tex) return ASSET;
-  const url = new URL('./vending.glb', import.meta.url).href;
-  onProg && onProg('vending.glb');
-  let res; try { res = await fetch(url); } catch (e) { throw new Error('vending.glb 를 불러오지 못했습니다 (' + (e && e.message || e) + ')'); }
-  if (!res.ok) throw new Error('vending.glb 를 찾을 수 없습니다 (HTTP ' + res.status + '). index.html 과 같은 위치에 올려 주세요.');
-  const buf = await res.arrayBuffer(), dv = new DataView(buf);
-  if (dv.getUint32(0, true) !== 0x46546C67) throw new Error('vending.glb 가 올바른 GLB 파일이 아닙니다');
-  const jl = dv.getUint32(12, true), json = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl))), bo = 20 + jl + 8;
-  const acc = i => { const a = json.accessors[i], b = json.bufferViews[a.bufferView], n = { SCALAR: 1, VEC2: 2, VEC3: 3 }[a.type], C = a.componentType == 5126 ? Float32Array : a.componentType == 5123 ? Uint16Array : Uint32Array, off = bo + (b.byteOffset || 0) + (a.byteOffset || 0); return new C(buf.slice(off, off + a.count * n * C.BYTES_PER_ELEMENT)); };
-  const pr = json.meshes[0].primitives[0], geo = { pos: acc(pr.attributes.POSITION), nor: acc(pr.attributes.NORMAL), uv: acc(pr.attributes.TEXCOORD_0), idx: acc(pr.indices) };
-  const imgs = [];
-  for (let i = 0; i < 2; i++) {      /* colour + ORM only (the supplied normal map is almost flat) */
-    const im = json.images[i], b = json.bufferViews[im.bufferView]; onProg && onProg('texture ' + (i + 1) + '/2');
-    imgs.push(await decodeImg(new Uint8Array(buf, bo + (b.byteOffset || 0), b.byteLength), im.mimeType || 'image/jpeg', tex));
-  }
-  ASSET = { geo, imgs, tex, mat: json.materials && json.materials[0] };
-  return ASSET;
-}
-export function assetsReady() { return !!ASSET; }
+/* ======================= assets: none to download any more (everything is generated) ======================= */
+export async function loadAssets(tier, onProg) { onProg && onProg('procedural'); return { tex: 0 }; }
+export function assetsReady() { return true; }
 
 /* ======================= shared drawing helpers ======================= */
 function cv2(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -295,46 +291,23 @@ class Pts {
     const o = this.o, g = o.g || 0, dr = o.drag || 0;
     for (let i = 0; i < this.n; i++) {
       if (this.life[i] <= 0) { this.al[i] = 0; continue; } this.life[i] -= dt; const k = i * 3, d = Math.max(0, 1 - dr * dt);
-      this.v[k + 1] += g * dt; this.v[k] *= d; this.v[k + 1] *= d; this.v[k + 2] *= d; this.p[k] += this.v[k] * dt; this.p[k + 1] += this.v[k + 1] * dt; this.p[k + 2] += this.v[k + 2] * dt;
+      this.v[k + 1] += g * dt; this.v[k] *= d; this.v[k + 1] *= d; this.v[k + 2] *= d; const px0 = this.p[k]; this.p[k] += this.v[k] * dt; this.p[k + 1] += this.v[k + 1] * dt; this.p[k + 2] += this.v[k + 2] * dt;
+      const G = o.glass; if (G && this.p[k + 1] > G.y0 && this.p[k + 1] < G.y1 && this.p[k + 2] > G.z0 && this.p[k + 2] < G.z1) {   /* the window glass is solid: sparks bounce off it, never cross */
+        if (px0 <= G.mid && this.p[k] > G.back) { this.p[k] = G.back; this.v[k] = -Math.abs(this.v[k]) * .3; } else if (px0 > G.mid && this.p[k] < G.front) { this.p[k] = G.front; this.v[k] = Math.abs(this.v[k]) * .3; } }
       const u = clamp(this.life[i] / this.max[i], 0, 1); this.al[i] = (o.alpha || .9) * Math.min(1, u * 2.5) * Math.min(1, (1 - u) * 10 + .2);
     }
     this.aP.needsUpdate = true; this.aA.needsUpdate = true; this.aS.needsUpdate = true; this.aC.needsUpdate = true;
   }
 }
 const hexRGB = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
-function coinFace(g) {
-  const C = { R: ['#F4F7FB', '#9AA5B5', '#5E6878'], SR: ['#EBDDFF', '#9A6BE0', '#4B2A94'], UR: ['#FFF3BC', '#FFB02E', '#B8560A'] }[g] || ['#F4F7FB', '#9AA5B5', '#5E6878'], c = cv2(256, 256), x = c.getContext('2d');
-  let r = x.createRadialGradient(100, 90, 8, 128, 128, 128); r.addColorStop(0, C[0]); r.addColorStop(.55, C[1]); r.addColorStop(1, C[2]); x.fillStyle = r; x.beginPath(); x.arc(128, 128, 127, 0, 6.2832); x.fill();
-  x.lineWidth = 7; x.strokeStyle = 'rgba(255,255,255,.55)'; x.beginPath(); x.arc(128, 128, 112, 0, 6.2832); x.stroke(); x.lineWidth = 3; x.strokeStyle = 'rgba(40,20,0,.45)'; x.beginPath(); x.arc(128, 128, 100, 0, 6.2832); x.stroke();
-  x.save(); x.translate(128, 130); x.fillStyle = 'rgba(60,30,0,.55)'; x.font = '900 118px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('B', 3, 4); x.fillStyle = C[0]; x.fillText('B', 0, 0);
-  x.fillStyle = 'rgba(60,30,0,.5)'; x.fillRect(-6, -76, 5, 20); x.fillRect(6, -76, 5, 20); x.fillRect(-6, 58, 5, 20); x.fillRect(6, 58, 5, 20); x.restore();
-  return ctex(c);
-}
-function padTex() {
-  const c = cv2(392, 520), x = c.getContext('2d'); return { c, x, t: ctex(c) };
-}
-function drawPad(P, pressed, t) {
-  const x = P.x; x.clearRect(0, 0, 392, 520);
-  const cx = [89, 196, 303], cy = [82, 198, 317, 432];
-  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) {
-    const k = KEYS[r][c], on = pressed && pressed.key === k, a = on ? 1 - pressed.u : 0;
-    if (a > 0) { const g = x.createRadialGradient(cx[c], cy[r], 4, cx[c], cy[r], 46); g.addColorStop(0, 'rgba(120,255,235,' + (.95 * a) + ')'); g.addColorStop(.6, 'rgba(60,200,255,' + (.45 * a) + ')'); g.addColorStop(1, 'rgba(60,200,255,0)'); x.fillStyle = g; x.beginPath(); x.arc(cx[c], cy[r], 46, 0, 6.2832); x.fill(); }
-    x.save(); x.translate(cx[c], cy[r]); x.fillStyle = on ? 'rgba(255,255,255,' + (.95) + ')' : 'rgba(190,200,215,.78)'; x.strokeStyle = x.fillStyle; x.lineWidth = 5; x.lineCap = 'round'; x.lineJoin = 'round';
-    if (k === 'C') { x.beginPath(); x.moveTo(-9, -9); x.lineTo(9, 9); x.moveTo(9, -9); x.lineTo(-9, 9); x.stroke(); }
-    else if (k === 'OK') { x.beginPath(); x.moveTo(-11, 1); x.lineTo(-3, 9); x.lineTo(12, -9); x.stroke(); }
-    else { x.font = '700 30px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(k, 0, 2); }
-    x.restore();
-  }
-  P.t.needsUpdate = true;
-}
-function ledTex() { const c = cv2(256, 120), x = c.getContext('2d'); return { c, x, t: ctex(c), s: null }; }
+function ledTex() { const c = cv2(360, 100), x = c.getContext('2d'); return { c, x, t: ctex(c), s: null }; }
 function drawLed(L, s, on, blink) {
-  if (L.s === s + '|' + on + '|' + blink) return; L.s = s + '|' + on + '|' + blink; const x = L.x; x.clearRect(0, 0, 256, 120);
-  x.fillStyle = 'rgba(2,14,10,.88)'; x.fillRect(0, 0, 256, 120);
-  x.font = '700 78px "Courier New", monospace'; x.textAlign = 'right'; x.textBaseline = 'middle';
+  if (L.s === s + '|' + on + '|' + blink) return; L.s = s + '|' + on + '|' + blink; const x = L.x; x.clearRect(0, 0, 360, 100);
+  x.fillStyle = 'rgba(2,14,10,.92)'; x.fillRect(0, 0, 360, 100);
+  x.font = '700 70px "Courier New", monospace'; x.textAlign = 'right'; x.textBaseline = 'middle';
   x.shadowColor = on ? '#41ffb0' : '#1c6b4c'; x.shadowBlur = on ? 14 : 4; x.fillStyle = on ? '#8dffd0' : '#2c8d66';
-  x.fillText(s || '---', 238, 64);
-  if (blink) { x.fillStyle = '#8dffd0'; x.fillRect(244, 34, 6, 56); }
+  x.fillText(s || '---', 336, 54);
+  if (blink) { x.fillStyle = '#8dffd0'; x.fillRect(344, 24, 7, 52); }
   L.t.needsUpdate = true;
 }
 function cursorTex() { const c = cv2(128, 128), x = c.getContext('2d'); x.strokeStyle = '#7ff7ff'; x.lineWidth = 8; x.shadowColor = '#34d8ff'; x.shadowBlur = 16; const r = 14; x.beginPath(); x.moveTo(14 + r, 14); x.arcTo(114, 14, 114, 114, r); x.arcTo(114, 114, 14, 114, r); x.arcTo(14, 114, 14, 14, r); x.arcTo(14, 14, 114, 14, r); x.closePath(); x.stroke(); x.fillStyle = 'rgba(80,220,255,.16)'; x.fill(); return ctex(c); }
@@ -355,9 +328,10 @@ function mDir(p, d) {   /* matrix placing a Y-axis cylinder so it points along u
   return [x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, z[0], z[1], z[2], 0, p[0], p[1], p[2], 1];
 }
 
+const rgbHex = c => (c[0] << 16) | (c[1] << 8) | c[2];
+
 /* ======================= scene ======================= */
 export function createVendScene(opt) {
-  if (!ASSET) throw new Error('vending.glb 가 아직 로드되지 않았습니다 (loadAssets 먼저 호출)');
   const sfx = (n, v, w) => { try { opt.onSfx && opt.onSfx(n, v == null ? 1 : v, w); } catch (e) { } };
   const tier = opt.tier == null ? pickTier() : opt.tier, Q = TIERS[tier], tl = opt.timeline, en = !!opt.en, errors = [], onErr = opt.onError || (() => { });
   const renderer = new THREE.WebGLRenderer({ canvas: opt.canvas, antialias: Q.aa, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: !!opt.preserve });
@@ -382,60 +356,54 @@ export function createVendScene(opt) {
   /* ---- lights ---- */
   scene.add(new THREE.HemisphereLight(0x9aa8c8, 0x2a2430, .30));
   const key = new THREE.DirectionalLight(0xfff0dc, 1.35); key.position.set(3, 2.4, 1.6); scene.add(key);
-  if (SH) { key.castShadow = true; const sc = key.shadow; sc.mapSize.set(tier >= 2 ? 2048 : 1024, tier >= 2 ? 2048 : 1024); const c = sc.camera; c.left = -1.1; c.right = 1.1; c.top = 1.1; c.bottom = -1.1; c.near = 1; c.far = 8; sc.bias = -.0004; sc.normalBias = .012; sc.radius = 3; key.target.position.set(.1, -.1, 0); scene.add(key.target); }
+  if (SH) { key.castShadow = true; const sc = key.shadow; sc.mapSize.set(tier >= 2 ? 2048 : 1024, tier >= 2 ? 2048 : 1024); const c = sc.camera; c.left = -1.3; c.right = 1.3; c.top = 1.3; c.bottom = -1.3; c.near = 1; c.far = 8; sc.bias = -.0004; sc.normalBias = .012; sc.radius = 3; key.target.position.set(.15, .05, 0); scene.add(key.target); }
   const fill = new THREE.DirectionalLight(0x7fa8ff, .35); fill.position.set(2.5, .4, -2.6); scene.add(fill);
   const cyan = new THREE.PointLight(0x30d8ff, .5, 3.5, 2); cyan.position.set(-.05, .25, -.95); scene.add(cyan);
   const magenta = new THREE.PointLight(0xff3fa8, .45, 3.5, 2); magenta.position.set(-.05, .2, .95); scene.add(magenta);
-  const winL = new THREE.PointLight(0xdfeaff, .45, 1.4, 2); winL.position.set(FX + .35, .10, .05); scene.add(winL);
-  const binL = new THREE.PointLight(0xffd9a0, 0, 1.0, 2); binL.position.set(DRW_X + BIN.d * .5, -.28, BIN.zc); scene.add(binL);
+  const binL = new THREE.PointLight(0xffd9a0, 0, 1.0, 2); binL.position.set(BIN.xRest, -.24, BIN.zc); scene.add(binL);
   const coinL = new THREE.PointLight(0xffcf70, 0, 1.2, 2); scene.add(coinL);
 
   /* ---- room ---- */
   const wallT = roomTex('wall'); wallT.repeat.set(5, 2.6);
-  const wall = new THREE.Mesh(new THREE.PlaneGeometry(10, 6), new THREE.MeshStandardMaterial({ map: wallT, roughness: .85, metalness: 0 })); wall.receiveShadow = SH; wall.rotation.y = Math.PI / 2; wall.position.set(-.32, .9, 0); scene.add(wall);
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(10, 6), new THREE.MeshStandardMaterial({ map: wallT, roughness: .85, metalness: 0 })); wall.receiveShadow = SH; wall.rotation.y = Math.PI / 2; wall.position.set(-.42, .9, 0); scene.add(wall);
   const floorT = roomTex('floor'); floorT.repeat.set(14, 14);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshStandardMaterial({ map: floorT, roughness: .55, metalness: .05, envMap: env, envMapIntensity: .35 })); floor.receiveShadow = SH; floor.rotation.x = -Math.PI / 2; floor.position.set(3.2, -.505, 0); scene.add(floor);
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(.78, .195), new THREE.MeshBasicMaterial({ map: signTex('COIN  VENDING'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); sign.rotation.y = Math.PI / 2; sign.position.set(-.30, .66, 0); scene.add(sign);
-  [[.62, 0x30d8ff], [-.62, 0xff3fa8]].forEach(a => { const m = new THREE.Mesh(new THREE.PlaneGeometry(.05, 1.8), new THREE.MeshBasicMaterial({ map: glowTex(a[1] == 0x30d8ff ? 'rgba(80,230,255,1)' : 'rgba(255,90,190,1)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); m.rotation.y = Math.PI / 2; m.position.set(-.30, .35, a[0]); scene.add(m); });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshStandardMaterial({ map: floorT, roughness: .55, metalness: .05, envMap: env, envMapIntensity: .35 })); floor.receiveShadow = SH; floor.rotation.x = -Math.PI / 2; floor.position.set(3.2, -.5065, 0); scene.add(floor);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(.78, .195), new THREE.MeshBasicMaterial({ map: signTex('COIN  VENDING'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); sign.rotation.y = Math.PI / 2; sign.position.set(-.41, .86, 0); scene.add(sign);
+  [[.62, 0x30d8ff], [-.62, 0xff3fa8]].forEach(a => { const m = new THREE.Mesh(new THREE.PlaneGeometry(.05, 1.8), new THREE.MeshBasicMaterial({ map: glowTex(a[1] == 0x30d8ff ? 'rgba(80,230,255,1)' : 'rgba(255,90,190,1)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); m.rotation.y = Math.PI / 2; m.position.set(-.41, .3, a[0]); scene.add(m); });
 
-  /* ---- the vending machine (supplied GLB) ---- */
-  const A = ASSET, g0 = new THREE.BufferGeometry();
-  g0.setAttribute('position', new THREE.BufferAttribute(A.geo.pos, 3)); g0.setAttribute('normal', new THREE.BufferAttribute(A.geo.nor, 3)); g0.setAttribute('uv', new THREE.BufferAttribute(A.geo.uv, 2)); g0.setIndex(new THREE.BufferAttribute(A.geo.idx, 1));
-  const gt = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.flipY = false; if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = tier ? 8 : 2; return t; };
-  const mTex = [gt(A.imgs[0], true), gt(A.imgs[1], false)];
-  const mMat = new THREE.MeshStandardMaterial({ map: mTex[0], roughnessMap: mTex[1], metalnessMap: envOk ? mTex[1] : null, aoMap: mTex[1], aoMapIntensity: .8, roughness: 1, metalness: envOk ? 1 : .12, side: THREE.DoubleSide, envMap: env, envMapIntensity: .55 });
-  mMat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(roughnessFactor * .75 + .30, 0., 1.);'); };
-  const machine = new THREE.Mesh(g0, mMat); machine.castShadow = SH; machine.receiveShadow = SH; scene.add(machine);
+  /* ---- the machine = the supplied asset package, mounted under a rig that maps package space P → scene space T ---- */
+  const A = createVendAssets(THREE, { tier, texSize: [256, 384, 512][tier], anisotropy: tier ? 4 : 1, transmission: false });
+  const rig = new THREE.Group(); rig.name = 'machine_rig'; rig.rotation.y = Math.PI / 2; rig.scale.setScalar(RIG.s); rig.position.set(0, RIG.y, RIG.z); rig.add(A.root); scene.add(rig);
+  const NOSHADOW = { edge_ridges: 1, engraved_rim: 1, key_label: 1, key_socket: 1 };
+  function tune(root, coinSet) {   /* shadows tier-gated; IBL on every PBR material; metals toned down (no chrome / blown highlights) */
+    const mats = new Set();
+    root.traverse(o => { if (!o.geometry || !o.material) return; o.castShadow = SH && !NOSHADOW[o.name]; o.receiveShadow = SH; (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => mats.add(m)); });
+    mats.forEach(m => {
+      if (!m.isMeshStandardMaterial) return; m.envMap = env;
+      if (coinSet) { m.envMapIntensity = .8; return; }
+      if (m.isMeshPhysicalMaterial) { m.envMapIntensity = .5; return; }
+      m.envMapIntensity = m.metalness > .6 ? .45 : .3; m.roughness = Math.min(1, Math.max(m.roughness, .36));
+    });
+  }
+  tune(A.root, false); A.coins.forEach(c => tune(c, true));
+  const cellCoin = A.coins, keyBy = {}; A.keys.forEach(k => { keyBy[k.userData.label] = k; });
+  const inL = new THREE.PointLight(0xfff1dc, .45, 1.4, 2); inL.position.set(.26, .30, RIG.z); scene.add(inL);
 
-  /* ---- keypad glyphs, LED display, shelf cursor ---- */
-  const PD = padTex(), padM = new THREE.Mesh(new THREE.PlaneGeometry(.098, .130), new THREE.MeshBasicMaterial({ map: PD.t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-  padM.rotation.y = Math.PI / 2; padM.position.set(FX + .0007, .1535, -.3055); scene.add(padM); drawPad(PD, null, 0);
-  const LD = ledTex(), ledM = new THREE.Mesh(new THREE.PlaneGeometry(.068, .032), new THREE.MeshBasicMaterial({ map: LD.t, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, toneMapped: false }));
-  ledM.rotation.y = Math.PI / 2; ledM.position.set(FX + .0008, .2705, -.3055); scene.add(ledM); drawLed(LD, '', false, false);
-  const curM = new THREE.Mesh(new THREE.PlaneGeometry(.122, .122), new THREE.MeshBasicMaterial({ map: cursorTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); curM.rotation.y = Math.PI / 2; curM.position.set(.2095, 0, 0); curM.visible = false; scene.add(curM);
+  /* ---- LED text (canvas on a plane over the package's led_display box) + shelf cursor ---- */
+  const LD = ledTex(), ledM = new THREE.Mesh(new THREE.PlaneGeometry(LY.led.w * .9, LY.led.h * .86), new THREE.MeshBasicMaterial({ map: LD.t, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, toneMapped: false }));
+  ledM.position.set(LY.led.x, LY.led.y, LY.led.z + .0045 + .0004); ledM.name = 'led_text'; rig.add(ledM); drawLed(LD, '', false, false);
+  const curM = new THREE.Mesh(new THREE.PlaneGeometry(LY.slot.w * RIG.s * 1.12, LY.slot.h * RIG.s * 1.06), new THREE.MeshBasicMaterial({ map: cursorTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); curM.rotation.y = Math.PI / 2; curM.position.set((LY.glassZ + .0023) * RIG.s, 0, 0); curM.visible = false; curM.renderOrder = 6; scene.add(curM);
   const curL = new THREE.PointLight(0x40d8ff, 0, .6, 2); scene.add(curL);
-
-  /* ---- pickup drawer: slides out of the hatch before the coin drops, so the hand reaches in FRONT of the body (never through it) ---- */
-  const trayM = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: .5, metalness: .5, envMap: env, envMapIntensity: .45 }), trayIn = new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: .65, metalness: .25, envMap: env, envMapIntensity: .25 }), handleM = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, roughness: .35, metalness: 1, envMap: env, envMapIntensity: .6 });
-  const drawer = new THREE.Group(); scene.add(drawer);
-  const XF = DRW_X + BIN.d;                                    /* panel front face when open (group is shifted back by (1-u)*d) */
-  const tbox = (x0, x1, y0, y1, z0, z1, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), m || trayM); b.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); b.receiveShadow = SH; b.castShadow = SH; drawer.add(b); return b; };
-  const xb = FX - .03, wt = .006;                              /* back end hides inside the body */
-  tbox(xb, XF - .014, BIN.y0, BIN.y0 + .004, BIN.z0, BIN.z1, trayIn);                       /* floor */
-  tbox(xb, XF - .014, BIN.y0, BIN.y1 - .01, BIN.z0, BIN.z0 + wt); tbox(xb, XF - .014, BIN.y0, BIN.y1 - .01, BIN.z1 - wt, BIN.z1);   /* side walls */
-  tbox(XF - .014, XF, BIN.y0 - .004, BIN.y1 + .004, BIN.z0 - .004, BIN.z1 + .004);          /* front panel */
-  tbox(XF, XF + .008, BIN.y0 + .03, BIN.y0 + .038, BIN.zc - .06, BIN.zc + .06, handleM);    /* pull lip */
-  tbox(XF - .012, XF - .006, BIN.y0 + .008, BIN.y0 + .016, BIN.zc - .04, BIN.zc + .04, trayM);
-  const drawerU = u => { drawer.position.x = -(1 - u) * BIN.d; drawer.visible = true; };
+  const drawer = A.drawer, dZ0 = drawer.userData.closedZ, dZ1 = drawer.userData.openZ;
+  const drawerU = u => { drawer.position.z = dZ0 + (dZ1 - dZ0) * u; };
   drawerU(0);
 
-  /* ---- coin ---- */
-  const coin = new THREE.Group(), cr = COIN.r, ct = COIN.t, coinFaces = { R: coinFace('R'), SR: coinFace('SR'), UR: coinFace('UR') };
-  const rimM = new THREE.MeshStandardMaterial({ color: 0xd8dde6, roughness: .34, metalness: 1, envMap: env, envMapIntensity: .8 }), faceM = new THREE.MeshStandardMaterial({ map: coinFaces.R, roughness: .32, metalness: .85, envMap: env, envMapIntensity: .75, emissive: 0x000000 });
-  const cb = new THREE.Mesh(new THREE.CylinderGeometry(cr, cr, ct, 40, 1, true), rimM); cb.rotation.z = -Math.PI / 2; coin.add(cb);
-  const f1 = new THREE.Mesh(new THREE.CircleGeometry(cr, 40), faceM); f1.rotation.y = Math.PI / 2; f1.position.x = ct / 2; coin.add(f1);
-  const f2 = new THREE.Mesh(new THREE.CircleGeometry(cr, 40), faceM); f2.rotation.y = -Math.PI / 2; f2.position.x = -ct / 2; coin.add(f2);
-  coin.traverse(o => { o.castShadow = SH; }); coin.visible = false; scene.add(coin);
+  /* ---- travelling coins: one per cubby, built with the package's makeCoin and sharing that cubby coin's face texture ---- */
+  const trav = A.coins.map((c, i) => {
+    const tc = makeAssetCoin(THREE, GRADE_IDS[Math.floor(i / 5)], i, { tex: c.userData.texture }); tc.rotation.set(0, Math.PI / 2, Math.PI / 2); tc.scale.setScalar(RIG.s * LY.coin.scale); tc.name = 'travel_' + tc.name;
+    const pv = new THREE.Group(); pv.add(tc); pv.visible = false; tune(tc, true); scene.add(pv); return pv;
+  });
+  let coin = trav[0];
 
   /* ---- hand ---- */
   const skin = new THREE.MeshStandardMaterial({ color: 0xe6b293, roughness: .52, metalness: 0, envMap: env, envMapIntensity: .18 });
@@ -468,9 +436,10 @@ export function createVendScene(opt) {
     return fk;
   }
   /* ---- particles ---- */
-  const spark = new Pts(Q.parts, dot, { add: true, g: -3.2, drag: 1.0, alpha: 1, order: 14 }), dust = new Pts(Math.round(Q.parts * .6), dot, { add: true, drag: .1, alpha: .35, order: 11 });
+  const GL = { back: (LY.glassZ - .002) * RIG.s - .0004, front: (LY.glassZ + .002) * RIG.s + .0004, mid: LY.glassZ * RIG.s, z0: -LY.win.x1 * RIG.s + RIG.z, z1: -LY.win.x0 * RIG.s + RIG.z, y0: LY.win.y0 * RIG.s + RIG.y, y1: LY.win.y1 * RIG.s + RIG.y };
+  const spark = new Pts(Q.parts, dot, { add: true, g: -3.2, drag: 1.0, alpha: 1, order: 14, glass: GL }), dust = new Pts(Math.round(Q.parts * .6), dot, { add: true, drag: .1, alpha: .35, order: 11, glass: GL });
   scene.add(spark.mesh, dust.mesh);
-  for (let i = 0; i < dust.n; i++) dust.emit(rnd(-.2, 1.6), rnd(-.45, .9), rnd(-.9, .9), rnd(-.01, .01), rnd(.004, .02), rnd(-.01, .01), rnd(20, 60), rnd(.006, .014), [.7, .8, 1]);
+  for (let i = 0; i < dust.n; i++) dust.emit(rnd(.36, 1.8), rnd(-.45, .9), rnd(-.9, .9), rnd(-.01, .01), rnd(.004, .02), rnd(-.01, .01), rnd(20, 60), rnd(.006, .014), [.7, .8, 1]);
   function burst(p, n, cols, sp, life, size) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.283, e = Math.random() * 3.14, s = sp * (.3 + Math.random() * .7); spark.emit(p[0], p[1], p[2], Math.abs(Math.sin(e)) * s * .5 + Math.random() * s * .4, Math.cos(e) * s, Math.sin(a) * Math.sin(e) * s, life * (.6 + Math.random() * .6), size * (.6 + Math.random() * .8), cols[(Math.random() * cols.length) | 0]); } }
 
   /* ---- per-frame state ---- */
@@ -503,26 +472,28 @@ export function createVendScene(opt) {
     const fk = setHand(hs.root, hs.pose, true), hdata = { fk };
     /* state */
     const ui = sampleUI(tl, t), cy = ui.cyc; out.phase = ui.phase; out.num = cy ? cy.num : 0;
-    const pk = ui.pressed ? ui.pressed.key + ':' + Math.round(ui.pressed.u * 12) : ''; if (pk !== padKey) { padKey = pk; drawPad(PD, ui.pressed, t); }
+    { const pr = ui.pressed; A.keys.forEach(k => { const lab = k.userData.label, cap = k.userData.cap; let d = 0, gw = 0; if (pr && pr.key === lab) { d = LY.keys.travel * keyDepth(pr); gw = pr.dt < 0 ? 0 : 1 - ease(pr.u / .9); } cap.position.z = k.userData.homeZ - d; k.userData.setGlow(gw * .8); }); }
+    /* compartment coins: hidden while their twin travels, restocked (grows back) after the cycle */
+    for (let s = 0; s < 15; s++) { let vis = true, sc = 1; for (const c of tl.cyc) if (c.slot === s) { if (t >= c.coin.tD && t < c.tEnd) vis = false; else if (t >= c.tEnd && t < c.tEnd + .3) sc = Math.max(.001, ease((t - c.tEnd) / .3)); } const cc = cellCoin[s]; cc.visible = vis; cc.scale.setScalar(sc * LY.coin.scale); }
     { const typing = ui.phase === 'type', blink = typing && (Math.floor(t * 2.6) & 1) === 0; drawLed(LD, ui.disp, ui.phase !== 'idle', blink); }
     /* cursor */
-    if (ui.cursor >= 0 && cy) { const s = ui.cursor, z = SZ[s % 5], y = SY[Math.floor(s / 5)], pul = ui.landed ? 1 + .12 * Math.sin(t * 24) * (1 - ui.curU) : 1; curM.visible = ui.curU < 1; curM.position.set(.2095, y, z); curM.scale.set(pul, pul, 1); curM.material.opacity = ui.landed ? 1 - ui.curU : 1; curL.position.set(.26, y, z); curL.intensity = ui.curU < 1 ? .7 : 0; }
+    if (ui.cursor >= 0 && cy) { const s = ui.cursor, z = SZ[s % 5], y = SY[Math.floor(s / 5)], pul = ui.landed ? 1 + .12 * Math.sin(t * 24) * (1 - ui.curU) : 1; curM.visible = ui.curU < 1; curM.position.set(curM.position.x, y, z); curM.scale.set(pul, pul, 1); curM.material.opacity = ui.landed ? 1 - ui.curU : 1; curL.position.set(FX + .06, y, z); curL.intensity = ui.curU < 1 ? .7 : 0; }
     else { curM.visible = false; curL.intensity = 0; }
     drawerU(sampleDrawer(tl, t));
     /* coin */
     const cs = sampleCoin(tl, t, hdata);
     if (cs && cs.vis) {
-      coin.visible = true; coin.position.set(cs.p[0], cs.p[1], cs.p[2]); coin.rotation.set(cs.rx, cs.ry, cs.rz); const g = cs.cy.g, fm = coinFaces[g] || coinFaces.R; if (faceM.map !== fm) { faceM.map = fm; faceM.needsUpdate = true; }
-      const gr = GRADES[g] || GRADES.R; rimM.color.set(g === 'UR' ? 0xffc65a : g === 'SR' ? 0xc7aaf5 : 0xd8dde6);
+      if (trav[cs.cy.slot] !== coin) { coin.visible = false; coin = trav[cs.cy.slot]; } coin.visible = true; coin.position.set(cs.p[0], cs.p[1], cs.p[2]); coin.rotation.set(cs.rx, cs.ry, cs.rz); const g = cs.cy.g;
+      const gr = GRADES[g] || GRADES.R;
       const glow = g === 'UR' ? .6 : g === 'SR' ? .35 : .15; coinL.position.set(cs.p[0] + .08, cs.p[1] + .02, cs.p[2]); coinL.color.set(gr.c); coinL.intensity = (cs.stage === 'rest' || cs.stage === 'hand' ? glow * 1.1 : glow * .5);
       binL.intensity = (cs.stage === 'rest' || cs.stage === 'hand' || cs.stage === 'drop') ? .3 : 0;
-      if (cs.stage === 'fall' && frames % 2 == 0) spark.emit(cs.p[0] + .02, cs.p[1] + rnd(-.03, .03), cs.p[2] + rnd(-.03, .03), rnd(-.05, .05), rnd(.1, .3), rnd(-.05, .05), .35, .008, hexRGB(gr.c));
+      if (cs.stage === 'fall' && frames % 2 == 0) spark.emit(cs.p[0] - .004, cs.p[1] + rnd(-.03, .03), cs.p[2] + rnd(-.03, .03), rnd(-.05, .05), rnd(.1, .3), rnd(-.05, .05), .35, .008, hexRGB(gr.c));
       lastCoin = cs;
-    } else { coin.visible = false; coinL.intensity = 0; binL.intensity = 0; lastCoin = null; }
+    } else { trav.forEach(c => { c.visible = false; }); coinL.intensity = 0; binL.intensity = 0; lastCoin = null; }
     /* one-shot effects (crossing times) */
     tl.cyc.forEach(c => {
       const K = c.c + ':'; const cross = (k, tt) => { const key = K + k; if (!trigged.has(key) && t >= tt && prevT < tt + .3) { trigged.add(key); return true; } return false; };
-      if (cross('pop', c.coin.tD)) burst([.21, c.coin.y0, c.coin.z0], 12, [hexRGB('#aef'), [1, 1, 1]], .5, .5, .01);
+      if (cross('pop', c.coin.tD)) burst([COIN.xPop - .006, c.coin.y0, c.coin.z0], 12, [hexRGB('#aef'), [1, 1, 1]], .5, .5, .01);
       if (cross('land', c.coin.tLandT)) { burst([c.rest[0], BIN.y0 + .02, c.rest[2]], c.g === 'UR' ? 40 : 18, [hexRGB(GRADES[c.g].c), [1, 1, 1]], .6, .6, .012); out.flash = Math.max(out.flash, .08); }
       if (cross('take', c.grab.tClose)) burst([c.rest[0], c.rest[1] + .04, c.rest[2]], 10, [[1, 1, 1]], .35, .4, .008);
       if (cross('show', c.tShow)) { const U = c.g === 'UR'; out.flash = Math.max(out.flash, U ? 1 : c.g === 'SR' ? .65 : .4); const p = lastCoin ? lastCoin.p : [.9, -.2, 0]; burst(p, U ? 120 : c.g === 'SR' ? 60 : 30, [hexRGB(GRADES[c.g].c), hexRGB(GRADES[c.g].t), [1, 1, 1]], U ? 1.6 : 1.0, 1.1, .02); }
