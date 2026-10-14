@@ -69,6 +69,18 @@ export const BOSS = [
   { k: 'tyrant', n: '폭군', hp: 3000, atk: 42, sp: 24, r: 22, col: '#8a2a2a', sk: [['roar', 13], ['slam', 8]], enr: 1, d: '포효(좀비 가속·기절) · 내려찍기 · 체력 50% 이하에서 광폭화' },
   { k: 'giant', n: '폭탄 거인', hp: 2500, atk: 30, sp: 22, r: 21, col: '#a8782a', sk: [['bomb', 5.5], ['slam', 9]], d: '폭탄 투척(울타리·집 폭파) · 내려찍기' }
 ];
+export const EXN = ['강철 벙커', '강철 벙커 ★1', '강철 벙커 ★2', '강철 벙커 ★3', '일렉트로닉 디지털 쉘터', '일렉트로닉 디지털 쉘터 ★1', '일렉트로닉 디지털 쉘터 ★2', '일렉트로닉 디지털 쉘터 ★3', '메카트로닉 쉘터'];
+export const EXP = [0, 1e11, 1e11, 1e11, 5e11, 1e11, 1e11, 1e11, 5e11];
+export const EXHP = [0, 300000, 500000, 800000, 1000000, 1500000, 2500000, 4000000, 6000000];
+export const MECH = [
+  { n: '건 봇', ic: '🔫', dps: 1500, hp: 30000, r: 220, g: 1, iv: .1, aoe: 0, sp: 80, col: '#7fb4d8', d: '기관포 연사 · 초당 1,500' },
+  { n: '미사일 봇', ic: '🚀', dps: 2000, hp: 30000, r: 270, g: 1, iv: 1.5, aoe: 48, sp: 60, col: '#d8a04a', d: '범위 폭발 미사일 · 초당 2,000' },
+  { n: '화염방사 봇', ic: '🔥', dps: 2500, hp: 40000, r: 85, g: 0, iv: .25, aoe: 34, sp: 85, col: '#e8603a', d: '근거리 광범위 화염 · 초당 2,500' },
+  { n: '레일건 봇', ic: '⚡', dps: 6000, hp: 25000, r: 320, g: 1, iv: 2, aoe: 0, sp: 55, col: '#a070ff', d: '단일 대상 초고화력 · 초당 6,000 (보스 사냥꾼)' },
+  { n: '수리 봇', ic: '🛠️', dps: 150, hp: 60000, r: 40, g: 0, iv: .5, aoe: 0, sp: 75, col: '#5ad07a', d: '쉘터·울타리를 계속 수리 · 맷집 담당' }
+];
+export const elecStars = s => (s.ex | 0) >= 8 ? 3 : Math.max(0, (s.ex | 0) - 4);
+export const zapStat = s => { const k = elecStars(s); return { dmg: 600 * (1 + .5 * k), n: 4 + 2 * k, rg: 150 + 20 * k, iv: .5 } };
 const SEGS = (() => {
   const a = []; const T = 8;
   for (let i = 0; i < 5; i++) a.push({ x: CX - R + i * 40, y: CY - R - T / 2, w: 40, h: T });
@@ -84,7 +96,7 @@ const TURPOS = [{ x: CX - R, y: CY - R }, { x: CX + R, y: CY - R }, { x: CX - R,
 
 /* ---------------- 상태 ---------------- */
 export function freshState(now) {
-  return { v: 1, rs: now, lt: now, age: 0, meat: 0, kills: 0, hp: 10000, hl: 0, wp: 0, ar: [0, 0, 0, 0, 0], al: [0, 0, 0, 0, 0], fn: 0, fh: SEGS.map(() => 0), tp: TRAPPOS.map(() => ({ t: 0, d: 0 })), tu: [0, 0, 0, 0], bk: 0, bn: 0, bt: 0, bkl: 0, dead: 0, rest: 0, best: 0, sw: 0 };
+  return { v: 1, rs: now, lt: now, age: 0, meat: 0, kills: 0, hp: 10000, hl: 0, wp: 0, ar: [0, 0, 0, 0, 0], al: [0, 0, 0, 0, 0], fn: 0, fh: SEGS.map(() => 0), tp: TRAPPOS.map(() => ({ t: 0, d: 0 })), tu: [0, 0, 0, 0], bk: 0, ex: 0, bn: 0, bt: 0, bkl: 0, dead: 0, rest: 0, best: 0, sw: 0 };
 }
 export function normState(o) {
   if (!o || typeof o !== 'object' || !o.v) return null;
@@ -95,7 +107,7 @@ export function normState(o) {
   s.meat = Math.max(0, +s.meat || 0); s.hp = Math.min(maxHp(s), Math.max(0, +s.hp || 0)); s.age = Math.max(0, +s.age || 0);
   return s;
 }
-export const maxHp = s => 10000 + HOUSE.slice(0, (s.hl | 0) + 1).reduce((a, h) => a + h.hp, 0);
+export const maxHp = s => 10000 + HOUSE.slice(0, (s.hl | 0) + 1).reduce((a, h) => a + h.hp, 0) + EXHP.slice(0, (s.ex | 0) + 1).reduce((a, h) => a + h, 0);
 export const fenceHp = s => s.fn > 0 ? FENCE[s.fn - 1].hp : 0;
 export function heroStats(s) {
   const w = WEAPONS[s.wp | 0]; let hp = 200, df = 0, gs = 0, ms = 0;
@@ -117,6 +129,8 @@ export function dpsOf(s) {
   const h = heroStats(s); let d = h.dmg / h.iv * .6;
   s.al.forEach((v, i) => { if (v) d += ALLY[i].dps * .6 });
   s.tu.forEach(t => { if (t > 0) { const T = TURRET[t - 1]; d += T.dmg / T.iv * .7 } });
+  if ((s.ex | 0) >= 4) { const z = zapStat(s); d += z.dmg * z.n / z.iv * .5 }
+  if ((s.ex | 0) >= 8) MECH.forEach(m => d += m.dps * .6);
   return d;
 }
 export function bossHp(s, bn) { return BOSS[bn % 5].hp * bossMul(bn) * mFn(s.age) }
@@ -165,8 +179,11 @@ export class Sim {
     this.S = S; this.ev = ev || {}; this.z = []; this.fx = []; this.pt = []; this.proj = []; this.t = 0; this.spT = 0; this.wvT = 12; this.tele = []; this.pool = []; this.banner = null; this.bossOut = []; this.shake = 0; this.id = 1;
     this.hs = heroStats(S); this.hero = { x: CX, y: CY + R + 34, hp: this.hs.hpMax, cd: 0, down: 0, face: 1, sw: 0, k: 'hero' };
     this.allies = []; S.al.forEach((v, i) => { if (v) this.allies.push({ i, x: CX + (i - 2) * 22, y: CY + R + 50, hp: ALLY[i].hp, cd: 0, down: 0, face: 1, sw: 0, k: 'ally' }) });
+    this.mechs = []; this.arcs = []; this.zapT = 0; this.repT = 0; if ((S.ex | 0) >= 8) this.addMechs();
     this.tur = S.tu.map(() => ({ cd: Math.random() })); this.trapCd = TRAPPOS.map(() => 0);
   }
+  units() { return [this.hero].concat(this.allies, this.mechs) }
+  addMechs() { this.mechs = MECH.map((m, i) => ({ i, mi: i, x: CX + (i - 2) * 26, y: CY + R + 62, hp: m.hp, hpMax: m.hp, cd: Math.random(), down: 0, face: 1, sw: 0, k: 'ally', mech: m })) }
   addAlly(i) { this.allies.push({ i, x: CX + (i - 2) * 22, y: CY + R + 50, hp: ALLY[i].hp, cd: 0, down: 0, face: 1, sw: 0, k: 'ally' }) }
   solids() {
     const L = [HOUSE_RECT]; const S = this.S;
@@ -199,7 +216,7 @@ export class Sim {
     if (S.fn > 0) SEGS.forEach((b, i) => { if (S.fh[i] > 0 && rectHit(z.x, z.y, 30, b)) S.fh[i] = 0 });
     if (rectHit(z.x, z.y, 30, HOUSE_RECT)) { const d = 150 + 50 * (m - 1); S.hp -= d; this.fx.push({ x: CX, y: CY - 30, t: 0, txt: '-' + Math.round(d), red: 1 }) }
     const hit = (u) => { if (!u.down && Math.hypot(u.x - z.x, u.y - z.y) < 38) { u.hp -= 40; this.fx.push({ x: u.x, y: u.y - 14, t: 0, txt: '-40', red: 1 }) } };
-    hit(this.hero); this.allies.forEach(hit);
+    this.units().forEach(hit);
   }
   horde() {
     const S = this.S, n = hordeN(S.age) + (Math.random() * 4 | 0), side = Math.random() * 4 | 0, u = .12 + Math.random() * .76;
@@ -222,11 +239,11 @@ export class Sim {
     if (u.down > 0 || u.hp <= 0) return; const d = Math.max(1, dmg * (1 - (u === this.hero ? this.hs.df : 0))); u.hp -= d; this.fx.push({ x: u.x, y: u.y - 14, t: 0, txt: '-' + Math.round(d), red: 1 }); if (u.hp <= 0) { u.hp = 0; u.down = 8 }
   }
   areaHit(x, y, r, dU, dF, dH) {
-    const S = this.S; [this.hero].concat(this.allies).forEach(u => { if (Math.hypot(u.x - x, u.y - y) < r + 6) this.hurtU(u, dU) });
+    const S = this.S; this.units().forEach(u => { if (Math.hypot(u.x - x, u.y - y) < r + 6) this.hurtU(u, dU) });
     if (dF > 0 && S.fn > 0) SEGS.forEach((b, i) => { if (S.fh[i] > 0 && rectHit(x, y, r, b)) S.fh[i] = Math.max(0, S.fh[i] - dF) });
     if (dH > 0 && rectHit(x, y, r, HOUSE_RECT)) { S.hp -= dH; this.fx.push({ x: CX, y: CY - 30, t: 0, txt: '-' + Math.round(dH), red: 1 }) }
   }
-  poolHit(p) { const S = this.S; [this.hero].concat(this.allies).forEach(u => { if (Math.hypot(u.x - p.x, u.y - p.y) < p.r) this.hurtU(u, p.dps * .5) }); if (S.fn > 0) SEGS.forEach((b, i) => { if (S.fh[i] > 0 && rectHit(p.x, p.y, p.r, b)) S.fh[i] = Math.max(0, S.fh[i] - 20) }); if (rectHit(p.x, p.y, p.r, HOUSE_RECT)) S.hp -= 8 }
+  poolHit(p) { const S = this.S; this.units().forEach(u => { if (Math.hypot(u.x - p.x, u.y - p.y) < p.r) this.hurtU(u, p.dps * .5) }); if (S.fn > 0) SEGS.forEach((b, i) => { if (S.fh[i] > 0 && rectHit(p.x, p.y, p.r, b)) S.fh[i] = Math.max(0, S.fh[i] - 20) }); if (rectHit(p.x, p.y, p.r, HOUSE_RECT)) S.hp -= 8 }
   bossAct(z, dt, sol, tu) {
     // 보스 스킬 (스킬마다 쿨타임, 시전 중에는 멈춤). 반환 true면 이번 프레임 이동/공격 생략
     const S = this.S, sp = z.boss; z.life += dt; z.shield = Math.max(0, z.shield - dt); z.cast = Math.max(0, z.cast - dt);
@@ -234,13 +251,13 @@ export class Sim {
     if (sp.enr && !z.enr && z.hp < z.hpMax * .5) { z.enr = 1; z.sp *= 1.6; z.atk *= 1.4; this.shake = .4; this.fx.push({ x: z.x, y: z.y - 24, t: 0, txt: '💢 광폭화!', red: 1, big: 1 }) }
     if (z.dash > 0) {
       z.dash -= dt; const b = this.move(z, z.dx * 300 * dt, z.dy * 300 * dt, z.r * .8, sol);
-      [this.hero].concat(this.allies).forEach(u => { if (!z.hit && u.down <= 0 && Math.hypot(u.x - z.x, u.y - z.y) < z.r + 10) { z.hit = 1; this.hurtU(u, z.atk * 2.5) } });
+      this.units().forEach(u => { if (!z.hit && u.down <= 0 && Math.hypot(u.x - z.x, u.y - z.y) < z.r + 10) { z.hit = 1; this.hurtU(u, z.atk * 2.5) } });
       if (b) { z.dash = 0; this.shake = .35; this.areaHit(z.x + z.dx * 14, z.y + z.dy * 14, 26, 0, 600, z.atk * 3); this.fx.push({ x: z.x, y: z.y, t: 0, boom: .8 }) }
       return true
     }
     if (z.cast > 0) return true;
     for (const k in z.sk) z.sk[k] -= dt;
-    const units = [this.hero].concat(this.allies).filter(u => u.down <= 0), near = units.sort((a, b) => Math.hypot(a.x - z.x, a.y - z.y) - Math.hypot(b.x - z.x, b.y - z.y))[0];
+    const units = this.units().filter(u => u.down <= 0), near = units.sort((a, b) => Math.hypot(a.x - z.x, a.y - z.y) - Math.hypot(b.x - z.x, b.y - z.y))[0];
     const dn = near ? Math.hypot(near.x - z.x, near.y - z.y) : 1e9, dh = Math.hypot(CX - z.x, CY - z.y);
     const rdy = k => z.sk[k] !== undefined && z.sk[k] <= 0, set = (k, cd) => z.sk[k] = cd * (z.enr ? .7 : 1);
     if (rdy('slam') && (dn < 85 || dh < 95)) { set('slam', 7.5); z.cast = .95; const x = z.x, y = z.y; this.tele.push({ kind: 'c', x, y, r: 64, t: 0, dur: .9, fn: () => { this.shake = .4; this.fx.push({ x, y, t: 0, boom: 1.4 }); this.areaHit(x, y, 64, z.atk * 2.2, 650, z.atk * 4) } }); return true }
@@ -265,7 +282,7 @@ export class Sim {
     if (!best) { tx = home.x; ty = home.y } else {
       const d = Math.hypot(best.x - u.x, best.y - u.y), clear = !this.blocked(u.x, u.y, best.x, best.y, sol);
       if (clear && d <= st.range + best.r * .5) {
-        if (u.cd <= 0) { u.cd = st.iv; u.sw = .15; u.face = best.x >= u.x ? 1 : -1; if (st.ranged) { this.proj.push({ x1: u.x, y1: u.y - 6, x2: best.x, y2: best.y, t: .09 }) } this.dmgZ(best, st.dmg, u) }
+        if (u.cd <= 0) { u.cd = st.iv; u.sw = .15; u.face = best.x >= u.x ? 1 : -1; if (st.ranged) { this.proj.push({ x1: u.x, y1: u.y - 6, x2: best.x, y2: best.y, t: .09 }) } this.dmgZ(best, st.dmg, u); if (st.aoe) { for (const q of this.z) if (!q.dead && q !== best && Math.hypot(q.x - best.x, q.y - best.y) < st.aoe) this.dmgZ(q, st.dmg * .7, u); this.fx.push({ x: best.x, y: best.y, t: 0, boom: .5, c: u.mech ? u.mech.col : null }) } }
         return;
       }
       if (clear) { tx = best.x; ty = best.y }
@@ -284,6 +301,10 @@ export class Sim {
     if (this.banner) { this.banner.t -= dt; if (this.banner.t <= 0) this.banner = null }
     // 영웅 / 동료
     this.hs = heroStats(S); this.unitAI(this.hero, this.hs, dt, sol); this.allies.forEach(a => { const d = ALLY[a.i]; this.unitAI(a, { hpMax: d.hp, range: d.r, ranged: !!d.g, dmg: d.dps * (d.g ? .25 : .5), iv: d.g ? .25 : .5, sp: d.sp }, dt, sol) });
+    this.mechs.forEach(a => { const d = a.mech; this.unitAI(a, { hpMax: d.hp, range: d.r, ranged: !!d.g, dmg: d.dps * d.iv, iv: d.iv, sp: d.sp, aoe: d.aoe }, dt, sol) });
+    if ((S.ex | 0) >= 4) { this.zapT -= dt; if (this.zapT <= 0) { const z = zapStat(S); this.zapT = z.iv; const L = this.z.filter(q => !q.dead && Math.hypot(q.x - CX, q.y - (CY - 24)) < z.rg).sort((a, b) => Math.hypot(a.x - CX, a.y - CY) - Math.hypot(b.x - CX, b.y - CY)).slice(0, z.n); L.forEach(q => { this.arcs.push({ x1: CX + 2, y1: CY - 40, x2: q.x, y2: q.y - 8, t: .18 }); this.dmgZ(q, z.dmg, 'zap') }) } }
+    this.arcs.forEach(a => a.t -= dt); this.arcs = this.arcs.filter(a => a.t > 0);
+    if ((S.ex | 0) >= 8) { this.repT -= dt; if (this.repT <= 0) { this.repT = 1; const rb = this.mechs[4]; if (rb && rb.down <= 0) { S.hp = Math.min(maxHp(S), S.hp + 500); if (S.fn > 0) { const mh = fenceHp(S); for (let i = 0; i < S.fh.length; i++) if (S.fh[i] > 0 && S.fh[i] < mh) S.fh[i] = Math.min(mh, S.fh[i] + mh * .02) } } } }
     // 포탑
     S.tu.forEach((t, i) => { if (t <= 0) return; const T = TURRET[t - 1], p = TURPOS[i], c = this.tur[i]; c.cd -= dt; if (c.cd > 0) return; let b = null, bd = T.rg; for (const z of this.z) { if (z.dead) continue; const d = Math.hypot(z.x - p.x, z.y - p.y); if (d < bd) { bd = d; b = z } } if (!b) return; c.cd = T.iv; this.proj.push({ x1: p.x, y1: p.y - 8, x2: b.x, y2: b.y, t: .08, c: T.aoe ? '#ffb02a' : T.n[0] === '레' ? '#ff4040' : '#ffe9a0' }); if (T.aoe) { for (const z of this.z) if (!z.dead && Math.hypot(z.x - b.x, z.y - b.y) < T.aoe) this.dmgZ(z, T.dmg, 't'); this.fx.push({ x: b.x, y: b.y, t: 0, boom: .6 }) } else this.dmgZ(b, T.dmg, 't');
     });
@@ -291,7 +312,7 @@ export class Sim {
     for (const z of this.z) {
       if (z.dead) continue; z.hurt = Math.max(0, z.hurt - dt); z.cd -= dt; z.ph += dt;
       z.buff = Math.max(0, (z.buff || 0) - dt); const d0 = z.boss ? { reach: 0 } : ZT[z.k]; let tgt = { x: CX, y: CY }, tu = null;
-      const cand = [this.hero].concat(this.allies); for (const u of cand) { if (u.down > 0) continue; const d = Math.hypot(u.x - z.x, u.y - z.y); if (d < (z.boss ? 90 : 55)) { tgt = u; tu = u; break } }
+      const cand = this.units(); for (const u of cand) { if (u.down > 0) continue; const d = Math.hypot(u.x - z.x, u.y - z.y); if (d < (z.boss ? 90 : 55)) { tgt = u; tu = u; break } }
       if (z.boss && this.bossAct(z, dt, sol, tu)) continue;
       const dx = tgt.x - z.x, dy = tgt.y - z.y, L = Math.hypot(dx, dy) || 1; z.face = dx >= 0 ? 1 : -1;
       let sp = z.sp * (z.buff > 0 ? 1.5 : 1); if (z.k === 'hop') { const c = z.ph % 1; sp = c < .35 ? z.sp : 0 }
@@ -380,6 +401,18 @@ function zomb(c, z, t) {
   c.filter = 'none'; c.restore();
   if (z.hp < z.hpMax) { c.fillStyle = '#0008'; c.fillRect(x - 9, y - (z.k === 'tall' ? 38 : z.k === 'heavy' ? 36 : 24), 18, 3); c.fillStyle = '#e0503a'; c.fillRect(x - 9, y - (z.k === 'tall' ? 38 : z.k === 'heavy' ? 36 : 24), 18 * Math.max(0, z.hp / z.hpMax), 3) }
 }
+function mechDraw(c, u, t) {
+  const m = u.mech, x = u.x, y = u.y, f = u.face || 1, bob = Math.sin(t * 10 + u.i) * (u.mv ? 1.5 : .5);
+  c.fillStyle = 'rgba(0,0,0,.3)'; c.beginPath(); c.ellipse(x, y + 10, 12, 5, 0, 0, 6.3); c.fill();
+  c.save(); c.translate(x, y); if (u.down > 0) c.globalAlpha = .3;
+  c.fillStyle = '#3a4048'; c.fillRect(-7, 2, 5, 9 + (u.mv && Math.sin(t * 10) > 0 ? 2 : 0)); c.fillRect(2, 2, 5, 9 + (u.mv && Math.sin(t * 10) <= 0 ? 2 : 0));
+  c.fillStyle = m.col; c.fillRect(-9, -11 + bob, 18, 15); c.fillStyle = 'rgba(255,255,255,.25)'; c.fillRect(-9, -11 + bob, 18, 4);
+  c.fillStyle = '#cfd6dc'; c.fillRect(-6, -19 + bob, 12, 8); c.fillStyle = '#ff3a2a'; c.fillRect(f > 0 ? 0 : -5, -16 + bob, 5, 2.5);
+  c.fillStyle = '#222'; c.fillRect(f * 8 - (f > 0 ? 0 : 12), -7 + bob, 12, 4);
+  if (m.n === '미사일 봇') { c.fillStyle = '#eee'; c.fillRect(-9, -15 + bob, 5, 5); c.fillRect(4, -15 + bob, 5, 5) } if (m.n === '화염방사 봇') { c.fillStyle = Math.sin(t * 20) > 0 ? '#ffb02a' : '#ff5020'; c.beginPath(); c.arc(f * 16, -5 + bob, 3.2, 0, 6.3); c.fill() } if (m.n === '레일건 봇') { c.strokeStyle = '#c8a0ff'; c.lineWidth = 2; c.beginPath(); c.moveTo(f * 6, -6 + bob); c.lineTo(f * 24, -6 + bob); c.stroke() } if (m.n === '수리 봇') { c.fillStyle = '#fff'; c.fillRect(-2, -8 + bob, 4, 10); c.fillRect(-5, -5 + bob, 10, 4) }
+  c.restore(); c.font = '9px sans-serif'; c.textAlign = 'center'; c.fillText(m.ic, x, y - 24);
+  if (u.hp < u.hpMax && u.hp > 0) { c.fillStyle = '#0008'; c.fillRect(x - 11, y - 30, 22, 3); c.fillStyle = '#5ad07a'; c.fillRect(x - 11, y - 30, 22 * Math.max(0, u.hp / u.hpMax), 3) }
+}
 export function draw(c, sim, S, t) {
   const sh = sim.shake > 0 ? [(Math.random() - .5) * 6, (Math.random() - .5) * 6] : [0, 0];
   c.save(); c.translate(sh[0], sh[1]);
@@ -397,6 +430,11 @@ export function draw(c, sim, S, t) {
   c.fillStyle = '#2a1a10'; c.fillRect(CX - 6, hb.y + hb.h - 20, 12, 20); c.fillStyle = '#ffe9a0'; c.fillRect(hb.x + 6, hb.y + 12, 10, 9); c.fillRect(hb.x + hb.w - 16, hb.y + 12, 10, 9);
   if ((S.hl | 0) >= 1) { c.fillStyle = '#5a5a5a'; c.fillRect(hb.x + hb.w - 12, hb.y - 18, 7, 14) } if ((S.hl | 0) >= 3) { c.fillStyle = '#c0c0c0'; c.fillRect(hb.x - 4, hb.y + hb.h - 4, hb.w + 8, 4) }
   if (S.hp < maxHp(S) * .5) { c.strokeStyle = '#0006'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(hb.x + 12, hb.y + 4); c.lineTo(hb.x + 18, hb.y + 20); c.lineTo(hb.x + 14, hb.y + 30); c.stroke() }
+  { const ex = S.ex | 0;
+    if (ex > 0) { const cl = ex >= 8 ? '#ff9a3a' : ex >= 4 ? '#5ae0ff' : '#ffd84a'; c.strokeStyle = cl; c.lineWidth = 2; c.globalAlpha = .55 + .25 * Math.sin(t * 4); c.strokeRect(hb.x - 3, hb.y - 3, hb.w + 6, hb.h + 6); c.globalAlpha = 1 }
+    const st = ex >= 8 ? 3 : ex >= 4 ? ex - 4 : ex; if (ex < 4 || ex >= 5) { c.font = 'bold 11px sans-serif'; c.textAlign = 'center'; c.fillStyle = '#ffd84a'; c.strokeStyle = '#000'; c.lineWidth = 2.5; const tx = '★'.repeat(st); if (tx) { c.strokeText(tx, CX, hb.y - 30); c.fillText(tx, CX, hb.y - 30) } }
+    if (ex >= 4) { c.fillStyle = '#2a3844'; c.fillRect(CX - 2, hb.y - 40, 4, 22); c.fillStyle = '#5ae0ff'; c.beginPath(); c.arc(CX, hb.y - 41, 4 + Math.sin(t * 8), 0, 6.3); c.fill(); c.fillStyle = 'rgba(90,224,255,.25)'; c.beginPath(); c.arc(CX, hb.y - 41, 11 + Math.sin(t * 6) * 2, 0, 6.3); c.fill(); c.fillStyle = '#5ae0ff'; c.fillRect(hb.x + 4, hb.y + 30, hb.w - 8, 2) }
+    if (ex >= 8) { c.fillStyle = '#ff9a3a'; c.fillRect(hb.x - 6, hb.y + 4, 4, 30); c.fillRect(hb.x + hb.w + 2, hb.y + 4, 4, 30); c.fillStyle = '#3a3a40'; c.fillRect(CX - 14, hb.y + hb.h - 16, 28, 16); c.fillStyle = '#ff9a3a'; for (let i = 0; i < 4; i++) c.fillRect(CX - 12 + i * 7, hb.y + hb.h - 14, 4, 12) } }
   // 포탑
   S.tu.forEach((tv, i) => { if (tv <= 0) return; const p = TURPOS[i]; c.fillStyle = '#3a3a44'; c.fillRect(p.x - 7, p.y - 6, 14, 12); c.fillStyle = ['#c8a050', '#9a9aa4', '#d08a40', '#ff6060'][tv - 1]; c.beginPath(); c.arc(p.x, p.y - 4, 5.5, 0, 6.3); c.fill(); c.fillRect(p.x, p.y - 6, 12, 3) });
   sim.pool.forEach(p => { c.fillStyle = 'rgba(110,200,40,' + (.28 + .1 * Math.sin(t * 6)) + ')'; c.beginPath(); c.arc(p.x, p.y, p.r, 0, 6.3); c.fill(); c.strokeStyle = 'rgba(160,255,80,.7)'; c.lineWidth = 2; c.stroke(); for (let i = 0; i < 4; i++) { c.fillStyle = 'rgba(200,255,120,.8)'; c.beginPath(); c.arc(p.x + Math.sin(t * 3 + i * 2) * p.r * .6, p.y + Math.cos(t * 2.4 + i * 3) * p.r * .5, 2, 0, 6.3); c.fill() } });
@@ -404,8 +442,10 @@ export function draw(c, sim, S, t) {
   // 유닛 정렬 그리기
   const L = []; sim.z.forEach(z => L.push([z.y, () => zomb(c, z, t)]));
   const hero = sim.hero; hero.hpMax = sim.hs.hpMax; L.push([hero.y, () => person(c, hero, S, t, Object.assign({}, S, sim.hs))]);
+  sim.mechs.forEach(a => { a.hpMax = a.mech.hp; L.push([a.y, () => mechDraw(c, a, t)]) });
   sim.allies.forEach(a => { a.hpMax = ALLY[a.i].hp; a.ic = ALLY[a.i].ic; a.col = ALLY[a.i].col; a.id = a.i; L.push([a.y, () => person(c, a, S, t, null)]) });
   L.sort((a, b) => a[0] - b[0]).forEach(q => q[1]());
+  sim.arcs.forEach(a => { c.strokeStyle = '#bff4ff'; c.lineWidth = 2; c.shadowColor = '#5ae0ff'; c.shadowBlur = 8; c.beginPath(); c.moveTo(a.x1, a.y1); const n = 6; for (let i = 1; i < n; i++) { const k = i / n; c.lineTo(a.x1 + (a.x2 - a.x1) * k + (Math.random() - .5) * 14, a.y1 + (a.y2 - a.y1) * k + (Math.random() - .5) * 14) } c.lineTo(a.x2, a.y2); c.stroke(); c.shadowBlur = 0 });
   // 발사선
   sim.proj.forEach(p => { c.strokeStyle = p.c || '#fff3b0'; c.lineWidth = 1.6; c.beginPath(); c.moveTo(p.x1, p.y1); c.lineTo(p.x2, p.y2); c.stroke() });
   sim.pt.forEach(p => { c.fillStyle = p.c; c.globalAlpha = Math.max(0, p.l * 2); c.fillRect(p.x, p.y, p.s, p.s); c.globalAlpha = 1 });
@@ -533,6 +573,10 @@ export function openShelter(ctx) {
     } else if (tab === 'shp') {
       h += '<h4>🏠 집 (현재 ' + HOUSE[S.hl].n + ' · 체력 ' + fmtN(S.hp) + ' / ' + fmtN(maxHp(S)) + ')</h4>';
       HOUSE.forEach((x, i) => { if (!i) return; h += row('🏠', x.n, '쉘터 최대 체력 +' + fmtN(x.hp) + ' (총 ' + fmtN(10000 + HOUSE.slice(0, i + 1).reduce((a, q) => a + q.hp, 0)) + ')', x.p, { a: 'hl', i, own: S.hl >= i, lock: S.hl < i - 1, lockTx: '이전 단계 필요' }) });
+      h += '<h4>🏭 쉘터 진화 (현재 ' + EXN[S.ex | 0] + ')</h4>';
+      if (S.hl < 4) h += '<div class="nt">🔒 강철 벙커까지 증축하면 진화 단계가 열립니다.</div>';
+      const EXD = ['', '체력 +300,000 · 강철 벙커 1성', '체력 +500,000 · 2성', '체력 +800,000 · 3성', '⚡ 쉘터가 직접 전기를 쏩니다 · 체력 +1,000,000', '⚡ 전기 강화: 피해·대상·사거리 증가 · 체력 +1,500,000', '⚡ 전기 강화 2성 · 체력 +2,500,000', '⚡ 전기 강화 3성 · 체력 +4,000,000', '🤖 메카봇 5기 소환 (건·미사일·화염·레일건·수리) · 체력 +6,000,000'];
+      for (let i = 1; i <= 8; i++) { const z = i >= 5 && i <= 7 ? zapStat({ ex: i }) : i === 4 ? zapStat({ ex: 4 }) : null; h += row(i === 8 ? '🤖' : i >= 4 ? '⚡' : '⭐', EXN[i], EXD[i] + (z ? ' · 전기 ' + z.dmg + ' × ' + z.n + '명 / ' + z.iv + '초' : ''), EXP[i], { a: 'ex', i, eq: (S.ex | 0) === i, own: (S.ex | 0) > i, low: 1, lock: S.hl < 4 || (S.ex | 0) < i - 1, lockTx: S.hl < 4 ? '강철 벙커 필요' : '이전 단계 필요' }) }
       const miss = maxHp(S) - S.hp; h += row('🧰', '쉘터 수리', '모자란 체력 ' + fmtN(miss) + ' 전부 복구 (체력 1당 0.2 고기)', Math.max(1, Math.ceil(miss * .2)), { a: 'hrep', lock: miss < 1, lockTx: '수리 불필요' });
       h += '<h4>🧱 울타리 (' + (S.fn ? FENCE[S.fn - 1].n : '없음') + ')</h4>';
       FENCE.forEach((f, i) => { h += row('🧱', f.n, '구간당 체력 ' + fmtN(f.hp) + ' · 사방을 둘러싸는 15구간 (남쪽 문은 열려 있음)', f.p, { a: 'fn', i, eq: S.fn === i + 1, own: S.fn > i + 1, low: 1 }) });
@@ -549,6 +593,7 @@ export function openShelter(ctx) {
       const hs = heroStats(S), mm = mFn(S.age);
       h += '<h4>내 상태</h4><div class="st"><div>공격력<b>' + hs.dmg + ' × ' + (1 / hs.iv).toFixed(2) + '/초</b></div><div>체력<b>' + hs.hpMax + '</b></div><div>방어<b>' + Math.round(hs.df * 100) + '%</b></div><div>이동속도<b>' + Math.round(hs.sp) + '</b></div><div>총 처치<b>' + fmtN(S.kills) + '</b></div><div>버틴 시간<b>' + Math.floor(S.age / 3600) + '시간 ' + Math.floor(S.age % 3600 / 60) + '분</b></div><div>좀비 강도<b>×' + mm.toFixed(2) + '</b></div><div>최고 기록<b>' + Math.floor(S.best / 3600) + '시간</b></div></div>';
       h += '<h4>크리처 도감 (현재 강도 적용)</h4>' + Object.keys(ZT).map(k => { const z = ZT[k], un = S.age >= z.un; return '<div class="bs"><span>' + (k === 'bomb' ? '💣' : '🧟') + '</span><div><b>' + z.n + (un ? '' : ' (🔒 ' + Math.ceil((z.un - S.age) / 60) + '분 후 등장)') + '</b><small>체력 ' + Math.round(z.hp * mm) + ' · ' + (z.atk ? '공격 ' + Math.round(z.atk * (1 + (mm - 1) * .5)) + '/초' : '접촉 시 자폭 (울타리 파괴 · 쉘터 피해 ' + Math.round(150 + 50 * (mm - 1)) + ')') + ' · 처치 시 고기 ' + (z.mt * mm).toFixed(1) + '</small></div></div>' }).join('');
+      if ((S.ex | 0) >= 8) h += '<h4>🤖 메카봇</h4>' + MECH.map(m => '<div class="bs"><span>' + m.ic + '</span><div><b>' + m.n + '</b><small>' + m.d + ' · 체력 ' + fmtN(m.hp) + '</small></div></div>').join('');
       h += '<h4>👹 보스 (매 분 등장 · 첫 보스는 5분 뒤 · ' + fmtN(S.bkl | 0) + '회 격파)</h4>' + BOSS.map((b, i) => '<div class="bs"><span>👹</span><div><b>' + b.n + '</b><small>체력 ' + fmtN(Math.round(b.hp * bossMul(S.bn | 0) * mm)) + ' · 공격 ' + Math.round(b.sp * 0 + b.atk * (1 + (mm - 1) * .5)) + ' · 처치 시 고기 ' + fmtN(Math.round(bossMeat(S, S.bn | 0))) + '<br>' + b.d + '</small></div></div>').join('') + '<p class="nt">보스는 75초 안에 못 잡으면 도망가고 쉘터에 피해를 줍니다. 붉은 표시 구역은 곧 스킬이 터지는 곳이라 캐릭터가 피합니다.</p>';
       h += '<p class="nt">• 모든 캐릭터와 크리처는 쉘터와 울타리를 통과할 수 없어요. 막히면 벽을 부수거나 남쪽 문으로 돌아갑니다.<br>• 쉘터가 무너지면 ' + F(BUILD) + ' USDT를 다시 내고 처음부터 시작합니다.<br>• 시간이 지날수록 좀비가 강해지고(최대 ×5) 새 종류가 나타납니다.</p>';
     }
@@ -561,6 +606,7 @@ export function openShelter(ctx) {
     else if (a === 'ar') { S.ar[i] = j + 1; sim.hero.hp = heroStats(S).hpMax; msg = armorItem(i, j).n + ' 착용' }
     else if (a === 'al') { S.al[i] = 1; sim.addAlly(i); msg = ALLY[i].n + ' 합류!' }
     else if (a === 'hl') { S.hl = i; S.hp += HOUSE[i].hp; msg = HOUSE[i].n + '로 증축 (체력 +' + fmtN(HOUSE[i].hp) + ')' }
+    else if (a === 'ex') { S.ex = i; S.hp += EXHP[i]; if (i >= 8) sim.addMechs(); msg = EXN[i] + '(으)로 진화! (체력 +' + fmtN(EXHP[i]) + ')' }
     else if (a === 'hrep') { S.hp = maxHp(S); msg = '쉘터를 수리했습니다' }
     else if (a === 'fn') { S.fn = i + 1; S.fh = SEGS.map(() => FENCE[i].hp); msg = FENCE[i].n + ' 설치' }
     else if (a === 'frep') { S.fh = SEGS.map(() => fenceHp(S)); msg = '울타리를 수리했습니다' }
