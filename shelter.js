@@ -114,11 +114,11 @@ export function heroStats(s) {
   s.ar.forEach((t, si) => { if (t > 0) { const it = armorItem(si, t - 1); hp += it.hp; df += it.df / 100; gs += it.sp; ms += it.ms } });
   return { w, dmg: w.d, iv: w.iv / (1 + gs), range: w.r, ranged: !!w.g, hpMax: hp, df: Math.min(.75, df), sp: 72 * (1 + ms) };
 }
-const mFn = age => 1 + Math.min(age / 3600, 48) / 12;
+const mFn = age => 1 + Math.min(age / 3600, 1200) / 6, rewM = m => Math.pow(m, 1.25);
 const intv = age => Math.max(1.6, 10 - age / 3600 * .33);
-const SD = .2, SDB = .28, HORDE_HP = .35, HORDE_ATK = .5, HORDE_MT = .3, ZCAP = 600, BOSS_T = 60, BOSS_LEAVE = 75, BOSS_START = 300;
+const SD = .2, SDB = .28, HORDE_HP = .35, HORDE_ATK = .5, HORDE_MT = .5, ZCAP = 600, BOSS_T = 60, BOSS_LEAVE = 120, BOSS_X = 50, BOSS_ATK = 3, BOSS_MEAT = 10, BOSS_START = 300;
 const hordeN = age => Math.min(320, 30 + Math.floor(age / 3600 * 8)), hordeI = age => Math.max(15, 38 - age / 3600 * .6);
-const bossMul = bn => bn < 30 ? .15 + .85 * bn / 30 : 1 + Math.min(bn - 30, 1410) / 60 * .1;
+const bossMul = bn => BOSS_X * (bn < 30 ? .15 + .85 * bn / 30 : 1 + Math.min(bn - 30, 1410) / 60 * .1);
 function mix(age) {
   const L = Object.keys(ZT).filter(k => age >= ZT[k].un), tw = L.reduce((a, k) => a + ZT[k].w, 0); return L.map(k => [k, ZT[k].w / tw]);
 }
@@ -133,10 +133,10 @@ export function dpsOf(s) {
   if ((s.ex | 0) >= 8) MECH.forEach(m => d += m.dps * .6);
   return d;
 }
-export function bossHp(s, bn) { return BOSS[bn % 5].hp * bossMul(bn) * mFn(s.age) }
-export function bossMeat(s, bn) { return 150 * (1 + Math.min(bn, 1440) * .01) * mFn(s.age) }
+export function bossHp(s, bn) { return BOSS[bn % 5].hp * bossMul(bn) * (1 + (mFn(s.age) - 1) * .4) }
+export function bossMeat(s, bn) { return BOSS_MEAT * 150 * (1 + Math.min(bn, 1440) * .01) * rewM(mFn(s.age)) }
 function bossOffline(s, rep) {
-  const bn = s.bn | 0, sp = BOSS[bn % 5], m = mFn(s.age), ma = 1 + (m - 1) * .5, hp = bossHp(s, bn), atk = sp.atk * ma;
+  const bn = s.bn | 0, sp = BOSS[bn % 5], m = mFn(s.age), ma = 1 + (m - 1) * .5, hp = bossHp(s, bn), atk = sp.atk * ma * BOSS_ATK;
   s.bn = bn + 1; const h = heroStats(s), hd = h.dmg / h.iv; let others = dpsOf(s) - hd * .6;
   const alive = Math.max(.15, Math.min(1, h.hpMax / (atk * (1 - h.df) * 15))), dps = hd * .5 * alive + others * .6, r = dps * 60 / hp;
   if (r >= 1) { s.meat += bossMeat(s, bn); s.bkl = (s.bkl | 0) + 1; rep.bk++; return }
@@ -149,7 +149,7 @@ export function settle(s, sec) {
   while (left > 0 && !s.dead) {
     const ds = Math.min(30, left); left -= ds; const age = s.age; s.age += ds;
     const m = mFn(age), ma = 1 + (m - 1) * .5, mx = mix(age);
-    let H = 0, A = 0, M = 0, wb = 0; mx.forEach(([k, w]) => { const z = ZT[k]; H += w * z.hp * m; A += w * z.atk * ma; M += w * z.mt * m; if (k === 'bomb') wb = w });
+    let H = 0, A = 0, M = 0, wb = 0; mx.forEach(([k, w]) => { const z = ZT[k]; H += w * z.hp * m; A += w * z.atk * ma; M += w * z.mt * rewM(m); if (k === 'bomb') wb = w });
     const a1 = ds / intv(age), a2 = ds / hordeI(age) * hordeN(age) * 1.125, arr = a1 + a2, Hm = H * (a1 + a2 * HORDE_HP) / arr; A *= (a1 + a2 * HORDE_ATK) / arr; M *= (a1 + a2 * HORDE_MT) / arr;
     s.bk += (a1 + a2 * HORDE_HP) * H; let cap = dpsOf(s) * ds / ds;
     s.tp.forEach(t => { if (t.t > 0 && t.d > 0) { const T = TRAP[t.t - 1], hits = Math.min(t.d, ds / Math.max(T.cd, .3) * .5 * (s.bk > 0 ? 1 : 0)); const dm = hits * T.dmg * (T.once ? 1 : 2); cap += dm / ds; t.d -= hits; if (t.d <= 0) { t.t = 0; t.d = 0 } } });
@@ -202,7 +202,7 @@ export class Sim {
   spawn(type) {
     const S = this.S, m = mFn(S.age), ma = 1 + (m - 1) * .5, d = ZT[type], side = Math.random() * 4 | 0, u = Math.random();
     let x, y; if (side === 0) { x = u * W; y = -12 } else if (side === 1) { x = W + 12; y = u * H } else if (side === 2) { x = u * W; y = H + 12 } else { x = -12; y = u * H }
-    this.z.push({ id: this.id++, k: type, x, y, hp: d.hp * m, hpMax: d.hp * m, atk: d.atk * ma, sp: d.sp * (.9 + Math.random() * .2), r: d.r, cd: Math.random(), ph: Math.random() * 6, mt: d.mt * m, hurt: 0, face: 1 });
+    this.z.push({ id: this.id++, k: type, x, y, hp: d.hp * m, hpMax: d.hp * m, atk: d.atk * ma, sp: d.sp * (.9 + Math.random() * .2), r: d.r, cd: Math.random(), ph: Math.random() * 6, mt: d.mt * rewM(m), hurt: 0, face: 1 });
   }
   dmgZ(z, dmg, src) {
     if (z.shield > 0) dmg *= .1;
@@ -238,7 +238,7 @@ export class Sim {
     let x, y; if (side === 0) { x = u * W; y = -30 } else if (side === 1) { x = W + 30; y = u * H } else if (side === 2) { x = u * W; y = H + 30 } else { x = -30; y = u * H }
     const hp = bossHp(S, bn); S.bn = bn + 1;
     const sk = {}; sp.sk.forEach(q => sk[q[0]] = q[1] * (.4 + Math.random() * .4));
-    this.z.push({ id: this.id++, k: 'boss', boss: sp, bi: bn, x, y, hp, hpMax: hp, atk: sp.atk * ma, sp: sp.sp, r: sp.r, cd: 1, ph: 0, mt: bossMeat(S, bn), hurt: 0, face: 1, life: 0, sk, shield: 0, cast: 0, dash: 0, enr: 0 });
+    this.z.push({ id: this.id++, k: 'boss', boss: sp, bi: bn, x, y, hp, hpMax: hp, atk: sp.atk * ma * BOSS_ATK, sp: sp.sp, r: sp.r, cd: 1, ph: 0, mt: bossMeat(S, bn), hurt: 0, face: 1, life: 0, sk, shield: 0, cast: 0, dash: 0, enr: 0 });
     this.banner = { txt: '⚠ 보스 등장 · ' + sp.n, sub: sp.d, t: 3.2 }; this.shake = .3; if (this.ev.boss) this.ev.boss(sp.n);
   }
   hurtU(u, dmg) {
@@ -502,6 +502,7 @@ const CSS = `#shl{position:fixed;inset:0;z-index:9000;background:#0c110d;color:#
 #shl .nt{font-size:11.5px;color:#9db093;line-height:1.5;margin:10px 2px}
 #shl .st{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:6px}#shl .st div{background:#16201a;border:1px solid #2e402e;border-radius:10px;padding:8px 10px;font-size:11.5px;color:#a9bba2}#shl .st b{display:block;font-size:14px;color:#fff;margin-top:2px}
 #shl .bs{display:flex;align-items:center;gap:10px;background:#16201a;border:1px solid #2e402e;border-radius:10px;padding:7px 10px;margin-top:6px;font-size:12px}#shl .bs span{font-size:20px}#shl .bs small{display:block;color:#a9bba2;font-size:10.5px}
+#shl .spd{position:absolute;right:8px;bottom:8px;display:flex;gap:4px;z-index:2}#shl .spd button{padding:6px 9px;border-radius:9px;border:1px solid #fff4;background:#000a;color:#ddd;font:800 11px inherit;font-family:inherit}#shl .spd button.on{background:#e8a020;color:#201000;border-color:#ffe08a}
 #shl .log{position:absolute;left:8px;right:8px;bottom:8px;font-size:11.5px;background:#000b;border:1px solid #8ac06088;border-radius:10px;padding:8px 10px;color:#e8ffd8;display:none}`;
 const fmtN = n => Math.round(n).toLocaleString('en-US');
 
@@ -510,7 +511,7 @@ export function openShelter(ctx) {
   const st = document.createElement('style'); st.id = 'shlcss'; st.textContent = CSS; document.head.appendChild(st);
   const root = document.createElement('div'); root.id = 'shl'; document.body.appendChild(root); document.body.style.overflow = 'hidden';
   const F = n => (n < 1e4 && n >= 0 && Math.abs(n - Math.round(n)) < 1e-9) ? fmtN(n) : (ctx.fmtBal ? ctx.fmtBal(n) : fmtN(n));
-  let S = normState(ctx.get()), sim = null, tab = 'chr', raf = 0, closed = false, pend = null, lastUI = 0, prevT = 0, tClock = 0, logT = 0, buildAsk = 0;
+  let spd = [1, 2, 5, 10].includes(window.__shlSpd) ? window.__shlSpd : 1, S = normState(ctx.get()), sim = null, tab = 'chr', raf = 0, closed = false, pend = null, lastUI = 0, prevT = 0, tClock = 0, logT = 0, buildAsk = 0;
   const $ = id => root.querySelector('#' + id);
   const toast = m => ctx.toast && ctx.toast(m);
   const sfx = (n, a) => { try { ctx.sfx && ctx.sfx(n, a) } catch (e) { } };
@@ -539,19 +540,20 @@ export function openShelter(ctx) {
       return;
     }
     const rep = catchup(); sim = new Sim(S, {}); save();
-    b.innerHTML = '<div class="cv"><canvas id="sc"></canvas><div class="hud"><div class="hr"><span id="h1"></span><span id="h2"></span></div><div class="bar"><i id="hb"></i></div><div class="hr"><span id="h3"></span><span id="h4"></span></div><div class="bar h" style="width:44%"><i id="hh" style="width:100%"></i></div><div class="hr" id="bsr" style="display:none"><span id="bsn"></span><span id="bst"></span></div><div class="bar bsb" id="bsb" style="display:none"><i id="bsi"></i></div></div><div class="log" id="log"></div><div class="ov" id="rest" style="display:none"><h2>⏳ 24시간 방어 완료</h2><p>수고했어요! 계속 지키려면 다음 24시간을 시작하세요. (무료 · 장비와 고기는 그대로)</p><button class="big" id="nx">다음 24시간 시작</button></div></div><div class="tb" id="tb"></div><div class="ls" id="ls"></div>';
+    b.innerHTML = '<div class="cv"><canvas id="sc"></canvas><div class="hud"><div class="hr"><span id="h1"></span><span id="h2"></span></div><div class="bar"><i id="hb"></i></div><div class="hr"><span id="h3"></span><span id="h4"></span></div><div class="bar h" style="width:44%"><i id="hh" style="width:100%"></i></div><div class="hr" id="bsr" style="display:none"><span id="bsn"></span><span id="bst"></span></div><div class="bar bsb" id="bsb" style="display:none"><i id="bsi"></i></div></div><div class="spd" id="spd">'+[1, 2, 5, 10].map(n => '<button data-sp="' + n + '"' + (n === spd ? ' class="on"' : '') + '>' + n + '배속</button>').join('')+'</div><div class="log" id="log"></div><div class="ov" id="rest" style="display:none"><h2>⏳ 24시간 방어 완료</h2><p>수고했어요! 계속 지키려면 다음 24시간을 시작하세요. (무료 · 장비와 고기는 그대로)</p><button class="big" id="nx">다음 24시간 시작</button></div></div><div class="tb" id="tb"></div><div class="ls" id="ls"></div>';
     const cv = $('sc'), dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = W * dpr; cv.height = H * dpr; const c = cv.getContext('2d'); c.scale(dpr, dpr);
+    $('spd').onclick = e => { const b = e.target.closest('button[data-sp]'); if (!b) return; spd = +b.dataset.sp; window.__shlSpd = spd; $('spd').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); sfx('rl_tick') };
     $('nx').onclick = () => { S.rs = Date.now(); S.lt = Date.now(); S.rest = 0; save(); $('rest').style.display = 'none'; sfx('rl_win', 1) };
     if (rep && rep.gap > 5) showLog('📜 자리를 비운 ' + Math.floor(rep.gap / 60) + '분 동안<br>좀비 <b>' + fmtN(rep.kills) + '</b>마리 처치 · 고기 <b>+' + F(Math.floor(rep.meat)) + '</b> · 쉘터 피해 <b>' + fmtN(Math.max(0, rep.hp)) + '</b>');
     tabs(); list();
     prevT = performance.now();
     const loop = (ts) => {
       if (closed) return; raf = requestAnimationFrame(loop);
-      const now = Date.now(); const dt = Math.min(.25, (ts - prevT) / 1000); prevT = ts; tClock += dt;
+      const now = Date.now(); const dt = Math.min(.25, (ts - prevT) / 1000); prevT = ts; tClock += dt * Math.min(spd, 3);
       if (S.dead) { cancelAnimationFrame(raf); view(); return }
       const gap = (now - S.lt) / 1000;
       if (gap > 2.5 && !S.rest) { const hp0 = S.hp; const r = catchup(); sim.z = []; sim.proj = []; if (r && r.gap > 5) showLog('📜 화면을 벗어난 ' + Math.floor(r.gap / 60) + '분 동안 좀비 ' + fmtN(r.kills) + '마리 처치 · 고기 +' + F(Math.floor(r.meat))); if (S.dead) { save(); view(); return } }
-      else if (!S.rest) { S.lt = now; if (now >= S.rs + DAY) { S.rest = 1 } else { let k = dt; while (k > 0) { sim.step(Math.min(.05, k)); k -= .05 } } }
+      else if (!S.rest) { S.lt = now; if (now >= S.rs + DAY) { S.rest = 1 } else { let k = Math.min(dt, .1) * spd, h = spd >= 5 ? .08 : .05; while (k > 1e-6) { const q = Math.min(h, k); sim.step(q); k -= q } } }
       else S.lt = now;
       draw(c, sim, S, tClock);
       if (logT > 0) { logT -= dt; if (logT <= 0) $('log').style.display = 'none' }
@@ -562,7 +564,7 @@ export function openShelter(ctx) {
   function hud() {
     const mh = maxHp(S), left = Math.max(0, S.rs + DAY - Date.now()); $('sm').textContent = F(Math.floor(S.meat));
     $('h1').textContent = '🏠 쉘터 ' + fmtN(S.hp) + ' / ' + fmtN(mh); $('h2').textContent = '⏱ ' + (S.rest ? '완료' : [Math.floor(left / 36e5), Math.floor(left % 36e5 / 6e4), Math.floor(left % 6e4 / 1e3)].map(v => String(v).padStart(2, '0')).join(':'));
-    $('hb').style.width = Math.max(0, S.hp / mh * 100) + '%'; const hs = sim.hs; $('h3').textContent = '☠ 처치 ' + fmtN(S.kills) + ' · 좀비 ' + sim.z.length; $('h4').textContent = '❤ ' + Math.max(0, Math.round(sim.hero.hp)) + ' / ' + hs.hpMax + (sim.hero.down > 0 ? ' (회복 중)' : '');
+    $('hb').style.width = Math.max(0, S.hp / mh * 100) + '%'; const hs = sim.hs; $('h3').textContent = '☠ ' + fmtN(S.kills) + ' · 좀비 ' + sim.z.length + ' · 난이도 ×' + mFn(S.age).toFixed(2); $('h4').textContent = '❤ ' + Math.max(0, Math.round(sim.hero.hp)) + ' / ' + hs.hpMax + (sim.hero.down > 0 ? ' (회복 중)' : '');
     { const bz = sim.z.find(q => q.boss), nx = Math.max(0, Math.ceil(BOSS_T - S.bt)); $('bsr').style.display = 'flex'; if (bz) { $('bsb').style.display = 'block'; $('bsi').style.width = Math.max(0, bz.hp / bz.hpMax * 100) + '%'; $('bsn').textContent = '👹 ' + bz.boss.n + ' ' + fmtN(Math.max(0, bz.hp)) + ' / ' + fmtN(bz.hpMax); $('bst').textContent = '도주까지 ' + Math.max(0, Math.ceil(BOSS_LEAVE - bz.life)) + '초' } else { $('bsb').style.display = 'none'; $('bsn').textContent = S.age < BOSS_START ? '👹 첫 보스: ' + Math.ceil(BOSS_START - S.age) + '초 후' : '👹 다음 보스'; $('bst').textContent = S.age < BOSS_START ? '' : nx + '초 후 · 격파 ' + fmtN(S.bkl | 0) + '회' } }
     $('hh').style.width = Math.max(0, sim.hero.hp / hs.hpMax * 100) + '%'; $('rest').style.display = S.rest ? 'flex' : 'none';
     root.querySelectorAll('#ls button[data-p]').forEach(b => { const p = +b.dataset.p; b.disabled = b.dataset.lock === '1' || S.meat < p });
@@ -609,9 +611,9 @@ export function openShelter(ctx) {
     } else {
       const hs = heroStats(S), mm = mFn(S.age);
       h += '<h4>내 상태</h4><div class="st"><div>공격력<b>' + hs.dmg + ' × ' + (1 / hs.iv).toFixed(2) + '/초</b></div><div>체력<b>' + hs.hpMax + '</b></div><div>방어<b>' + Math.round(hs.df * 100) + '%</b></div><div>이동속도<b>' + Math.round(hs.sp) + '</b></div><div>총 처치<b>' + fmtN(S.kills) + '</b></div><div>버틴 시간<b>' + Math.floor(S.age / 3600) + '시간 ' + Math.floor(S.age % 3600 / 60) + '분</b></div><div>좀비 강도<b>×' + mm.toFixed(2) + '</b></div><div>최고 기록<b>' + Math.floor(S.best / 3600) + '시간</b></div></div>';
-      h += '<h4>크리처 도감 (현재 강도 적용)</h4>' + Object.keys(ZT).map(k => { const z = ZT[k], un = S.age >= z.un; return '<div class="bs"><span>' + (k === 'bomb' ? '💣' : '🧟') + '</span><div><b>' + z.n + (un ? '' : ' (🔒 ' + Math.ceil((z.un - S.age) / 60) + '분 후 등장)') + '</b><small>체력 ' + Math.round(z.hp * mm) + ' · ' + (z.atk ? '공격 ' + Math.round(z.atk * (1 + (mm - 1) * .5)) + '/초' : '접촉 시 자폭 (울타리 파괴 · 쉘터 피해 ' + Math.round(150 + 50 * (mm - 1)) + ')') + ' · 처치 시 고기 ' + (z.mt * mm).toFixed(1) + '</small></div></div>' }).join('');
+      h += '<h4>크리처 도감 (현재 강도 적용)</h4>' + Object.keys(ZT).map(k => { const z = ZT[k], un = S.age >= z.un; return '<div class="bs"><span>' + (k === 'bomb' ? '💣' : '🧟') + '</span><div><b>' + z.n + (un ? '' : ' (🔒 ' + Math.ceil((z.un - S.age) / 60) + '분 후 등장)') + '</b><small>체력 ' + Math.round(z.hp * mm) + ' · ' + (z.atk ? '공격 ' + Math.round(z.atk * (1 + (mm - 1) * .5)) + '/초' : '접촉 시 자폭 (울타리 파괴 · 쉘터 피해 ' + Math.round(150 + 50 * (mm - 1)) + ')') + ' · 처치 시 고기 ' + (z.mt * rewM(mm)).toFixed(1) + '</small></div></div>' }).join('');
       if ((S.ex | 0) >= 8) h += '<h4>🤖 메카봇</h4>' + MECH.map(m => '<div class="bs"><span>' + m.ic + '</span><div><b>' + m.n + '</b><small>' + m.d + ' · 체력 ' + fmtN(m.hp) + '</small></div></div>').join('');
-      h += '<h4>👹 보스 (매 분 등장 · 첫 보스는 5분 뒤 · ' + fmtN(S.bkl | 0) + '회 격파)</h4>' + BOSS.map((b, i) => '<div class="bs"><span>👹</span><div><b>' + b.n + '</b><small>체력 ' + fmtN(Math.round(b.hp * bossMul(S.bn | 0) * mm)) + ' · 공격 ' + Math.round(b.sp * 0 + b.atk * (1 + (mm - 1) * .5)) + ' · 처치 시 고기 ' + fmtN(Math.round(bossMeat(S, S.bn | 0))) + '<br>' + b.d + '</small></div></div>').join('') + '<p class="nt">보스는 75초 안에 못 잡으면 도망가고 쉘터에 피해를 줍니다. 붉은 표시 구역은 곧 스킬이 터지는 곳이라 캐릭터가 피합니다.</p>';
+      h += '<h4>👹 보스 (매 분 등장 · 첫 보스는 5분 뒤 · ' + fmtN(S.bkl | 0) + '회 격파)</h4>' + BOSS.map((b, i) => '<div class="bs"><span>👹</span><div><b>' + b.n + '</b><small>체력 ' + fmtN(Math.round(b.hp * bossMul(S.bn | 0) * mm)) + ' · 공격 ' + Math.round(b.atk * BOSS_ATK * (1 + (mm - 1) * .5)) + ' · 처치 시 고기 ' + fmtN(Math.round(bossMeat(S, S.bn | 0))) + '<br>' + b.d + '</small></div></div>').join('') + '<p class="nt">보스는 ' + BOSS_LEAVE + '초 안에 못 잡으면 도망가고 쉘터에 피해를 줍니다. 붉은 표시 구역은 곧 스킬이 터지는 곳이라 캐릭터가 피합니다.</p>';
       h += '<p class="nt">• 모든 캐릭터와 크리처는 쉘터와 울타리를 통과할 수 없어요. 막히면 벽을 부수거나 남쪽 문으로 돌아갑니다.<br>• 쉘터가 무너지면 ' + F(BUILD) + ' USDT를 다시 내고 처음부터 시작합니다.<br>• 시간이 지날수록 좀비가 강해지고(최대 ×5) 새 종류가 나타납니다.</p>';
     }
     L.innerHTML = h; hud();
