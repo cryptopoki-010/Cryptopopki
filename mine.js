@@ -54,12 +54,12 @@ function paintBG(dpr) {
   /* 레일 */
   g.fillStyle = '#4a3016'; for (let x = 4; x < W; x += 16) g.fillRect(x, GY + 7, 10, 5); g.fillStyle = '#9aa3ad'; g.fillRect(0, GY + 6, W, 2); g.fillStyle = '#6b737c'; g.fillRect(0, GY + 8, W, 1);
   /* 광산 입구(우측, 크게) */
-  g.beginPath(); g.moveTo(246, GY); g.lineTo(250, 70); g.quadraticCurveTo(300, 20, 390, 30); g.lineTo(390, GY); g.closePath(); gr = g.createLinearGradient(246, 0, 390, 0); gr.addColorStop(0, '#4a4a52'); gr.addColorStop(1, '#2f2f36'); g.fillStyle = gr; g.fill();
+  g.beginPath(); g.moveTo(246, GY); g.lineTo(250, 70); g.quadraticCurveTo(300, 20, 390, 30); g.lineTo(390, GY); g.closePath(); gr = g.createLinearGradient(246, 0, 390, 0); gr.addColorStop(0, SK.mt[0]); gr.addColorStop(1, SK.mt[1]); g.fillStyle = gr; g.fill();
   for (let i = 0; i < 40; i++) { const x = 250 + rnd() * 140, y = 40 + rnd() * 180; g.fillStyle = 'rgba(' + (rnd() < .5 ? '0,0,0' : '255,255,255') + ',' + (.05 + rnd() * .08) + ')'; g.beginPath(); g.ellipse(x, y, 4 + rnd() * 12, 3 + rnd() * 8, rnd() * 3, 0, TAU); g.fill(); }
   g.beginPath(); g.moveTo(270, GY); g.lineTo(270, 130); g.quadraticCurveTo(322, 88, 376, 130); g.lineTo(376, GY); g.closePath(); gr = g.createRadialGradient(323, 190, 10, 323, 190, 100); gr.addColorStop(0, '#2a1d14'); gr.addColorStop(1, '#0c0806'); g.fillStyle = gr; g.fill();
   g.strokeStyle = '#6a4524'; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(266, GY); g.lineTo(266, 130); g.quadraticCurveTo(322, 80, 380, 130); g.lineTo(380, GY); g.stroke();
   g.strokeStyle = '#8a5a2c'; g.lineWidth = 2; g.beginPath(); g.moveTo(263, GY); g.lineTo(263, 130); g.quadraticCurveTo(322, 77, 377, 128); g.stroke();
-  g.fillStyle = '#7a4c24'; g.fillRect(262, 118, 120, 7); g.fillStyle = '#c9a15a'; rr(g, 300, 96, 46, 16, 3); g.fill(); g.fillStyle = '#2a1608'; g.font = '900 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('광산', 323, 104.5);
+  g.fillStyle = '#7a4c24'; g.fillRect(262, 118, 120, 7); g.fillStyle = '#c9a15a'; rr(g, 300, 96, 46, 16, 3); g.fill(); g.fillStyle = '#2a1608'; g.font = '900 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(SK.label, 323, 104.5);
   /* 정제 기계(좌측, 크게) */
   const mx = 6, my = 66, mw = 142, mh = GY - my;
   g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.ellipse(mx + mw / 2 + 10, GY + 4, mw * .62, 8, 0, 0, TAU); g.fill();
@@ -80,8 +80,15 @@ function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w
 
 /* ---------------- 오브젝트 ---------------- */
 function poly(g, cx, cy, r, n, seed, sq) { const rnd = mul32(seed); g.beginPath(); for (let i = 0; i < n; i++) { const a = i / n * TAU, d = r * (.72 + rnd() * .38); const x = cx + Math.cos(a) * d, y = cy + Math.sin(a) * d * (sq || .85); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.closePath(); }
-const ORE = ['#8b8f99', '#6f737d', '#9c7a52', '#7a6a5a'], GEM = ['#ffd54a', '#5ad0ff', '#ff6a7a', '#7affb0'];
-function oreChunk(g, x, y, r, seed, glow) { poly(g, x, y, r, 7, seed); g.fillStyle = ORE[seed % 4]; g.fill(); g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = .8; g.stroke(); g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.arc(x - r * .25, y - r * .3, r * .35, 0, TAU); g.fill(); if (glow) { g.fillStyle = GEM[seed % 4]; g.beginPath(); g.moveTo(x + r * .1, y - r * .3); g.lineTo(x + r * .4, y); g.lineTo(x + r * .1, y + r * .25); g.lineTo(x - r * .15, y); g.closePath(); g.fill(); } }
+export const SKINS = {
+  base: { label: '광산', mt: ['#4a4a52', '#2f2f36'], ore: ['#8b8f99', '#6f737d', '#9c7a52', '#7a6a5a'], gem: ['#ffd54a', '#5ad0ff', '#ff6a7a', '#7affb0'], tint: null, all: false },
+  emerald: { label: '에메랄드', mt: ['#2e5a45', '#183226'], ore: ['#4f8266', '#3d6a52', '#6a9a76', '#58866c'], gem: ['#35e08a', '#7affc0', '#1fbf6a', '#b8ffd8'], tint: 'rgba(40,210,130,.10)', all: true },
+  gold: { label: '금광', mt: ['#6a5528', '#352809'], ore: ['#b0903a', '#8f722a', '#cfa84a', '#7f6430'], gem: ['#ffd54a', '#ffe27a', '#ffb800', '#fff0a0'], tint: 'rgba(255,190,40,.12)', all: true },
+  diamond: { label: '다이아', mt: ['#46647e', '#1f3144'], ore: ['#a4c8e4', '#82abcb', '#c8e8fa', '#92bcdc'], gem: ['#bff4ff', '#ffffff', '#8fe0ff', '#d8f0ff'], tint: 'rgba(130,210,255,.12)', all: true }
+};
+let SK = SKINS.base, ORE = SK.ore, GEM = SK.gem;
+function setSkin(id) { SK = SKINS[id] || SKINS.base; ORE = SK.ore; GEM = SK.gem; }
+function oreChunk(g, x, y, r, seed, glow) { poly(g, x, y, r, 7, seed); g.fillStyle = ORE[seed % 4]; g.fill(); g.strokeStyle = 'rgba(0,0,0,.4)'; g.lineWidth = .8; g.stroke(); g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.arc(x - r * .25, y - r * .3, r * .35, 0, TAU); g.fill(); if (glow || SK.all) { g.fillStyle = GEM[seed % 4]; g.beginPath(); g.moveTo(x + r * .1, y - r * .3); g.lineTo(x + r * .4, y); g.lineTo(x + r * .1, y + r * .25); g.lineTo(x - r * .15, y); g.closePath(); g.fill(); } }
 const WALL = [[330, -18, 17, 11], [350, -20, 15, 12], [340, -42, 14, 13], [318, -34, 13, 14], [362, -36, 12, 15], [331, -62, 11, 16], [352, -62, 11, 17], [323, -8, 12, 18], [368, -10, 12, 19]];
 
 function drawWall(g, rs, shake, hits) {
@@ -151,6 +158,30 @@ function drawMouse(g, o) {
   function limb(g, a, col, by) { if (!a) return; g.save(); g.translate(0, by); const sx = 2, sy = -17; g.strokeStyle = col; g.lineWidth = 3.6; g.lineCap = 'round'; g.beginPath(); g.moveTo(sx, sy); g.lineTo(a.x, a.y); g.stroke(); g.fillStyle = '#f3c0c8'; g.beginPath(); g.arc(a.x, a.y, 2.5, 0, TAU); g.fill(); if (a.tool != null) pickaxe(g, a.x, a.y, a.tool, .78); g.restore(); }
 }
 
+
+/* 드릴 거북이 (원점 = 발 중앙, 오른쪽을 보고 드릴로 바위를 팝니다) */
+function drawTurtle(g, x, y, T, work, idx) {
+  g.save(); g.translate(x + (work ? Math.sin(T * 42 + idx * 2) * .7 : 0), y);
+  g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(2, 1, 24, 4, 0, 0, TAU); g.fill();
+  const fl = work ? Math.sin(T * 14 + idx) * 1.4 : 0;
+  g.fillStyle = '#5fa85a'; [[-12, 0], [-3, 0], [8, 0], [15, 0]].forEach((p, i) => { g.beginPath(); g.ellipse(p[0], -2 + (i % 2 ? fl : -fl) * .4, 4, 3.4, 0, 0, TAU); g.fill(); });
+  g.fillStyle = '#4c8f4a'; g.beginPath(); g.moveTo(-17, -9); g.lineTo(-25, -5); g.lineTo(-17, -5); g.closePath(); g.fill();
+  const sg = g.createRadialGradient(-3, -20, 2, 0, -10, 22); sg.addColorStop(0, '#7ccc6a'); sg.addColorStop(1, '#2f6a34'); g.fillStyle = sg; g.beginPath(); g.ellipse(0, -9, 19, 13, 0, PI, TAU); g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(15,45,20,.55)'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(0, -9, 19, 13, 0, PI, TAU); g.stroke();
+  [[-8, -15], [3, -17], [-1, -9], [10, -11], [-12, -8]].forEach(p => { g.beginPath(); for (let k = 0; k < 6; k++) { const a = k * PI / 3 + .3; k ? g.lineTo(p[0] + Math.cos(a) * 5, p[1] + Math.sin(a) * 4) : g.moveTo(p[0] + Math.cos(a) * 5, p[1] + Math.sin(a) * 4); } g.closePath(); g.stroke(); });
+  g.fillStyle = '#d8c27a'; g.fillRect(-18, -9, 36, 4);
+  g.fillStyle = '#7fbf6a'; g.beginPath(); g.arc(21, -10, 6, 0, TAU); g.fill();
+  g.fillStyle = '#1b1620'; g.beginPath(); g.arc(24, -11, 1.5, 0, TAU); g.fill(); g.fillStyle = '#fff'; g.beginPath(); g.arc(24.4, -11.5, .5, 0, TAU); g.fill();
+  g.fillStyle = '#f2c230'; g.beginPath(); g.arc(21, -12, 6.4, PI, TAU); g.closePath(); g.fill(); g.fillStyle = '#fff6c4'; g.beginPath(); g.arc(26, -14, 1.6, 0, TAU); g.fill();
+  /* 드릴 */
+  g.save(); g.translate(26, -7); const dx = work ? Math.sin(T * 50) * .8 : 0; g.translate(dx, 0);
+  g.fillStyle = '#7b8794'; rr(g, -2, -4, 6, 8, 2); g.fill();
+  g.save(); g.beginPath(); g.moveTo(3, -5.5); g.lineTo(21, 0); g.lineTo(3, 5.5); g.closePath(); g.fillStyle = '#c4cbd4'; g.fill(); g.clip();
+  g.strokeStyle = '#59636e'; g.lineWidth = 1.6; const off = work ? (T * 40) % 6 : 0; for (let i = -1; i < 5; i++) { const xx = 3 + i * 6 + off; g.beginPath(); g.moveTo(xx, -6); g.lineTo(xx + 3.5, 6); g.stroke(); }
+  g.restore(); g.restore();
+  g.restore();
+}
+
 /* ================= 마운트 ================= */
 export function mountMine(el, br) {
   br = br || {};
@@ -164,7 +195,7 @@ export function mountMine(el, br) {
   el.appendChild(root);
   const cv = root.querySelector('canvas'), g = cv.getContext('2d'), $ = id => root.querySelector('#' + id);
   root.querySelector('.mnst').onclick = e => { const b = e.target.closest('button'); if (!b) return; [...root.querySelectorAll('.mnst button')].forEach(x => x.classList.toggle('on', x === b)); $('mnm').hidden = b.dataset.v !== 'm'; $('mns').hidden = b.dataset.v !== 's'; if (b.dataset.v === 'm') resize(); else shop(true); };
-  let dpr = 1, bg = null, alive = true, raf = 0, last = performance.now(), T = 0, ct = 0, curK = -2, lastHit = -1, lastToss = -1, shake = 0, wc = 0, popT = -1, popV = 0, active = false, uiT = 0;
+  let curSkin = '', tpop = -1, tpopV = 0, vtNow = 0, dpr = 1, bg = null, alive = true, raf = 0, last = performance.now(), T = 0, ct = 0, curK = -2, lastHit = -1, lastToss = -1, shake = 0, wc = 0, popT = -1, popV = 0, active = false, uiT = 0;
   const parts = [], mine = () => br.getMine ? br.getMine() : { start: 0, done: 0 };
   function resize() { const w = root.querySelector('.mnc').clientWidth; if (!w) return; dpr = Math.min(window.devicePixelRatio || 1, 2); cv.style.height = Math.round(w * H / W) + 'px'; cv.width = Math.round(w * dpr); cv.height = Math.round(w * H / W * dpr); bg = paintBG(Math.max(.5, dpr * w / W)); }
   resize(); const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { if (alive) resize(); }) : null; ro && ro.observe(root.querySelector('.mnc'));
@@ -173,7 +204,7 @@ export function mountMine(el, br) {
     const m = mine(), now = Date.now(); active = !!m.start && now < m.start + CFG.day;
     $('mnstt').textContent = active ? '채굴 중' : (m.start ? '채굴 종료 · 다시 시작해 주세요' : '대기 중');
     $('mnrem').textContent = active ? '남은 시간 ' + hms(m.start + CFG.day - now) : '채굴 시작 버튼을 눌러 주세요';
-    { const n = (m.mice | 0) || 1, mu = br.mul ? br.mul() : 1, bo = (+m.bo || 0) - now; $('mnbuf').textContent = '생쥐 ' + n + '마리 · 채굴량 ×' + mu.toFixed(1) + (bo > 0 ? ' · ⚡경험치 부스트 ' + hms(bo) : ''); }
+    { const n = (m.mice | 0) || 1, mu = br.mul ? br.mul() : 1, bo = (+m.bo || 0) - now; $('mnbuf').textContent = '생쥐 ' + n + '마리 · 드릴 거북이 ' + ((m.tur | 0)) + '마리 · 채굴량 ×' + mu.toFixed(1) + ((+m.ae || 0) - now > 0 ? ' · ⏩가속 ' + hms((+m.ae) - now) : '') + (bo > 0 ? ' · ⚡경험치 부스트 ' + hms(bo) : ''); }
     const b = $('mngo'); b.disabled = active; b.textContent = active ? '채굴 중' : (m.start ? '다시 시작' : '채굴 시작');
     $('mncyc').textContent = String(m.done || 0) + ' / 8640'; $('mntot').textContent = fmt(br.sumDone ? br.sumDone() : 0); $('mnlg').textContent = br.loggedIn && !br.loggedIn() ? '로그인하지 않으면 접속을 종료한 뒤의 채굴은 저장되지 않습니다.' : '';
   }
@@ -182,24 +213,29 @@ export function mountMine(el, br) {
   let pend = null, shopKey = '';
   function shop(force) {
     const L = br.shop ? br.shop() : [], now = Date.now(); if (pend && now - pend.t > 3000) pend = null;
-    const key = JSON.stringify(L.map(x => [x.id, x.st, x.priceTxt, x.can, x.max])) + (pend ? pend.id : '') + fmt(getBal()); if (!force && key === shopKey) return; shopKey = key;
-    $('mns').innerHTML = '<div class="mnbal">보유 잔액 <b>' + fmt(getBal()) + '</b> USDT</div>' + L.map(x => '<div class="mnit"><div class="ic">' + x.ic + '</div><div class="bd"><b>' + x.name + '</b><p>' + x.desc + '</p><small>' + x.st + '</small></div><button data-id="' + x.id + '"' + ((x.max || !x.can) ? ' disabled' : '') + (pend && pend.id === x.id ? ' class="ask"' : '') + '>' + (x.max ? '최대' : (pend && pend.id === x.id ? '한 번 더 눌러 구매' : x.priceTxt)) + '</button></div>').join('') + '<p class="mnnt">구매한 효과는 계정에 저장됩니다. 구매 버튼은 두 번 눌러야 결제돼요.</p>';
+    const key = JSON.stringify(L.map(x => x.g ? x.g : [x.id, x.st, x.priceTxt, x.can, x.max])) + (pend ? pend.id : '') + fmt(getBal()); if (!force && key === shopKey) return; shopKey = key;
+    $('mns').innerHTML = '<div class="mnbal">보유 잔액 <b>' + fmt(getBal()) + '</b> USDT</div>' + L.map(x => x.g ? '<h4 class="mngh">' + x.g + '</h4>' : '<div class="mnit"><div class="ic">' + x.ic + '</div><div class="bd"><b>' + x.name + '</b><p>' + x.desc + '</p><small>' + x.st + '</small></div><button data-id="' + x.id + '"' + ((x.max || !x.can) ? ' disabled' : '') + (pend && pend.id === x.id ? ' class="ask"' : x.on ? ' class="on"' : '') + '>' + (x.max ? '최대' : (pend && pend.id === x.id ? '한 번 더 눌러 구매' : x.priceTxt)) + '</button></div>').join('') + '<p class="mnnt">구매한 효과는 계정에 저장됩니다. 구매 버튼은 두 번 눌러야 결제돼요.</p>';
   }
   $('mns').onclick = e => {
     const b = e.target.closest('button[data-id]'); if (!b || b.disabled) return; const id = b.dataset.id;
-    if (!pend || pend.id !== id) { pend = { id, t: Date.now() }; sfx('rl_tick'); shop(true); return; }
+    const it = (br.shop ? br.shop() : []).find(x => x.id === id);
+    if (!(it && it.free) && (!pend || pend.id !== id)) { pend = { id, t: Date.now() }; sfx('rl_tick'); shop(true); return; }
     pend = null; const r = br.buy ? br.buy(id) : { ok: false, msg: '구매할 수 없습니다' }; (br.toast || (() => { }))(r.msg); sfx(r.ok ? 'rl_win' : 'cc_miss', 1); shop(true); ui();
   };
   shop(true);
   ui();
+  const TFY = GY + 30, TX = i => 22 + i * 92;
   function P(k, x, y, vx, vy, l, r, c, gv) { parts.push({ k, x, y, vx, vy, l, m: l, r, c, gv: gv == null ? 600 : gv }); }
   function paid(c, amt) {
     if (!alive) return; popT = 0; popV = amt; $('mnlast').textContent = '+' + fmt(amt); sfx('rl_win', 1); ui();
     for (let i = 0; i < 12; i++) P('g', 44 + Math.random() * 16, GY - 40, (Math.random() - .5) * 110, -150 - Math.random() * 90, .9, 2.4 + Math.random() * 1.5, GEM[(Math.random() * 4) | 0], 500);
   }
+  function tpaid(c, amt) { if (!alive) return; tpop = 0; tpopV = amt; sfx('rl_win', 1); ui(); for (let i = 0; i < 10; i++) P('g', 60 + Math.random() * 260, TFY - 30, (Math.random() - .5) * 90, -120 - Math.random() * 80, .9, 2.4 + Math.random() * 1.5, GEM[(Math.random() * 4) | 0], 500); }
   function update(dt) {
     T += dt; const now = Date.now(), m = mine(); active = !!m.start && now < m.start + CFG.day;
-    if (active) { const el = now - m.start, k = Math.floor(el / (CFG.cycle * 1000)); ct = (el % (CFG.cycle * 1000)) / 1000; if (k !== curK) { curK = k; const p0 = pose(ct); lastHit = p0.k >= 0 ? p0.hits : -1; lastToss = p0.toss > 0 ? Math.floor(p0.toss * 12) : -1; } } else { ct = 0; curK = -2; }
+    if ((m.skin || 'base') !== curSkin) { curSkin = m.skin || 'base'; setSkin(curSkin); resize(); }
+    vtNow = br.vnow ? br.vnow(now) : Math.max(0, now - m.start);
+    if (active) { const el = vtNow, k = Math.floor(el / (CFG.cycle * 1000)); ct = (el % (CFG.cycle * 1000)) / 1000; if (k !== curK) { curK = k; const p0 = pose(ct); lastHit = p0.k >= 0 ? p0.hits : -1; lastToss = p0.toss > 0 ? Math.floor(p0.toss * 12) : -1; } } else { ct = 0; curK = -2; }
     uiT += dt; if (uiT > .5) { uiT = 0; ui(); if (!$('mns').hidden) shop(); }
     const p = pose(ct);
     if (active && p.walking) wc += dt * (p.step === '곡괭이 꺼내기' ? 0 : 1);
@@ -213,6 +249,8 @@ export function mountMine(el, br) {
     if (active && p.tilt > .7 && p.fill > .02 && ct < 8.95) { for (let i = 0; i < 2; i++) P('o', CART_D - 26 + Math.random() * 6, GY - 40 + Math.random() * 6, -50 - Math.random() * 50, -30 + Math.random() * 20, .6, 2.2 + Math.random() * 2, ORE[(Math.random() * 4) | 0], 700); if (Math.random() < .4) sfx('dk_flip'); }
     if (popT >= 0) { popT += dt; if (popT > 1.4) popT = -1; }
     if (active && ct > 8.4 && ct < 9.7 && Math.random() < .35) P('d', 125 + Math.random() * 8, 6, 4 + Math.random() * 6, -18 - Math.random() * 10, 1.3, 5, '#d9d9e0', -6);
+    { const tn = Math.min(4, (m.tur | 0)); if (active && tn && Math.random() < dt * 40) { const i = (Math.random() * tn) | 0, tx = TX(i) + 47; P('s', tx, TFY - 8 + (Math.random() - .5) * 8, 40 + Math.random() * 80, -30 - Math.random() * 60, .25, 1, '#ffe27a', 400); if (Math.random() < .5) P('d', tx + 6, TFY - 4, 10 + Math.random() * 20, -8 - Math.random() * 8, .6, 3 + Math.random() * 3, '#b9a98f', -8); } }
+    if (tpop >= 0) { tpop += dt; if (tpop > 1.6) tpop = -1; }
     shake = Math.max(0, shake - dt * 14);
     for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.l -= dt; if (q.l <= 0) { parts.splice(i, 1); continue; } q.vy += q.gv * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.k === 'c' && q.y > GY - 2) { q.y = GY - 2; q.vy *= -.25; q.vx *= .6; } if (q.k === 'o' && q.y > GY - 28 && q.x < 168) q.l = Math.min(q.l, .05); if (q.k === 'd') { q.r += dt * 6; } }
   }
@@ -264,6 +302,11 @@ export function mountMine(el, br) {
       g.save(); if (l) { const sc = 1 - .05 * l; g.translate(W / 2, GY); g.scale(sc, sc); g.translate(-W / 2, -GY - 6 * l); g.globalAlpha = .93; }
       worker(pL, ctL, l); g.restore();
     }
+    /* 드릴 거북이 */
+    { const mm = mine(), tn = Math.min(4, mm.tur | 0);
+      for (let i = 0; i < tn; i++) { const tx = TX(i); oreChunk(g, tx + 62, TFY - 8, 9, 31 + i, true); g.fillStyle = 'rgba(0,0,0,.25)'; g.beginPath(); g.ellipse(tx + 62, TFY + 1, 11, 3, 0, 0, TAU); g.fill(); drawTurtle(g, tx, TFY, T, active, i); }
+      if (tn) { const fr = active ? (vtNow % 60000) / 60000 : 0, n = mm.tur | 0; g.save(); g.font = '700 10px ' + FONT; g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.7)'; const lb = '드릴 거북이 ×' + n + ' · 1분마다 +$' + (br.turPay ? br.turPay() : 0).toLocaleString('en-US'); g.strokeText(lb, 8, H - 11); g.fillStyle = '#9ee08a'; g.fillText(lb, 8, H - 11); g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, H - 8, W, 4); g.fillStyle = '#5ad0b0'; g.fillRect(0, H - 8, W * fr, 4); g.restore(); }
+      if (tpop >= 0) { const q = tpop / 1.6; g.save(); g.globalAlpha = 1 - q * q; g.font = '900 18px ' + FONT; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#06241c'; g.fillStyle = '#7affd0'; const y = TFY - 38 - eo(q) * 26, t = '+$' + tpopV.toLocaleString('en-US', { maximumFractionDigits: 2 }); g.strokeText(t, W / 2, y); g.fillText(t, W / 2, y); g.restore(); } }
     /* 입자 */
     parts.forEach(q => { const a = clamp(q.l / q.m, 0, 1); if (q.k === 'd') { g.globalAlpha = a * .45; g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill(); } else if (q.k === 's') { g.globalAlpha = a; g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill(); } else if (q.k === 'g') { g.globalAlpha = a; g.fillStyle = q.c; g.beginPath(); g.moveTo(q.x, q.y - q.r * 1.4); g.lineTo(q.x + q.r, q.y); g.lineTo(q.x, q.y + q.r * 1.2); g.lineTo(q.x - q.r, q.y); g.closePath(); g.fill(); } else { g.globalAlpha = 1; g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill(); } }); g.globalAlpha = 1;
     /* 가쁜 숨 */
@@ -274,12 +317,13 @@ export function mountMine(el, br) {
     g.save(); g.font = '700 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; const stp = active ? p.step : '휴식 중', tw = g.measureText(stp).width + 20; g.fillStyle = 'rgba(0,0,0,.55)'; rr(g, W / 2 - tw / 2, 6, tw, 20, 10); g.fill(); g.fillStyle = '#ffe9b0'; g.fillText(stp, W / 2, 16.5); g.restore();
     /* 진행 바 */
     g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, H - 4, W, 4); if (active) { g.fillStyle = '#e0a82e'; g.fillRect(0, H - 4, W * ct / CFG.cycle, 4); }
+    if (SK.tint) { g.fillStyle = SK.tint; g.fillRect(0, 0, W, H); for (let i = 0; i < 14; i++) { const r_ = mul32(i * 17 + 3), tx = 276 + r_() * 108, ty = 56 + r_() * 176, a = Math.max(0, Math.sin(T * 2.2 + i * 1.7)); if (a > .15) { g.save(); g.globalAlpha = a * .9; g.fillStyle = GEM[i % 4]; g.translate(tx, ty); g.beginPath(); g.moveTo(0, -4 - a * 2); g.lineTo(1.2, -1.2); g.lineTo(4 + a * 2, 0); g.lineTo(1.2, 1.2); g.lineTo(0, 4 + a * 2); g.lineTo(-1.2, 1.2); g.lineTo(-4 - a * 2, 0); g.lineTo(-1.2, -1.2); g.closePath(); g.fill(); g.restore(); } } }
     const vg = g.createRadialGradient(W / 2, H * .5, H * .4, W / 2, H * .5, W * .75); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.4)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   }
   function frame(now) { if (!alive) return; raf = requestAnimationFrame(frame); const dt = Math.min(.05, (now - last) / 1000); last = now; update(dt); if (!$('mnm').hidden) render(); }
   raf = requestAnimationFrame(frame);
   function stop() { if (!alive) return; alive = false; cancelAnimationFrame(raf); ro && ro.disconnect(); root.remove(); }
-  return { stop, root, paid, ui, get state() { return { ct, active, parts: parts.length }; } };
+  return { stop, root, paid, tpaid, ui, get state() { return { ct, active, parts: parts.length }; } };
 }
 
 const CSS = `
@@ -296,5 +340,6 @@ const CSS = `
 .mnbal{background:#1a110c;border:1px solid #4a3620;border-radius:12px;padding:10px 12px;font-size:12px;color:#c9a15a}.mnbal b{color:#ffe9b0;font-size:16px;font-variant-numeric:tabular-nums}
 .mnit{display:flex;gap:10px;align-items:center;background:#1a110c;border:1px solid #4a3620;border-radius:14px;padding:12px;margin-top:8px}.mnit .ic{flex:none;width:44px;height:44px;border-radius:12px;background:linear-gradient(#3a2a18,#22160c);border:1px solid #6a4e2a;display:flex;align-items:center;justify-content:center;font-size:22px}.mnit .bd{flex:1;min-width:0;line-height:1.35}.mnit b{font-size:14px;color:#ffe9b0}.mnit p{margin:2px 0 3px;font-size:11px;color:#a89873}.mnit small{font-size:11px;color:#9ee08a}
 .mn .mnit button{flex:none!important;width:auto!important;min-width:84px;max-width:110px;margin:0!important;height:42px;padding:0 10px!important;border-radius:11px;border:1px solid #ffe08a;background:linear-gradient(#e8421f,#a8200f);color:#fff3d6;font:800 12px ${FONT};cursor:pointer;line-height:1.2}.mn .mnit button.ask{background:linear-gradient(#d9a52e,#9a6c14);color:#1c1207}.mn .mnit button:disabled{filter:grayscale(.8) brightness(.55);cursor:default;border-color:#6a4e2a}
+.mngh{margin:14px 2px 2px;font-size:12px;color:#c9a15a;letter-spacing:.06em}.mn .mnit button.on{background:linear-gradient(#3a5a3a,#1f3a22);color:#9ee08a;border-color:#6aa86a}
 .mnsoon{height:240px;border-radius:14px;border:1px dashed #6a4e2a;background:#14100c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#e8d9b4}.mnsoon b{font-size:20px;color:#ffe9b0}.mnsoon span{font-size:12px;color:#a89873}
 `;

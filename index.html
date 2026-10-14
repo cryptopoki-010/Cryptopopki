@@ -325,35 +325,62 @@ function openDdakji(){if(DKm&&DKm.busy)return;DKm=DKm||{busy:false};DKm.busy=tru
 function grid(){if(cur==3){$('gr').innerHTML=gameCards();apply($('gr'));return}$('gr').innerHTML=P.map(function(p,i){return [p,i]}).filter(function(e){return e[1]!=16&&KEEP[ANIM[e[1]]]===e[1]&&TH[cur].indexOf(ANIM[e[1]])>=0}).sort(function(a,b){return TH[cur].indexOf(ANIM[a[1]])-TH[cur].indexOf(ANIM[b[1]])||a[1]-b[1]}).map(function(e,j){var p=e[0],i=e[1],u=true;return '<div class="cd"><div class="art" style="background:'+BG[j%4]+'"><span class="pr'+(u?' ur':'')+'">UR 0.9%</span>'+(THIMG[ANIM[i]]?'<img class="ph" alt="" src="'+THIMG[ANIM[i]]+'" style="object-position:'+THPOS[ANIM[i]]+'">':gfx(p[3]))+'<span class="ct"><svg viewBox="0 0 24 24"><use href="#fl"/></svg>'+fm(p[4])+'</span></div><div class="if"><b>'+p[1]+'</b><small class="m">'+ALAB[ANIM[i]]+' · EXP +'+EXPT[i]+'</small><div class="r"><span class="p">'+p[2]+' <small>USDT</small></span><button class="op" onclick="buy('+i+')">뽑기</button></div></div></div>'}).join('');apply($('gr'))}
 /* views + theme */
 var cvw='home';
-/* ---- 채굴장: 시작 후 24시간 동안 접속 여부와 상관없이 진행 (경과 시간으로 계산) ---- */
-var mine={start:0,done:0,mice:1,lvl:0,sh:0,bo:0,sum:0},MNm=null,MNtok=0,MNC={cyc:10000,day:864e5,max:8640,at:9400,micePrice:500,miceMax:100,lvlPrice:1000,lvlMax:Infinity,lvlStep:.2,shieldPrice:1e4,boostPrice:1e5,boostMs:18e5,boostX:30};
-function mnNorm(o){o=o||{};return{start:+o.start>0?+o.start:0,done:o.done|0,mice:Math.min(MNC.miceMax,Math.max(1,o.mice|0||1)),lvl:Math.min(MNC.lvlMax,Math.max(0,o.lvl|0)),sh:Math.max(0,o.sh|0),bo:+o.bo>0?+o.bo:0,sum:+o.sum>0?+o.sum:0}}
+/* ---- 채굴장: 시작 후 24시간 동안 접속 여부와 상관없이 진행 (경과 시간으로 계산) ----
+   가속은 '가상 채굴 시계(vt)'를 더 빨리 흐르게 하는 방식이라 오프라인 중에도 같은 식으로 계산됩니다. */
+var mine={start:0,done:0,mice:1,lvl:0,sh:0,bo:0,sum:0,tur:0,td:0,ae:0,vt:0,lt:0,skins:['base'],skin:'base'},MNm=null,MNtok=0;
+var MNC={cyc:10000,day:864e5,at:9400,micePrice:500,miceMax:100,lvlPrice:1000,lvlMax:Infinity,lvlStep:.2,shieldPrice:1e4,boostPrice:1e5,boostMs:18e5,boostX:30,
+ turP:1e6,turY:1e4,turCyc:6e4,accP:1e4,accMs:18e5,accX:2};
+var MNSK={base:{n:'기본 (채굴장)',b:0,p:0,ic:'⛏️'},emerald:{n:'에메랄드 광산',b:.5,p:5e5,ic:'💚'},gold:{n:'금 광산',b:3,p:2e6,ic:'🥇'},diamond:{n:'다이아 광산',b:10,p:1e8,ic:'💎'}};
+function mnNorm(o){o=o||{};var now=Date.now(),st=+o.start>0?+o.start:0,to=st?Math.min(now,st+MNC.day):0,sk=(Array.isArray(o.skins)?o.skins:[]).filter(function(k){return MNSK[k]});if(sk.indexOf('base')<0)sk.unshift('base');
+ return{start:st,done:o.done|0,mice:Math.min(MNC.miceMax,Math.max(1,o.mice|0||1)),lvl:Math.min(MNC.lvlMax,Math.max(0,o.lvl|0)),sh:Math.max(0,o.sh|0),bo:+o.bo>0?+o.bo:0,sum:+o.sum>0?+o.sum:0,
+  tur:Math.max(0,o.tur|0),td:Math.max(0,o.td|0),ae:+o.ae>0?+o.ae:0,vt:(o.vt==null)?(st?to-st:0):Math.max(0,+o.vt||0),lt:(o.lt==null)?to:(+o.lt||0),skins:sk,skin:(sk.indexOf(o.skin)>=0?o.skin:'base')}}
 function mnRw(st,i,j){var h=(Math.floor(st/1000)^Math.imul(i+1,2654435761)^Math.imul(j+1,40503))|0;h=Math.imul(h^(h>>>15),2246822507);h=Math.imul(h^(h>>>13),3266489909);h^=h>>>16;return Math.round((1+((h>>>0)/4294967296)*2)*100)/100}
-function mnMul(){return 1+MNC.lvlStep*(mine.lvl|0)}
+function mnMul(){return 1+MNC.lvlStep*(mine.lvl|0)+((MNSK[mine.skin]||MNSK.base).b)}
 function mnCyc(i){var n=mine.mice|0||1,s=0;for(var j=0;j<n;j++)s+=mnRw(mine.start,i,j);return Math.round(s*mnMul()*100)/100}
-function mnDue(now){if(!mine||!mine.start)return 0;var e=Math.min(now-mine.start,MNC.day);if(e<MNC.at)return 0;return Math.min(MNC.max,Math.floor((e-MNC.at)/MNC.cyc)+1)}
+function mnTurPay(){return Math.round((mine.tur|0)*MNC.turY*mnMul()*100)/100}
+/* 가상 시계: 실제 경과 시간 + (가속 구간과 겹친 시간 × (배속-1)) */
+function mnVAdv(now){if(!mine.start)return;var to=Math.min(now,mine.start+MNC.day),from=mine.lt||mine.start;if(to>from){var ac=Math.max(0,Math.min(to,+mine.ae||0)-from);mine.vt=(+mine.vt||0)+(to-from)+ac*(MNC.accX-1);mine.lt=to}}
+function mnVNow(now){if(!mine.start)return 0;var to=Math.min(now,mine.start+MNC.day),from=mine.lt||mine.start,v=+mine.vt||0;if(to>from){var ac=Math.max(0,Math.min(to,+mine.ae||0)-from);v+=(to-from)+ac*(MNC.accX-1)}return v}
+function mnDueV(v){if(v<MNC.at)return 0;return Math.floor((v-MNC.at)/MNC.cyc)+1}
 function mnSum(){return +(+mine.sum||0).toFixed(2)}
 function expM(){return Date.now()<(+mine.bo||0)?MNC.boostX:1}
-function mnTick(){if(!mine||!mine.start)return;var n=mnDue(Date.now());if(n>(mine.done|0)){var c=n-(mine.done|0),s=0;for(var i=mine.done|0;i<n;i++)s+=mnCyc(i);s=+s.toFixed(2);mine.done=n;mine.sum=+((+mine.sum||0)+s).toFixed(2);bal=+(bal+s).toFixed(2);if(MNm&&MNm.paid&&c<3)MNm.paid(c,s);else if(c>=3){toast('채굴 '+c+'회 완료 · +'+f2(s)+' USDT');if(MNm&&MNm.ui)MNm.ui()}}}
-function mnStart(){var now=Date.now();if(mine&&mine.start&&now<mine.start+MNC.day){toast('이미 채굴 중입니다');return false}mine.start=now;mine.done=0;mine.sum=0;toast('채굴을 시작했습니다 · 24시간 동안 자동으로 진행됩니다');return true}
+function mnTick(){if(!mine||!mine.start)return;mnVAdv(Date.now());var n=mnDueV(mine.vt),c=0,s=0,tn=Math.floor(mine.vt/MNC.turCyc),tc=0,ts=0,i;
+ if(n>(mine.done|0)){c=n-(mine.done|0);for(i=mine.done|0;i<n;i++)s+=mnCyc(i);s=+s.toFixed(2);mine.done=n}
+ if(tn>(mine.td|0)){tc=tn-(mine.td|0);ts=+(tc*mnTurPay()).toFixed(2);mine.td=tn}
+ if(c||tc){var tot=+(s+ts).toFixed(2);mine.sum=+((+mine.sum||0)+tot).toFixed(2);bal=+(bal+tot).toFixed(2);
+  if(c+tc>=3){toast('채굴 완료 · +'+f2(tot)+' USDT');if(MNm&&MNm.ui)MNm.ui()}
+  else{if(c&&MNm&&MNm.paid)MNm.paid(c,s);if(tc&&MNm&&MNm.tpaid)MNm.tpaid(tc,ts)}}}
+function mnStart(){var now=Date.now();if(mine&&mine.start&&now<mine.start+MNC.day){toast('이미 채굴 중입니다');return false}mine.start=now;mine.done=0;mine.sum=0;mine.vt=0;mine.lt=now;mine.td=0;toast('채굴을 시작했습니다 · 24시간 동안 자동으로 진행됩니다');return true}
 function fmtK(v){v=+v;if(!isFinite(v))return '∞';if(v<1e4)return v.toLocaleString('ko-KR',{maximumFractionDigits:2});var U=['','만','억','조','경','해','자','양','구','간','정'],k=0;while(v>=1e4&&k<U.length-1){v/=1e4;k++}return (v>=100?Math.round(v):Math.round(v*100)/100).toLocaleString('ko-KR')+U[k]}
 function mnMouseP(){return MNC.micePrice*Math.pow(2,(mine.mice|0||1)-1)}
-function mnShopList(){var now=Date.now(),left=Math.max(0,(+mine.bo||0)-now),mc=mine.mice|0||1,lv=mine.lvl|0,L=[];
- L.push({id:'boost',ic:'⚡',name:'경험치 부스트 3000%',desc:'30분 동안 얻는 경험치가 '+MNC.boostX+'배. 구매하면 남은 시간에 30분이 더해집니다.',st:left>0?'적용 중 · 남은 '+Math.floor(left/6e4)+'분 '+('0'+Math.floor(left%6e4/1e3)).slice(-2)+'초':'미적용',price:MNC.boostPrice,max:false});
+function mnMS(ms){ms=Math.max(0,Math.ceil(ms/1000));var m=Math.floor(ms/60),s=ms%60;return m+'분 '+('0'+s).slice(-2)+'초'}
+function mnShopList(){var now=Date.now(),left=Math.max(0,(+mine.bo||0)-now),aleft=Math.max(0,(+mine.ae||0)-now),mc=mine.mice|0||1,lv=mine.lvl|0,L=[];
+ L.push({g:'아이템'});
+ L.push({id:'boost',ic:'⚡',name:'경험치 부스트 3000%',desc:'30분 동안 얻는 경험치가 '+MNC.boostX+'배. 구매하면 남은 시간에 30분이 더해집니다.',st:left>0?'적용 중 · 남은 '+mnMS(left):'미적용',price:MNC.boostPrice,max:false});
  L.push({id:'shield',ic:'🛡️',name:'룰렛 꽝 방어권',desc:'룰렛에서 꽝(폭탄)이 나오면 1장을 써서 배팅금을 돌려받습니다.',st:'보유 '+(mine.sh|0)+'장',price:MNC.shieldPrice,max:false});
  L.push({id:'mouse',ic:'🐭',name:'채굴 생쥐 +1마리',desc:'생쥐가 1마리 늘 때마다 사이클 보상이 한 마리분 더해집니다. 구매할 때마다 가격이 2배.',st:mc+' / '+MNC.miceMax+'마리',price:mc>=MNC.miceMax?0:mnMouseP(),max:mc>=MNC.miceMax});
- L.push({id:'lvl',ic:'⛏️',name:'채굴량 +0.2배',desc:'채굴 보상 배율이 0.2씩 오릅니다. 구매 횟수 제한 없음.',st:'채굴량 ×'+mnMul().toFixed(1)+' (구매 '+lv+'회)',price:lv>=MNC.lvlMax?0:MNC.lvlPrice,max:lv>=MNC.lvlMax});
- return L.map(function(x){x.priceTxt=x.max?'최대':fmtK(x.price)+' USDT';x.can=!x.max&&bal>=x.price-1e-9;return x})}
-function mnBuy(id){var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it)return{ok:false,msg:'알 수 없는 상품'};if(it.max)return{ok:false,msg:'이미 최대입니다'};if(bal<it.price-1e-9)return{ok:false,msg:'잔액이 부족합니다'};
- bal=+(bal-it.price).toFixed(2);
+ L.push({id:'lvl',ic:'⛏️',name:'채굴량 +0.2배',desc:'채굴 보상 배율이 0.2씩 오릅니다. 구매 횟수 제한 없음.',st:'구매 '+lv+'회',price:MNC.lvlPrice,max:false});
+ L.push({id:'turtle',ic:'🐢',name:'드릴 거북이',desc:'1마리당 1분마다 '+fmtK(MNC.turY)+' USDT를 채굴합니다. 고정 가격, 수량 제한 없음.',st:'보유 '+(mine.tur|0)+'마리 · 1분당 '+fmtK(mnTurPay())+' USDT',price:MNC.turP,max:false});
+ L.push({id:'accel',ic:'⏩',name:'채굴장 가속권 (200%)',desc:'30분 동안 채굴 속도 '+MNC.accX+'배. 여러 개 쓰면 시간이 늘어납니다.',st:aleft>0?'가속 중 · 남은 '+mnMS(aleft):'미사용',price:MNC.accP,max:false});
+ L.push({g:'채굴장 스킨'});
+ ['base','emerald','gold','diamond'].forEach(function(k){var d=MNSK[k],own=mine.skins.indexOf(k)>=0,on=mine.skin==k;
+  L.push({id:own?'eq_'+k:'sk_'+k,ic:d.ic,name:d.n,desc:d.b?'채굴량 +'+Math.round(d.b*100)+'% (채굴량 배율에 더해집니다)':'기본 채굴장입니다.',st:on?'장착 중':own?'보유 중':'미보유',price:own?0:d.p,max:false,free:own,own:own,on:on})});
+ return L.map(function(x){if(x.g)return x;x.priceTxt=x.free?(x.on?'장착 중':'장착'):(x.max?'최대':fmtK(x.price)+' USDT');x.can=x.free?!x.on:(!x.max&&bal>=x.price-1e-9);return x})}
+function mnBuy(id){var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it)return{ok:false,msg:'알 수 없는 상품'};
+ if(id.slice(0,3)=='eq_'){mine.skin=id.slice(3);return{ok:true,msg:it.name+' 장착'}}
+ if(it.max)return{ok:false,msg:'이미 최대입니다'};if(bal<it.price-1e-9)return{ok:false,msg:'잔액이 부족합니다'};
+ mnTick();bal=+(bal-it.price).toFixed(2);
  if(id=='boost'){var base=Math.max(Date.now(),+mine.bo||0);mine.bo=base+MNC.boostMs}
  else if(id=='shield')mine.sh=(mine.sh|0)+1;
  else if(id=='mouse')mine.mice=(mine.mice|0||1)+1;
  else if(id=='lvl')mine.lvl=(mine.lvl|0)+1;
+ else if(id=='turtle')mine.tur=(mine.tur|0)+1;
+ else if(id=='accel'){var b2=Math.max(Date.now(),+mine.ae||0);mine.ae=b2+MNC.accMs}
+ else if(id.slice(0,3)=='sk_'){var k=id.slice(3);if(mine.skins.indexOf(k)<0)mine.skins.push(k);mine.skin=k}
  return{ok:true,msg:it.name+' 구매 완료 (−'+fmtK(it.price)+' USDT)'}}
 function mnUseShield(){if((mine.sh|0)>0){mine.sh--;return true}return false}
 setInterval(mnTick,1000);document.addEventListener('visibilitychange',function(){if(!document.hidden)mnTick()});
-window.rv_mine=function(){var el=$('mnroot');el.innerHTML='';var tk=++MNtok;if(MNm){MNm.stop();MNm=null}import('./mine.js').then(function(m){if(tk!==MNtok||cvw!='mine')return;MNm=m.mountMine(el,{getMine:function(){return mine},start:mnStart,sumDone:mnSum,shop:mnShopList,buy:mnBuy,mul:mnMul,loggedIn:function(){return !!window.UID&&!!window.__rdy},toast:toast,sfx:function(n,a,b){SFX.ev(n,a,b)},getBal:function(){return bal},setBal:function(v){bal=v}});apply(el)}).catch(function(e){toast('채굴장을 불러오지 못했습니다');console.error('[mine]',e)})};
+window.rv_mine=function(){var el=$('mnroot');el.innerHTML='';var tk=++MNtok;if(MNm){MNm.stop();MNm=null}import('./mine.js').then(function(m){if(tk!==MNtok||cvw!='mine')return;MNm=m.mountMine(el,{getMine:function(){return mine},start:mnStart,sumDone:mnSum,shop:mnShopList,buy:mnBuy,mul:mnMul,vnow:mnVNow,turPay:mnTurPay,loggedIn:function(){return !!window.UID&&!!window.__rdy},toast:toast,sfx:function(n,a,b){SFX.ev(n,a,b)},getBal:function(){return bal},setBal:function(v){bal=v}});apply(el)}).catch(function(e){toast('채굴장을 불러오지 못했습니다');console.error('[mine]',e)})};
 function view(v){cvw=v;if(v!='mine'&&MNm){MNm.stop();MNm=null}var a=['home','inv','mine','my'],b=document.querySelectorAll('nav.bt button');a.forEach(function(k,i){$('v-'+k).hidden=k!=v;if(k==v)b[i].setAttribute('aria-current','page');else b[i].removeAttribute('aria-current')});window.scrollTo(0,0);if(window['rv_'+v])window['rv_'+v]()}
 function theme(){var e=document.documentElement,d=e.dataset.theme?e.dataset.theme=='dark':matchMedia('(prefers-color-scheme:dark)').matches;e.dataset.theme=d?'light':'dark'}
 /* temporary stubs, replaced in later stages */
