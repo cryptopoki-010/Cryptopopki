@@ -236,7 +236,7 @@ export async function openRoulette(br) {
   if (!document.getElementById('rlcss')) { const s = document.createElement('style'); s.id = 'rlcss'; s.textContent = CSS; document.head.appendChild(s); }
   try { await Promise.race([document.fonts.load('900 20px "IBM Plex Sans KR"'), new Promise(r => setTimeout(r, 700))]); } catch (e) { }
   const root = document.createElement('div'); root.className = 'rl';
-  root.innerHTML = '<canvas></canvas><div class="rlt"><button class="rlx" aria-label="닫기">✕</button><div class="rlb"><small>보유 잔액</small><b><span id="rlbal">0.00</span><i>USDT</i></b></div><div class="rlh" id="rlhist"></div></div>' +
+  root.innerHTML = '<canvas></canvas><div class="rlt"><button class="rlx" aria-label="닫기">✕</button><div class="rlb"><small>보유 잔액</small><b><span id="rlbal">0.00</span><i>USDT</i></b><small id="rlsh" style="color:#9ee08a;letter-spacing:0"></small></div><div class="rlh" id="rlhist"></div></div>' +
     '<div class="rlr" id="rlres"><div class="card"><h3></h3><p></p><b></b></div></div>' +
     '<div class="rlp"><div class="rlbox"><div class="rlrow"><em>배율</em><div class="rlm" id="rlm"></div></div>' +
     '<div class="rlrow"><em>금액</em><div class="rla"><button id="rlmi" aria-label="감소">−</button><input id="rlin" inputmode="decimal" autocomplete="off"><button id="rlpl" aria-label="증가">+</button></div></div>' +
@@ -262,7 +262,7 @@ export async function openRoulette(br) {
   const bal = () => +getBal() || 0, minBet = .1;
   function maxAmt() { return Math.max(0, Math.floor(bal() / mul * 100) / 100); }
   function sync() {
-    $('rlbal').textContent = fmt(bal()); [...$('rlm').children].forEach(b => b.classList.toggle('on', +b.dataset.m === mul)); [...$('rlc2').children].forEach(b => b.classList.toggle('on', b.dataset.c && +b.dataset.c === amt));
+    $('rlbal').textContent = fmt(bal()); $('rlsh').textContent = (br.getShield ? br.getShield() : 0) > 0 ? '꽝 방어권 ' + br.getShield() + '장' : ''; [...$('rlm').children].forEach(b => b.classList.toggle('on', +b.dataset.m === mul)); [...$('rlc2').children].forEach(b => b.classList.toggle('on', b.dataset.c && +b.dataset.c === amt));
     const tot = +(amt * mul).toFixed(2); $('rltot').textContent = fmt(tot); $('rlmax').textContent = fmt(tot * 100); const ok = !spinning && amt >= minBet && tot <= bal() + 1e-9; $('rlsp').disabled = !ok; $('rlsp').textContent = spinning ? '...' : (tot > bal() + 1e-9 ? '잔액 부족' : 'SPIN');
   }
   function setAmt(v, keep) { v = Math.round(v * 100) / 100; amt = clamp(v, minBet, Math.max(minBet, 1e7)); if (!keep) $('rlin').value = String(amt); sync(); }
@@ -290,9 +290,10 @@ export async function openRoulette(br) {
   function idxToPtr(a) { return Math.floor(mod(-a, TAU) / STEP); }
   $('rlsp').onclick = () => startSpin();
   function finish() {
-    const s = spin; spin = null; spinning = false; const o = s.o, win = +(s.tot * o.mult).toFixed(2); setBal(+(bal() + win).toFixed(2)); addHist(o, win);
+    const s = spin; spin = null; spinning = false; const o = s.o; let win = +(s.tot * o.mult).toFixed(2), guarded = false; if (o.k == 'bomb' && br.useShield && br.useShield()) { guarded = true; win = s.tot; } setBal(+(bal() + win).toFixed(2)); addHist(o, win);
     const card = $('rlres'), h = card.querySelector('h3'), p = card.querySelector('p'), b = card.querySelector('b'); let col = '#ffe9b0';
-    if (o.k == 'bomb') { col = '#ff6a4a'; h.textContent = '꽝!'; p.textContent = '폭탄이 터졌습니다'; b.textContent = '-' + fmt(s.tot) + ' USDT'; sfx('rl_bomb'); shake = 1; flashA = .55; flashC = '#ff5a2a'; explode(L.cx, L.cy, 1); }
+    if (guarded) { col = '#9ee08a'; h.textContent = '방어 성공!'; p.textContent = '꽝 방어권 사용 · 배팅금 환급'; b.textContent = '+' + fmt(win) + ' USDT (손실 없음)'; sfx('rl_win', 1); flashA = .3; flashC = '#c8ffb0'; coins(30); }
+    else if (o.k == 'bomb') { col = '#ff6a4a'; h.textContent = '꽝!'; p.textContent = '폭탄이 터졌습니다'; b.textContent = '-' + fmt(s.tot) + ' USDT'; sfx('rl_bomb'); shake = 1; flashA = .55; flashC = '#ff5a2a'; explode(L.cx, L.cy, 1); }
     else if (o.mult >= 50) { col = '#ffd54a'; h.textContent = o.mult >= 100 ? 'JACKPOT!!' : 'BIG WIN!'; p.textContent = 'x' + o.mult + ' × 배율 ' + mul + ' × ' + fmt(amt); b.textContent = '+' + fmt(win) + ' USDT'; sfx('rl_jackpot', o.mult >= 100 ? 2 : 1); shake = .6; flashA = .6; flashC = '#ffe08a'; coins(160); confetti(120); }
     else if (o.mult >= 5) { col = '#9ee08a'; h.textContent = 'WIN!'; p.textContent = 'x' + o.mult + ' × 배율 ' + mul + ' × ' + fmt(amt); b.textContent = '+' + fmt(win) + ' USDT'; sfx('rl_win', 2); flashA = .22; flashC = '#c8ffb0'; coins(60); }
     else { col = '#d9e8c0'; h.textContent = 'x1'; p.textContent = '본전! (x1 × 배율 ' + mul + ' × ' + fmt(amt) + ')'; b.textContent = '+' + fmt(win) + ' USDT'; sfx('rl_win', 1); coins(18); }
@@ -340,12 +341,12 @@ export async function openRoulette(br) {
     /* 비네트 + 플래시 */
     { const vg = g.createRadialGradient(W / 2, H * .42, Math.min(W, H) * .3, W / 2, H * .45, Math.max(W, H) * .78); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.72)'); g.fillStyle = vg; g.fillRect(0, 0, W, H); }
     if (flashA > .01) { g.globalAlpha = Math.min(.8, flashA); g.fillStyle = flashC; g.fillRect(0, 0, W, H); g.globalAlpha = 1; flashA *= Math.pow(.004, dt); }
-    g.restore(); resT += dt; if (resT > .25) { resT = 0; $('rlbal').textContent = fmt(bal()); }
+    g.restore(); resT += dt; if (resT > .25) { resT = 0; $('rlbal').textContent = fmt(bal()); $('rlsh').textContent = (br.getShield ? br.getShield() : 0) > 0 ? '꽝 방어권 ' + br.getShield() + '장' : ''; }
   }
   raf = requestAnimationFrame(frame); bed('r');
   function close() { if (!alive) return; settleNow(); alive = false; cancelAnimationFrame(raf); clearTimeout(resTimer); window.removeEventListener('resize', onR); root.remove(); document.body.style.overflow = ''; try { br.onClose && br.onClose(); } catch (e) { } }
   /* 회전 중에 닫으면 결과를 즉시 정산 (차감만 되고 당첨금이 사라지는 일이 없도록) */
-  function settleNow() { if (!spin) return; const s = spin; spin = null; spinning = false; const win = +(s.tot * s.o.mult).toFixed(2); setBal(+(bal() + win).toFixed(2)); toast(s.o.k == 'bomb' ? '꽝! -' + fmt(s.tot) + ' USDT' : '당첨 x' + s.o.mult + ' +' + fmt(win) + ' USDT'); }
+  function settleNow() { if (!spin) return; const s = spin; spin = null; spinning = false; let win = +(s.tot * s.o.mult).toFixed(2), g_ = false; if (s.o.k == 'bomb' && br.useShield && br.useShield()) { g_ = true; win = s.tot; } setBal(+(bal() + win).toFixed(2)); toast(g_ ? '꽝 방어권 사용 · 배팅금 환급 +' + fmt(win) + ' USDT' : s.o.k == 'bomb' ? '꽝! -' + fmt(s.tot) + ' USDT' : '당첨 x' + s.o.mult + ' +' + fmt(win) + ' USDT'); }
   root.querySelector('.rlx').onclick = () => { settleNow(); close(); };
   const api = { close, spin: startSpin, get state() { return { th, spinning, mul, amt, hist: hist.map(h => h.o.k) }; }, setMul(m) { mul = m; sync(); }, setAmt, root };
   return api;

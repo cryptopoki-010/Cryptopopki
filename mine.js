@@ -159,11 +159,11 @@ export function mountMine(el, br) {
   if (!document.getElementById('mncss')) { const s = document.createElement('style'); s.id = 'mncss'; s.textContent = CSS; document.head.appendChild(s); }
   const root = document.createElement('div'); root.className = 'mn';
   root.innerHTML = '<div class="mnst"><button class="on" data-v="m">채굴장</button><button data-v="s">상점</button></div>' +
-    '<div class="mnv" id="mnm"><div class="mnhd"><div><b id="mnstt">대기 중</b><small id="mnrem">-</small></div><button id="mngo">채굴 시작</button></div><div class="mnc"><canvas></canvas></div><div class="mnin"><div><small>이번 24시간 채굴</small><b id="mntot">0.00</b><i>USDT</i></div><div><small>완료 사이클</small><b id="mncyc">0</b><i>회</i></div><div><small>직전 보상</small><b id="mnlast">-</b></div></div><p class="mnnt">시작 후 24시간 동안은 이 화면을 닫아도 채굴이 계속됩니다. 24시간이 지나면 채굴 시작 버튼을 다시 눌러야 해요. 1사이클 10초, 보상 1~3 USDT.</p><p class="mnnt" id="mnlg" style="color:#e8a070"></p></div>' +
-    '<div class="mnv" id="mns" hidden><div class="mnsoon"><b>준비중입니다</b><span>상점은 곧 열립니다.</span></div></div>';
+    '<div class="mnv" id="mnm"><div class="mnhd"><div><b id="mnstt">대기 중</b><small id="mnrem">-</small><small id="mnbuf"></small></div><button id="mngo">채굴 시작</button></div><div class="mnc"><canvas></canvas></div><div class="mnin"><div><small>이번 24시간 채굴</small><b id="mntot">0.00</b><i>USDT</i></div><div><small>완료 사이클</small><b id="mncyc">0</b><i>회</i></div><div><small>직전 보상</small><b id="mnlast">-</b></div></div><p class="mnnt">시작 후 24시간 동안은 이 화면을 닫아도 채굴이 계속됩니다. 24시간이 지나면 채굴 시작 버튼을 다시 눌러야 해요. 1사이클 10초, 보상 1~3 USDT.</p><p class="mnnt" id="mnlg" style="color:#e8a070"></p></div>' +
+    '<div class="mnv" id="mns" hidden></div>';
   el.appendChild(root);
   const cv = root.querySelector('canvas'), g = cv.getContext('2d'), $ = id => root.querySelector('#' + id);
-  root.querySelector('.mnst').onclick = e => { const b = e.target.closest('button'); if (!b) return; [...root.querySelectorAll('.mnst button')].forEach(x => x.classList.toggle('on', x === b)); $('mnm').hidden = b.dataset.v !== 'm'; $('mns').hidden = b.dataset.v !== 's'; if (b.dataset.v === 'm') resize(); };
+  root.querySelector('.mnst').onclick = e => { const b = e.target.closest('button'); if (!b) return; [...root.querySelectorAll('.mnst button')].forEach(x => x.classList.toggle('on', x === b)); $('mnm').hidden = b.dataset.v !== 'm'; $('mns').hidden = b.dataset.v !== 's'; if (b.dataset.v === 'm') resize(); else shop(true); };
   let dpr = 1, bg = null, alive = true, raf = 0, last = performance.now(), T = 0, ct = 0, curK = -2, lastHit = -1, lastToss = -1, shake = 0, wc = 0, popT = -1, popV = 0, active = false, uiT = 0;
   const parts = [], mine = () => br.getMine ? br.getMine() : { start: 0, done: 0 };
   function resize() { const w = root.querySelector('.mnc').clientWidth; if (!w) return; dpr = Math.min(window.devicePixelRatio || 1, 2); cv.style.height = Math.round(w * H / W) + 'px'; cv.width = Math.round(w * dpr); cv.height = Math.round(w * H / W * dpr); bg = paintBG(Math.max(.5, dpr * w / W)); }
@@ -173,10 +173,24 @@ export function mountMine(el, br) {
     const m = mine(), now = Date.now(); active = !!m.start && now < m.start + CFG.day;
     $('mnstt').textContent = active ? '채굴 중' : (m.start ? '채굴 종료 · 다시 시작해 주세요' : '대기 중');
     $('mnrem').textContent = active ? '남은 시간 ' + hms(m.start + CFG.day - now) : '채굴 시작 버튼을 눌러 주세요';
+    { const n = (m.mice | 0) || 1, mu = br.mul ? br.mul() : 1, bo = (+m.bo || 0) - now; $('mnbuf').textContent = '생쥐 ' + n + '마리 · 채굴량 ×' + mu.toFixed(1) + (bo > 0 ? ' · ⚡경험치 부스트 ' + hms(bo) : ''); }
     const b = $('mngo'); b.disabled = active; b.textContent = active ? '채굴 중' : (m.start ? '다시 시작' : '채굴 시작');
     $('mncyc').textContent = String(m.done || 0) + ' / 8640'; $('mntot').textContent = fmt(br.sumDone ? br.sumDone() : 0); $('mnlg').textContent = br.loggedIn && !br.loggedIn() ? '로그인하지 않으면 접속을 종료한 뒤의 채굴은 저장되지 않습니다.' : '';
   }
   $('mngo').onclick = () => { if (br.start && br.start()) { sfx('rl_start'); curK = -2; ui(); } };
+  /* ---- 상점 ---- */
+  let pend = null, shopKey = '';
+  function shop(force) {
+    const L = br.shop ? br.shop() : [], now = Date.now(); if (pend && now - pend.t > 3000) pend = null;
+    const key = JSON.stringify(L.map(x => [x.id, x.st, x.priceTxt, x.can, x.max])) + (pend ? pend.id : '') + fmt(getBal()); if (!force && key === shopKey) return; shopKey = key;
+    $('mns').innerHTML = '<div class="mnbal">보유 잔액 <b>' + fmt(getBal()) + '</b> USDT</div>' + L.map(x => '<div class="mnit"><div class="ic">' + x.ic + '</div><div class="bd"><b>' + x.name + '</b><p>' + x.desc + '</p><small>' + x.st + '</small></div><button data-id="' + x.id + '"' + ((x.max || !x.can) ? ' disabled' : '') + (pend && pend.id === x.id ? ' class="ask"' : '') + '>' + (x.max ? '최대' : (pend && pend.id === x.id ? '한 번 더 눌러 구매' : x.priceTxt)) + '</button></div>').join('') + '<p class="mnnt">구매한 효과는 계정에 저장됩니다. 구매 버튼은 두 번 눌러야 결제돼요.</p>';
+  }
+  $('mns').onclick = e => {
+    const b = e.target.closest('button[data-id]'); if (!b || b.disabled) return; const id = b.dataset.id;
+    if (!pend || pend.id !== id) { pend = { id, t: Date.now() }; sfx('rl_tick'); shop(true); return; }
+    pend = null; const r = br.buy ? br.buy(id) : { ok: false, msg: '구매할 수 없습니다' }; (br.toast || (() => { }))(r.msg); sfx(r.ok ? 'rl_win' : 'cc_miss', 1); shop(true); ui();
+  };
+  shop(true);
   ui();
   function P(k, x, y, vx, vy, l, r, c, gv) { parts.push({ k, x, y, vx, vy, l, m: l, r, c, gv: gv == null ? 600 : gv }); }
   function paid(c, amt) {
@@ -186,7 +200,7 @@ export function mountMine(el, br) {
   function update(dt) {
     T += dt; const now = Date.now(), m = mine(); active = !!m.start && now < m.start + CFG.day;
     if (active) { const el = now - m.start, k = Math.floor(el / (CFG.cycle * 1000)); ct = (el % (CFG.cycle * 1000)) / 1000; if (k !== curK) { curK = k; const p0 = pose(ct); lastHit = p0.k >= 0 ? p0.hits : -1; lastToss = p0.toss > 0 ? Math.floor(p0.toss * 12) : -1; } } else { ct = 0; curK = -2; }
-    uiT += dt; if (uiT > .5) { uiT = 0; ui(); }
+    uiT += dt; if (uiT > .5) { uiT = 0; ui(); if (!$('mns').hidden) shop(); }
     const p = pose(ct);
     if (active && p.walking) wc += dt * (p.step === '곡괭이 꺼내기' ? 0 : 1);
     if (active && p.k >= 0 && p.hits > lastHit) {
@@ -201,6 +215,32 @@ export function mountMine(el, br) {
     if (active && ct > 8.4 && ct < 9.7 && Math.random() < .35) P('d', 125 + Math.random() * 8, 6, 4 + Math.random() * 6, -18 - Math.random() * 10, 1.3, 5, '#d9d9e0', -6);
     shake = Math.max(0, shake - dt * 14);
     for (let i = parts.length - 1; i >= 0; i--) { const q = parts[i]; q.l -= dt; if (q.l <= 0) { parts.splice(i, 1); continue; } q.vy += q.gv * dt; q.x += q.vx * dt; q.y += q.vy * dt; if (q.k === 'c' && q.y > GY - 2) { q.y = GY - 2; q.vy *= -.25; q.vx *= .6; } if (q.k === 'o' && q.y > GY - 28 && q.x < 168) q.l = Math.min(q.l, .05); if (q.k === 'd') { q.r += dt * 6; } }
+  }
+  function worker(p, ct_, l) {
+    /* 레일 위 수레 */
+    const cartX = p.cart; const tiltA = p.tilt * .72;
+    drawCart(g, cartX, tiltA, p.fill, cartX * .15, !(p.pickIn > .5) && ct_ < 6.0 || (ct_ >= T_.put - .01) && p.pickIn < .5 && p.step !== '곡괭이 꺼내기', p.run);
+    /* 생쥐 */
+    const face = p.face, mxp = p.m;
+    const armTarget = () => { const hx = cartX + 25, hy = GY - 26 - p.tilt * 10; return { x: (hx - mxp) * face - 0, y: hy - GY - 1 }; };
+    let arm = null, armB = null;
+    const sd = face;
+    if (p.step === '광산으로 이동' || p.step === '정제기로 이동' || p.step === '정제 중…' || p.step === '보상 확인') {
+      const t = armTarget(); const cx = clamp(t.x, -22, 22), cy = clamp(t.y, -30, -8); arm = { x: cx, y: cy };
+      if (p.wipe) { const q = Math.sin(T * 12) * 3; armB = { x: 9 + q * .3, y: -31 + q }; } else armB = { x: 4, y: -9 };
+    } else if (p.k >= 0 || p.step === '광산으로 다가가는 중') {
+      let ang;
+      if (p.k >= 0) { const u = p.u, r = u < .5 ? eo(u / .5) : 1; const cyc_ = u < .55 ? lerp(.2, -2.3, eo(u / .55)) : u < .68 ? lerp(-2.3, .45, (u - .55) / .13) : lerp(.45, .2, eo((u - .68) / .32)); ang = cyc_; } else ang = .2;
+      const hx = 12 + Math.sin(ang) * 0, hy = -18 - Math.cos(ang) * 6 + (ang < -1 ? -10 : 0); arm = { x: 9 + Math.cos(ang) * 4, y: -22 - Math.sin(-ang) * 4, tool: ang + .1 }; armB = { x: 8 + Math.cos(ang) * 3, y: -20 - Math.sin(-ang) * 3 };
+    } else if (p.step === '곡괭이 꺼내기') { const e = p.pickIn; arm = { x: lerp(-18, 10, e), y: lerp(-10, -20, e), tool: e > .6 ? .3 : null }; armB = { x: 4, y: -9 }; }
+    else if (p.toss > 0) { const s_ = Math.sin(p.toss * TAU * 4); arm = { x: -8 - s_ * 6 - 4, y: -12 - Math.max(0, s_) * 10 }; armB = { x: -6 + s_ * 5, y: -12 - Math.max(0, -s_) * 8 }; }
+    else if (p.step === '수레로 돌아가는 중') { arm = { x: lerp(10, -10, p.pickIn < .5 ? 1 : 0), y: -14 }; armB = { x: 4, y: -9 }; if (p.pickIn > .01) arm.tool = .3; }
+    else { arm = { x: 4, y: -10 }; armB = { x: 2, y: -9 }; }
+    drawMouse(g, { x: mxp, face, wl: p.m * .3, pant: p.pant, wipe: p.wipe, arm, armB, T, walking: p.walking, turn: p.turn });
+    /* 곡괭이가 수레로 날아가는 중 */
+    if (ct_ >= T_.hitEnd && ct_ < T_.put) { const u = eio((ct_ - T_.hitEnd) / (T_.put - T_.hitEnd)); pickaxe(g, lerp(mxp + 8, cartX - 6, u), lerp(GY - 28, GY - 34, u) - Math.sin(u * PI) * 18, lerp(.3, -.55, u), .9); }
+    if (ct_ >= T_.take - .01 && ct_ < T_.take + .5) { const u = eio((ct_ - T_.take) / .5); }
+    if (p.pant > .4) { const q = (T * 1.8) % 1; g.save(); g.globalAlpha = .85 * (1 - q); g.font = '900 11px ' + FONT; g.textAlign = 'center'; g.fillStyle = '#fff'; g.strokeStyle = '#000a'; g.lineWidth = 3; const bx = mxp - 22 + (face > 0 ? 40 : 0) * 0, by = GY - 50 - q * 10; g.strokeText('헉헉', bx, by); g.fillText('헉헉', bx, by); g.restore(); }
   }
   function render() {
     const w = cv.width / dpr; g.setTransform(dpr * w / W, 0, 0, dpr * w / W, 0, 0); g.clearRect(0, 0, W, H); if (bg) g.drawImage(bg, 0, 0, W, H);
@@ -218,33 +258,15 @@ export function mountMine(el, br) {
     drawWall(g, p.rock, Math.sin(T * 60) * shake, p.hits);
     /* 잔해 더미 */
     const pn = Math.round(p.pile * 14); for (let i = 0; i < pn; i++) { const r_ = mul32(i * 11 + 1); oreChunk(g, 300 + r_() * 34 + (i % 3) * 3, GY - 3 - r_() * 5, 3.4 + r_() * 2.2, 40 + i, i % 4 === 0); }
-    /* 레일 위 수레 */
-    const cartX = p.cart; const tiltA = p.tilt * .72;
-    drawCart(g, cartX, tiltA, p.fill, cartX * .15, !(p.pickIn > .5) && ct < 6.0 || (ct >= T_.put - .01) && p.pickIn < .5 && p.step !== '곡괭이 꺼내기', p.run);
-    /* 생쥐 */
-    const face = p.face, mxp = p.m;
-    const armTarget = () => { const hx = cartX + 25, hy = GY - 26 - p.tilt * 10; return { x: (hx - mxp) * face - 0, y: hy - GY - 1 }; };
-    let arm = null, armB = null;
-    const sd = face;
-    if (p.step === '광산으로 이동' || p.step === '정제기로 이동' || p.step === '정제 중…' || p.step === '보상 확인') {
-      const t = armTarget(); const cx = clamp(t.x, -22, 22), cy = clamp(t.y, -30, -8); arm = { x: cx, y: cy };
-      if (p.wipe) { const q = Math.sin(T * 12) * 3; armB = { x: 9 + q * .3, y: -31 + q }; } else armB = { x: 4, y: -9 };
-    } else if (p.k >= 0 || p.step === '광산으로 다가가는 중') {
-      let ang;
-      if (p.k >= 0) { const u = p.u, r = u < .5 ? eo(u / .5) : 1; const cyc_ = u < .55 ? lerp(.2, -2.3, eo(u / .55)) : u < .68 ? lerp(-2.3, .45, (u - .55) / .13) : lerp(.45, .2, eo((u - .68) / .32)); ang = cyc_; } else ang = .2;
-      const hx = 12 + Math.sin(ang) * 0, hy = -18 - Math.cos(ang) * 6 + (ang < -1 ? -10 : 0); arm = { x: 9 + Math.cos(ang) * 4, y: -22 - Math.sin(-ang) * 4, tool: ang + .1 }; armB = { x: 8 + Math.cos(ang) * 3, y: -20 - Math.sin(-ang) * 3 };
-    } else if (p.step === '곡괭이 꺼내기') { const e = p.pickIn; arm = { x: lerp(-18, 10, e), y: lerp(-10, -20, e), tool: e > .6 ? .3 : null }; armB = { x: 4, y: -9 }; }
-    else if (p.toss > 0) { const s_ = Math.sin(p.toss * TAU * 4); arm = { x: -8 - s_ * 6 - 4, y: -12 - Math.max(0, s_) * 10 }; armB = { x: -6 + s_ * 5, y: -12 - Math.max(0, -s_) * 8 }; }
-    else if (p.step === '수레로 돌아가는 중') { arm = { x: lerp(10, -10, p.pickIn < .5 ? 1 : 0), y: -14 }; armB = { x: 4, y: -9 }; if (p.pickIn > .01) arm.tool = .3; }
-    else { arm = { x: 4, y: -10 }; armB = { x: 2, y: -9 }; }
-    drawMouse(g, { x: mxp, face, wl: wc * 5.5, pant: p.pant, wipe: p.wipe, arm, armB, T, walking: p.walking, turn: p.turn });
-    /* 곡괭이가 수레로 날아가는 중 */
-    if (ct >= T_.hitEnd && ct < T_.put) { const u = eio((ct - T_.hitEnd) / (T_.put - T_.hitEnd)); pickaxe(g, lerp(mxp + 8, cartX - 6, u), lerp(GY - 28, GY - 34, u) - Math.sin(u * PI) * 18, lerp(.3, -.55, u), .9); }
-    if (ct >= T_.take - .01 && ct < T_.take + .5) { const u = eio((ct - T_.take) / .5); }
+    const shown = Math.min(6, (mine().mice | 0) || 1);
+    for (let l = shown - 1; l >= 0; l--) {
+      const ctL = active ? (ct + l * 1.9) % CFG.cycle : 0, pL = l ? pose(ctL) : p;
+      g.save(); if (l) { const sc = 1 - .05 * l; g.translate(W / 2, GY); g.scale(sc, sc); g.translate(-W / 2, -GY - 6 * l); g.globalAlpha = .93; }
+      worker(pL, ctL, l); g.restore();
+    }
     /* 입자 */
     parts.forEach(q => { const a = clamp(q.l / q.m, 0, 1); if (q.k === 'd') { g.globalAlpha = a * .45; g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill(); } else if (q.k === 's') { g.globalAlpha = a; g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill(); } else if (q.k === 'g') { g.globalAlpha = a; g.fillStyle = q.c; g.beginPath(); g.moveTo(q.x, q.y - q.r * 1.4); g.lineTo(q.x + q.r, q.y); g.lineTo(q.x, q.y + q.r * 1.2); g.lineTo(q.x - q.r, q.y); g.closePath(); g.fill(); } else { g.globalAlpha = 1; g.fillStyle = q.c; g.beginPath(); g.arc(q.x, q.y, q.r, 0, TAU); g.fill(); } }); g.globalAlpha = 1;
     /* 가쁜 숨 */
-    if (p.pant > .4) { const q = (T * 1.8) % 1; g.save(); g.globalAlpha = .85 * (1 - q); g.font = '900 11px ' + FONT; g.textAlign = 'center'; g.fillStyle = '#fff'; g.strokeStyle = '#000a'; g.lineWidth = 3; const bx = mxp - 22 + (face > 0 ? 40 : 0) * 0, by = GY - 50 - q * 10; g.strokeText('헉헉', bx, by); g.fillText('헉헉', bx, by); g.restore(); }
     /* 보상 팝업 */
     if (popT >= 0) { const q = popT / 1.4; g.save(); g.globalAlpha = 1 - q * q; g.font = '900 20px ' + FONT; g.textAlign = 'center'; g.lineWidth = 4; g.strokeStyle = '#2a1608'; g.fillStyle = '#ffd54a'; const y = GY - 70 - eo(q) * 32, s = '+$' + popV.toFixed(2); g.strokeText(s, 52, y); g.fillText(s, 52, y); g.restore(); }
     if (!active) { g.fillStyle = 'rgba(8,5,3,.55)'; g.fillRect(0, 0, W, H); const q = (T * .6) % 1; g.save(); g.font = '900 13px ' + FONT; g.fillStyle = '#ffe9b0'; g.textAlign = 'center'; g.fillText('zzZ', mxp0() + 14, GY - 52 - q * 14); g.restore(); }
@@ -271,5 +293,8 @@ const CSS = `
 .mnin{display:flex;gap:8px}.mnin>div{flex:1;background:#1a110c;border:1px solid #4a3620;border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;line-height:1.2;min-width:0}
 .mnin small{font-size:10px;color:#c9a15a}.mnin b{font-size:16px;color:#ffe9b0;font-variant-numeric:tabular-nums}.mnin i{font-style:normal;font-size:10px;color:#c9a15a;margin-left:3px}
 .mnnt{margin:0;font-size:11px;color:#a89873;line-height:1.5;text-align:center}
+.mnbal{background:#1a110c;border:1px solid #4a3620;border-radius:12px;padding:10px 12px;font-size:12px;color:#c9a15a}.mnbal b{color:#ffe9b0;font-size:16px;font-variant-numeric:tabular-nums}
+.mnit{display:flex;gap:10px;align-items:center;background:#1a110c;border:1px solid #4a3620;border-radius:14px;padding:12px;margin-top:8px}.mnit .ic{flex:none;width:44px;height:44px;border-radius:12px;background:linear-gradient(#3a2a18,#22160c);border:1px solid #6a4e2a;display:flex;align-items:center;justify-content:center;font-size:22px}.mnit .bd{flex:1;min-width:0;line-height:1.35}.mnit b{font-size:14px;color:#ffe9b0}.mnit p{margin:2px 0 3px;font-size:11px;color:#a89873}.mnit small{font-size:11px;color:#9ee08a}
+.mn .mnit button{flex:none!important;width:auto!important;min-width:84px;max-width:110px;margin:0!important;height:42px;padding:0 10px!important;border-radius:11px;border:1px solid #ffe08a;background:linear-gradient(#e8421f,#a8200f);color:#fff3d6;font:800 12px ${FONT};cursor:pointer;line-height:1.2}.mn .mnit button.ask{background:linear-gradient(#d9a52e,#9a6c14);color:#1c1207}.mn .mnit button:disabled{filter:grayscale(.8) brightness(.55);cursor:default;border-color:#6a4e2a}
 .mnsoon{height:240px;border-radius:14px;border:1px dashed #6a4e2a;background:#14100c;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#e8d9b4}.mnsoon b{font-size:20px;color:#ffe9b0}.mnsoon span{font-size:12px;color:#a89873}
 `;
