@@ -326,7 +326,7 @@ function grid(){if(cur==3){$('gr').innerHTML=gameCards();apply($('gr'));return}$
 /* views + theme */
 var cvw='home';
 /* ---- 채굴장: 시작 후 24시간 동안 접속 여부와 상관없이 진행 (경과 시간으로 계산) ---- */
-var mine={start:0,done:0,mice:1,lvl:0,sh:0,bo:0,sum:0},MNm=null,MNtok=0,MNC={cyc:10000,day:864e5,max:8640,at:9400,micePrice:500,miceMax:100,lvlPrice:1000,lvlMax:10,lvlStep:.2,shieldPrice:1e4,boostPrice:1e5,boostMs:18e5,boostX:30};
+var mine={start:0,done:0,mice:1,lvl:0,sh:0,bo:0,sum:0},MNm=null,MNtok=0,MNC={cyc:10000,day:864e5,max:8640,at:9400,micePrice:500,miceMax:100,lvlPrice:1000,lvlMax:Infinity,lvlStep:.2,shieldPrice:1e4,boostPrice:1e5,boostMs:18e5,boostX:30};
 function mnNorm(o){o=o||{};return{start:+o.start>0?+o.start:0,done:o.done|0,mice:Math.min(MNC.miceMax,Math.max(1,o.mice|0||1)),lvl:Math.min(MNC.lvlMax,Math.max(0,o.lvl|0)),sh:Math.max(0,o.sh|0),bo:+o.bo>0?+o.bo:0,sum:+o.sum>0?+o.sum:0}}
 function mnRw(st,i,j){var h=(Math.floor(st/1000)^Math.imul(i+1,2654435761)^Math.imul(j+1,40503))|0;h=Math.imul(h^(h>>>15),2246822507);h=Math.imul(h^(h>>>13),3266489909);h^=h>>>16;return Math.round((1+((h>>>0)/4294967296)*2)*100)/100}
 function mnMul(){return 1+MNC.lvlStep*(mine.lvl|0)}
@@ -342,7 +342,7 @@ function mnShopList(){var now=Date.now(),left=Math.max(0,(+mine.bo||0)-now),mc=m
  L.push({id:'boost',ic:'⚡',name:'경험치 부스트 3000%',desc:'30분 동안 얻는 경험치가 '+MNC.boostX+'배. 구매하면 남은 시간에 30분이 더해집니다.',st:left>0?'적용 중 · 남은 '+Math.floor(left/6e4)+'분 '+('0'+Math.floor(left%6e4/1e3)).slice(-2)+'초':'미적용',price:MNC.boostPrice,max:false});
  L.push({id:'shield',ic:'🛡️',name:'룰렛 꽝 방어권',desc:'룰렛에서 꽝(폭탄)이 나오면 1장을 써서 배팅금을 돌려받습니다.',st:'보유 '+(mine.sh|0)+'장',price:MNC.shieldPrice,max:false});
  L.push({id:'mouse',ic:'🐭',name:'채굴 생쥐 +1마리',desc:'생쥐가 1마리 늘 때마다 사이클 보상이 한 마리분 더해집니다. 구매할 때마다 가격이 2배.',st:mc+' / '+MNC.miceMax+'마리',price:mc>=MNC.miceMax?0:mnMouseP(),max:mc>=MNC.miceMax});
- L.push({id:'lvl',ic:'⛏️',name:'채굴량 +0.2배',desc:'채굴 보상 배율이 0.2씩 오릅니다. 최대 10번.',st:'채굴량 ×'+mnMul().toFixed(1)+' ('+lv+' / '+MNC.lvlMax+')',price:lv>=MNC.lvlMax?0:MNC.lvlPrice,max:lv>=MNC.lvlMax});
+ L.push({id:'lvl',ic:'⛏️',name:'채굴량 +0.2배',desc:'채굴 보상 배율이 0.2씩 오릅니다. 구매 횟수 제한 없음.',st:'채굴량 ×'+mnMul().toFixed(1)+' (구매 '+lv+'회)',price:lv>=MNC.lvlMax?0:MNC.lvlPrice,max:lv>=MNC.lvlMax});
  return L.map(function(x){x.priceTxt=x.max?'최대':fmtK(x.price)+' USDT';x.can=!x.max&&bal>=x.price-1e-9;return x})}
 function mnBuy(id){var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it)return{ok:false,msg:'알 수 없는 상품'};if(it.max)return{ok:false,msg:'이미 최대입니다'};if(bal<it.price-1e-9)return{ok:false,msg:'잔액이 부족합니다'};
  bal=+(bal-it.price).toFixed(2);
