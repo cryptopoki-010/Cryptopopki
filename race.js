@@ -431,8 +431,8 @@ export async function openRace(br) {
   function layout() {
     W = root.clientWidth; H = root.clientHeight; dpr = Math.min(window.devicePixelRatio || 1, dprCap); if (W * H * dpr * dpr > 2.4e6) dpr = Math.max(1, Math.sqrt(2.4e6 / (W * H)));
     cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    const hdr = Math.round(H * .058), dashY = H * .535;
-    Lc = { W, H, hdr, dashY, wsB: dashY + H * .045, hy: H * .30, F: W * 1.0, wcx: W / 2, wcy: H * .752, wr: Math.min(W * .235, H * .105), spX: W / 2, spY: H * .592, spR: W * .105 };
+    const hdr = Math.round(H * .05), dashY = H * .60;
+    Lc = { W, H, hdr, dashY, wsB: dashY + H * .045, hy: H * .335, F: W * 1.0, wcx: W / 2, wcy: H * .795, wr: Math.min(W * .22, H * .098), spX: W / 2, spY: H * .652, spR: W * .098 };
   }
   layout(); let rto = 0; const onR = () => { clearTimeout(rto); rto = setTimeout(() => { if (alive) layout(); }, 150); }; window.addEventListener('resize', onR);
 
@@ -554,19 +554,19 @@ export async function openRace(br) {
     g.strokeStyle = 'rgba(255,255,255,.2)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, dashY + H * .03); g.quadraticCurveTo(W / 2, dashY - H * .05, W, dashY + H * .03); g.stroke();
     g.strokeStyle = 'rgba(255,255,255,.12)'; g.setLineDash([5, 4]); g.beginPath(); g.moveTo(0, dashY + H * .052); g.quadraticCurveTo(W / 2, dashY - H * .028, W, dashY + H * .052); g.stroke(); g.setLineDash([]);
     /* 기둥/루프 */
-    const pg = g.createLinearGradient(0, 0, W * .16, 0); pg.addColorStop(0, '#07080a'); pg.addColorStop(1, '#1b1d23');
-    g.fillStyle = pg; g.beginPath(); g.moveTo(0, 0); g.lineTo(W * .17, hdr); g.lineTo(W * .06, dashY + H * .02); g.lineTo(0, dashY + H * .03); g.closePath(); g.fill();
-    const pg2 = g.createLinearGradient(W, 0, W * .84, 0); pg2.addColorStop(0, '#07080a'); pg2.addColorStop(1, '#1b1d23');
-    g.fillStyle = pg2; g.beginPath(); g.moveTo(W, 0); g.lineTo(W * .83, hdr); g.lineTo(W * .94, dashY + H * .02); g.lineTo(W, dashY + H * .03); g.closePath(); g.fill();
-    g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(W * .17, hdr); g.lineTo(W * .06, dashY + H * .02); g.moveTo(W * .83, hdr); g.lineTo(W * .94, dashY + H * .02); g.stroke();
-    const rg = g.createLinearGradient(0, 0, 0, hdr + 6); rg.addColorStop(0, '#050608'); rg.addColorStop(1, '#17191e'); g.fillStyle = rg; g.beginPath(); g.moveTo(0, 0); g.lineTo(W, 0); g.lineTo(W, 4); g.quadraticCurveTo(W / 2, hdr + 14, 0, 4); g.closePath(); g.fill();
+    const pg = g.createLinearGradient(0, 0, W * .09, 0); pg.addColorStop(0, '#07080a'); pg.addColorStop(1, '#1b1d23');
+    g.fillStyle = pg; g.beginPath(); g.moveTo(0, 0); g.lineTo(W * .09, hdr); g.lineTo(W * .02, dashY + H * .02); g.lineTo(0, dashY + H * .03); g.closePath(); g.fill();
+    const pg2 = g.createLinearGradient(W, 0, W * .91, 0); pg2.addColorStop(0, '#07080a'); pg2.addColorStop(1, '#1b1d23');
+    g.fillStyle = pg2; g.beginPath(); g.moveTo(W, 0); g.lineTo(W * .91, hdr); g.lineTo(W * .98, dashY + H * .02); g.lineTo(W, dashY + H * .03); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(W * .09, hdr); g.lineTo(W * .02, dashY + H * .02); g.moveTo(W * .91, hdr); g.lineTo(W * .98, dashY + H * .02); g.stroke();
+    const rg = g.createLinearGradient(0, 0, 0, hdr + 6); rg.addColorStop(0, '#050608'); rg.addColorStop(1, '#17191e'); g.fillStyle = rg; g.beginPath(); g.moveTo(0, 0); g.lineTo(W, 0); g.lineTo(W, 4); g.quadraticCurveTo(W / 2, hdr + 6, 0, 4); g.closePath(); g.fill();
     /* 룸미러 */
-    const mx = W * .31, mw = W * .38, my = hdr + 6, mh = H * .06;
+    const mx = W * .35, mw = W * .30, my = hdr + 2, mh = H * .042;
     g.fillStyle = '#0b0c0f'; rr(g, mx - 5, my - 3, mw + 10, mh + 6, 12); g.fill(); g.strokeStyle = '#3b3f48'; g.lineWidth = 1.5; g.stroke();
     mirror(mx, my, mw, mh, P, 0, 0, 1.55, 'rear');
     /* 사이드미러 */
-    const sw = W * .225, sh = H * .068, sy2 = dashY - H * .085;
-    [[W * .012, -1, 'L'], [W * .763, 1, 'R']].forEach(([x0, sd]) => { g.fillStyle = '#0b0c0f'; rr(g, x0 - 4, sy2 - 4, sw + 8, sh + 8, 14); g.fill(); g.strokeStyle = '#444955'; g.lineWidth = 1.5; g.stroke(); mirror(x0, sy2, sw, sh, P, sd * .9, sd * -.2, 1.25, 'side'); });
+    const sw = W * .19, sh = H * .05, sy2 = dashY - H * .048;
+    [[W * .008, -1, 'L'], [W * .802, 1, 'R']].forEach(([x0, sd]) => { g.fillStyle = '#0b0c0f'; rr(g, x0 - 4, sy2 - 4, sw + 8, sh + 8, 14); g.fill(); g.strokeStyle = '#444955'; g.lineWidth = 1.5; g.stroke(); mirror(x0, sy2, sw, sh, P, sd * .9, sd * -.2, 1.25, 'side'); });
     /* 계기판 */
     const cx = L.spX, cy = L.spY, r = L.spR;
     g.fillStyle = '#0a0b0e'; rr(g, cx - r * 2.35, cy - r * 1.18, r * 4.7, r * 2.36, r * .5); g.fill(); g.strokeStyle = 'rgba(255,255,255,.1)'; g.lineWidth = 1; g.stroke();
@@ -584,7 +584,7 @@ export async function openRace(br) {
     if (p >= 1) { kx = B[0]; ky = B[1]; } else { const q = p * 3; if (q < 1) { kx = A[0]; ky = A[1] * (1 - q); } else if (q < 2) { kx = A[0] + (B[0] - A[0]) * (q - 1); ky = 0; } else { kx = B[0]; ky = B[1] * (q - 2); } }
     drawStick(g, W * .84, H * .905, W * .045, kx, ky, gearNow, Math.sin(T * 40) * clamp(kmh / 240, 0, 1) * .8);
     /* 내비 화면 */
-    const nx0 = W * .035, ny0 = H * .79, nw = W * .215, nh = H * .115; g.fillStyle = '#05080c'; rr(g, nx0 - 3, ny0 - 3, nw + 6, nh + 6, 8); g.fill(); g.strokeStyle = '#27405e'; g.lineWidth = 1; g.stroke();
+    const nx0 = W * .035, ny0 = H * .83, nw = W * .2, nh = H * .1; g.fillStyle = '#05080c'; rr(g, nx0 - 3, ny0 - 3, nw + 6, nh + 6, 8); g.fill(); g.strokeStyle = '#27405e'; g.lineWidth = 1; g.stroke();
     g.fillStyle = '#0b1522'; rr(g, nx0, ny0, nw, nh, 6); g.fill(); g.save(); rr(g, nx0, ny0, nw, nh, 6); g.clip(); const sc = (nw - 10) / (2 * (CC + R)); mapPath(g, nx0 + nw / 2, ny0 + nh / 2, sc); g.strokeStyle = '#3d86d8'; g.lineWidth = 4; g.lineJoin = 'round'; g.stroke();
     for (const c of sim.cars) { pathAt(c.s + S0); const x = nx0 + nw / 2 + P3[0] * sc, y = ny0 + nh / 2 - P3[1] * sc; g.fillStyle = c === P ? '#ffcb2e' : CARS[c.id].c; g.beginPath(); g.arc(x, y, c === P ? 3.4 : 2, 0, TAU); g.fill(); } g.restore();
   }
@@ -602,9 +602,9 @@ export async function openRace(br) {
     const lap = clamp(Math.floor(P.s / LAP) + 1, 1, CFG.laps); g.textAlign = 'left'; g.font = '800 ' + Math.round(hdr * .27) + 'px ' + FONT; g.fillStyle = '#cfe0ff'; g.fillText('LAP ' + lap + '/' + CFG.laps, 12, hdr * .5);
     g.textAlign = 'right'; const tt = Math.max(0, sim.t - 0); const mm = Math.floor(tt / 60), ss = tt % 60; g.fillStyle = '#a9bad8'; g.fillText((mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss.toFixed(1), W - 58, hdr * .5);
     /* 드리프트 게이지 */
-    if (phase === 'race' && P.fin < 0) { const z = sim.zone(), bw = W * .5, bx = W / 2 - bw / 2, by = L.dashY - H * .125;
+    if (phase === 'race' && P.fin < 0) { const z = sim.zone(), bw = W * .46, bx = W / 2 - bw / 2, by = L.dashY - H * .06;
       if (z.arc >= 0 || z.toNext < 130) {
-        g.fillStyle = 'rgba(0,0,0,.55)'; rr(g, bx - 8, by - 20, bw + 16, 42, 12); g.fill();
+        g.fillStyle = 'rgba(0,0,0,.32)'; rr(g, bx - 8, by - 19, bw + 16, 38, 12); g.fill();
         g.font = '800 11px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = z.arc < 0 ? '#9fb6dd' : z.done ? '#6dff9f' : z.inWin ? '#ffe36a' : '#fff'; g.fillText(z.arc < 0 ? '커브 접근 중 · 준비!' : z.done ? '드리프트 성공 ✔' : z.inWin ? '지금 DRIFT!!' : '타이밍을 기다리세요', W / 2, by - 8);
         g.fillStyle = '#1b2433'; rr(g, bx, by + 2, bw, 10, 5); g.fill(); g.fillStyle = z.done ? 'rgba(109,255,159,.55)' : 'rgba(255,214,60,.85)'; rr(g, bx + bw * WIN[0], by + 2, bw * (WIN[1] - WIN[0]), 10, 5); g.fill();
         if (z.arc >= 0) { const mxp = bx + bw * z.fr; g.fillStyle = '#fff'; g.beginPath(); g.moveTo(mxp, by + 14); g.lineTo(mxp - 5, by + 22); g.lineTo(mxp + 5, by + 22); g.closePath(); g.fill(); g.fillRect(mxp - 1.5, by, 3, 12); }
