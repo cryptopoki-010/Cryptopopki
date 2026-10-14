@@ -1772,7 +1772,7 @@ window.MGNET={
  async listRooms(){const s=await getDocs(query(collection(db,RR),where('status','==','open'),limit(40)));return s.docs.map(d=>{const x=d.data();return{id:x.id||d.id,name:x.name,host:x.host,t:x.t,hb:x.hb,status:x.status}})},
  async createRoom(d){await setDoc(doc(db,RR,d.id),d)},
  async joinRoom(id,guest,ph){try{return await runTransaction(db,async tx=>{const r=doc(db,RR,id),s=await tx.get(r);if(!s.exists())return{ok:false,msg:'방이 사라졌습니다'};const x=s.data();if(x.ph!==ph)return{ok:false,msg:'비밀번호가 맞지 않습니다'};if(x.status!=='open'||x.guest)return{ok:false,msg:'이미 사용 중인 방입니다'};tx.update(r,{guest:guest,status:'joined'});return{ok:true}})}catch(e){console.error(e);return{ok:false,msg:'입장 실패 ('+(e.code||'error')+')'}}},
- watch(id,cb,err){return onSnapshot(doc(db,RR,id),s=>cb(s.exists()?s.data():null),err)},
+ watch(id,cb,err){return onSnapshot(doc(db,RR,id),{includeMetadataChanges:true},s=>{if(s.metadata.hasPendingWrites)return;cb(s.exists()?s.data():null)},err)},
  patch(id,o){return updateDoc(doc(db,RR,id),o)},
  push(id,evs){return updateDoc(doc(db,RR,id),{ev:arrayUnion(...evs)})},
  remove(id){return deleteDoc(doc(db,RR,id))}

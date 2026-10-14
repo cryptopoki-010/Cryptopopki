@@ -12,7 +12,7 @@ const angd = (a, b) => { let d = (a - b) % TAU; if (d > PI) d -= TAU; if (d < -P
 function mul32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 /* 난이도: 입장료(=최소 배팅금) · 최대 배팅금 · AI 속도 배수 */
-export const DIFFS = { easy: { n: '쉬움', fee: 1e4, max: 1e7, aiX: .975 }, normal: { n: '보통', fee: 1e7, max: 1e8, aiX: 1.005 }, hard: { n: '어려움', fee: 1e8, max: Infinity, aiX: 1.02 } };
+export const DIFFS = { easy: { n: '쉬움', fee: 1e4, max: 1e7, aiX: .94, ai: '느림 · 3등 안 확률 약 60%' }, normal: { n: '보통', fee: 1e7, max: 1e8, aiX: 1.005, ai: '보통 · 3등 안 확률 약 26%' }, hard: { n: '어려움', fee: 1e8, max: Infinity, aiX: 1.045, ai: '빠름 · 3등 안 확률 약 10%' } };
 export const CFG = { cars: 10, laps: 3, fee: 1e7, minBet: 1e7, mult: [5, 2, 0], driftWin: 1.0, wrongSlow: .5, wrongT: 2, boostX: 1.5, boostT: 2, missileT: 3, stunT: 2, shieldT: 5, aiX: 1.005, W: [.4, .3, .3], PASS: [.12, .20, .30], BM: [1.05, 1.08, 1.11], BT: [1.4, 1.8, 2.2] };
 /* 1등 배팅금×5 · 2등 배팅금×2 · 3등 입장료 환급(배팅금 몰수) · 그 외 전액 몰수 */
 export function payoutOf(rank, bet, fee) { return rank === 1 ? bet * 5 : rank === 2 ? bet * 2 : rank === 3 ? (fee || 0) : 0; }
@@ -511,7 +511,7 @@ export async function openRace(br) {
   function setDiff(d) {
     if (phase !== 'sel' || !DIFFS[d]) return; diff = d; const D = DIFFS[d]; fee = D.fee; minBet = D.fee; maxBet = D.max;
     [...$('rcdf').children].forEach(b => b.classList.toggle('on', b.dataset.d === d));
-    $('rcrl').innerHTML = '<b>' + D.n + '</b> · 입장료 <b>' + kfmt(fee) + ' USDT</b> (결과와 상관없이 소모) · 최소 배팅금 <b>' + kfmt(minBet) + '</b> · 최대 배팅금 <b>' + (isFinite(maxBet) ? kfmt(maxBet) + ' USDT' : '무제한') + '</b>';
+    $('rcrl').innerHTML = '<b>' + D.n + '</b> · 입장료 <b>' + kfmt(fee) + ' USDT</b> (결과와 상관없이 소모) · 최소 배팅금 <b>' + kfmt(minBet) + '</b> · 최대 배팅금 <b>' + (isFinite(maxBet) ? kfmt(maxBet) + ' USDT' : '무제한') + '</b><br>상대 차 속도 <b>' + D.ai + '</b> (정확한 드리프트 기준)';
     const cs = $('rcch').children; cs[0].textContent = '최소 ' + kfmt(minBet); cs[1].textContent = '+' + kfmt(minBet); cs[2].textContent = '+' + kfmt(minBet * 10); inp.placeholder = minBet.toLocaleString('en-US');
     setBet(minBet);
   }

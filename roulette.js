@@ -10,23 +10,25 @@ export const ODDS = [
   { k: 'x50', label: 'x50', mult: 50, p: 0.4 },
   { k: 'x100', label: 'x100', mult: 100, p: 0.1 },
 ];
-const BYK = {}; ODDS.forEach(o => BYK[o.k] = o);
+export const ODDS_HALF = [{ k: 'bomb', label: '꽝', mult: 0, p: 50 }, { k: 'x2', label: 'x2', mult: 2, p: 50 }];
+const BYK = {}; ODDS.concat(ODDS_HALF).forEach(o => BYK[o.k] = o);
 /* 0..999 균등 난수 (rejection sampling, crypto 우선) */
 function rand1000() {
   try { const a = new Uint32Array(1), lim = 4294967296 - (4294967296 % 1000); let v; do { crypto.getRandomValues(a); v = a[0]; } while (v >= lim); return v % 1000; } catch (e) { return Math.floor(Math.random() * 1000); }
 }
-export function rollOutcome(n) {
+export function rollOutcome(n, half) {
   if (n == null) n = rand1000();
+  if (half) return n < 500 ? BYK.bomb : BYK.x2;
   return n < 500 ? BYK.bomb : n < 800 ? BYK.x1 : n < 950 ? BYK.x5 : n < 995 ? BYK.x15 : n < 999 ? BYK.x50 : BYK.x100;
 }
 /* 휠 20칸 배치 (꽝 8 · x1 6 · x5 3 · x15 1 · x50 1 · x100 1) — 실제 확률은 추첨으로 결정되고 칸 수와는 무관 */
 export const SLICES_FULL = ['bomb', 'x1', 'bomb', 'x5', 'bomb', 'x1', 'x15', 'bomb', 'x1', 'bomb', 'x5', 'x50', 'bomb', 'x1', 'bomb', 'x5', 'x1', 'bomb', 'x100', 'x1'];
-export const SLICES_HALF = ['bomb', 'x1', 'x5', 'bomb', 'x15', 'x1', 'bomb', 'x50', 'x5', 'x100', 'bomb', 'x1'];
+export const SLICES_HALF = ['bomb', 'x2', 'bomb', 'x2', 'bomb', 'x2', 'bomb', 'x2', 'bomb', 'x2', 'bomb', 'x2', 'bomb', 'x2', 'bomb', 'x2'];
 export let SLICES = SLICES_FULL;
 const TAU = Math.PI * 2; let N = SLICES.length, STEP = TAU / N;
 function setSlices(half) { SLICES = half ? SLICES_HALF : SLICES_FULL; N = SLICES.length; STEP = TAU / N; }
 const MULS = [1, 2, 3, 5, 10, 50, 100, 500, 1000, 5000], CHIPS = [1, 5, 10, 50, 100];
-const SLC = { bomb: ['#1b1a1c', '#2a2133'], x1: ['#2e5a38', '#26502f'], x5: ['#8e2a20', '#7c231b'], x15: ['#b98a2b', '#a87a24'], x50: ['#d9a52e', '#e0b13a'], x100: ['#6b0f12', '#5a0c10'] };
+const SLC = { bomb: ['#1b1a1c', '#2a2133'], x1: ['#2e5a38', '#26502f'], x5: ['#8e2a20', '#7c231b'], x15: ['#b98a2b', '#a87a24'], x50: ['#d9a52e', '#e0b13a'], x100: ['#6b0f12', '#5a0c10'], x2: ['#2f6f5a', '#27604d'] };
 
 /* ---------------- 그리기 도구 ---------------- */
 function mk(w, h) { const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
@@ -240,7 +242,7 @@ export async function openRoulette(br) {
   if (!document.getElementById('rlcss')) { const s = document.createElement('style'); s.id = 'rlcss'; s.textContent = CSS; document.head.appendChild(s); }
   try { await Promise.race([document.fonts.load('900 20px "IBM Plex Sans KR"'), new Promise(r => setTimeout(r, 700))]); } catch (e) { }
   const root = document.createElement('div'); root.className = 'rl';
-  root.innerHTML = '<canvas></canvas><div class="rlt"><button class="rlx" aria-label="닫기">✕</button><div class="rlb"><small>보유 잔액</small><b><span id="rlbal">0.00</span><i>USDT</i></b><small id="rlsh" style="color:#9ee08a;letter-spacing:0"></small></div><div class="rlh" id="rlhist"></div><button class="rlhf" id="rlhf">🌗 1/2판</button></div>' +
+  root.innerHTML = '<canvas></canvas><div class="rlt"><button class="rlx" aria-label="닫기">✕</button><div class="rlb"><small>보유 잔액</small><b><span id="rlbal">0.00</span><i>USDT</i></b><small id="rlsh" style="color:#9ee08a;letter-spacing:0"></small></div><div class="rlh" id="rlhist"></div><button class="rlhf" id="rlhf">🎯 1/2판 (50%)</button></div>' +
     '<div class="rlr" id="rlres"><div class="card"><h3></h3><p></p><b></b></div></div>' +
     '<div class="rlp"><div class="rlbox"><div class="rlrow"><em>배율</em><div class="rlm" id="rlm"></div></div>' +
     '<div class="rlrow"><em>금액</em><div class="rla"><button id="rlmi" aria-label="감소">−</button><input id="rlin" inputmode="decimal" autocomplete="off"><button id="rlpl" aria-label="증가">+</button></div></div>' +
@@ -261,7 +263,7 @@ export async function openRoulette(br) {
   }
   build();
   let half = false;
-  function setHalf(v) { if (spinning) return; half = v; setSlices(half); wheel = paintWheel(L.R, dpr); hl = null; $('rlhf').classList.toggle('on', half); $('rlhf').textContent = half ? '🌕 일반판' : '🌗 1/2판'; sfx('rl_tick'); }
+  function setHalf(v) { if (spinning) return; half = v; setSlices(half); wheel = paintWheel(L.R, dpr); hl = null; $('rlhf').classList.toggle('on', half); $('rlhf').textContent = half ? '🎡 일반판' : '🎯 1/2판 (50%)'; sfx('rl_tick'); sync(); }
   $('rlhf').onclick = () => setHalf(!half);
   let rto = 0; const onR = () => { clearTimeout(rto); rto = setTimeout(() => { if (alive) build(); }, 180); }; window.addEventListener('resize', onR);
 
@@ -270,7 +272,7 @@ export async function openRoulette(br) {
   function maxAmt() { return Math.max(0, Math.floor(bal() / mul * 100) / 100); }
   function sync() {
     $('rlbal').textContent = fmt(bal()); $('rlsh').textContent = (br.getShield ? br.getShield() : 0) > 0 ? '꽝 방어권 ' + br.getShield() + '장' : ''; [...$('rlm').children].forEach(b => b.classList.toggle('on', +b.dataset.m === mul)); [...$('rlc2').children].forEach(b => b.classList.toggle('on', b.dataset.c && +b.dataset.c === amt));
-    const tot = +(amt * mul).toFixed(2); $('rltot').textContent = fmt(tot); $('rlmax').textContent = fmt(tot * 100); const ok = !spinning && amt >= minBet && tot <= bal() + 1e-9; $('rlsp').disabled = !ok; $('rlsp').textContent = spinning ? '...' : (tot > bal() + 1e-9 ? '잔액 부족' : 'SPIN');
+    const tot = +(amt * mul).toFixed(2); $('rltot').textContent = fmt(tot); $('rlmax').textContent = fmt(tot * (half ? 2 : 100)); const ok = !spinning && amt >= minBet && tot <= bal() + 1e-9; $('rlsp').disabled = !ok; $('rlsp').textContent = spinning ? '...' : (tot > bal() + 1e-9 ? '잔액 부족' : 'SPIN');
   }
   function setAmt(v, keep) { v = Math.round(v * 100) / 100; amt = clamp(v, minBet, Math.max(minBet, 1e15)); if (!keep) $('rlin').value = String(amt); sync(); }
   $('rlm').innerHTML = MULS.map(m => '<button data-m="' + m + '">x' + m + '</button>').join('');
@@ -281,7 +283,7 @@ export async function openRoulette(br) {
   $('rlpl').onclick = () => { if (!spinning) { sfx('rl_tick'); setAmt(amt >= 10 ? amt + 5 : amt >= 1 ? amt + 1 : amt + .1); } };
   $('rlin').addEventListener('input', () => { const v = parseFloat($('rlin').value.replace(',', '.')); if (isFinite(v) && v > 0) { amt = Math.round(v * 100) / 100; sync(); } });
   $('rlin').addEventListener('blur', () => { setAmt(isFinite(amt) ? amt : 1); });
-  $('rlod').onclick = () => { const o = document.createElement('div'); o.className = 'rlo'; o.innerHTML = '<div class="sheet"><h4>당첨 확률</h4><table>' + ODDS.map(x => '<tr><td>' + (x.mult ? 'x' + x.mult : '꽝 (폭탄)') + '</td><td>' + x.p + '%</td></tr>').join('') + '</table><p>당첨금 = 룰렛 숫자 × 배율 × 금액<br>총 배팅 = 금액 × 배율 (꽝이면 총 배팅을 잃습니다)</p><button>닫기</button></div>'; o.onclick = ev => { if (ev.target === o || ev.target.tagName == 'BUTTON') o.remove(); }; root.appendChild(o); };
+  $('rlod').onclick = () => { const o = document.createElement('div'); o.className = 'rlo'; o.innerHTML = '<div class="sheet"><h4>당첨 확률</h4><table>' + (half ? ODDS_HALF : ODDS).map(x => '<tr><td>' + (x.mult ? 'x' + x.mult : '꽝 (폭탄)') + '</td><td>' + x.p + '%</td></tr>').join('') + '</table><p>당첨금 = 룰렛 숫자 × 배율 × 금액<br>총 배팅 = 금액 × 배율 (꽝이면 총 배팅을 잃습니다)</p><button>닫기</button></div>'; o.onclick = ev => { if (ev.target === o || ev.target.tagName == 'BUTTON') o.remove(); }; root.appendChild(o); };
   function addHist(o, win) { hist.unshift({ o, win }); hist.length = Math.min(hist.length, 8); $('rlhist').innerHTML = hist.map(h => '<span class="' + (h.o.k == 'bomb' ? 'b' : h.o.mult >= 15 ? 'j' : 'w') + '">' + (h.o.k == 'bomb' ? '꽝' : 'x' + h.o.mult) + '</span>').join(''); }
   setAmt(1); sync();
 
@@ -290,7 +292,7 @@ export async function openRoulette(br) {
   function startSpin(forceK) {
     if (spinning) return; const tot = +(amt * mul).toFixed(2); if (!(amt >= minBet) || tot > bal() + 1e-9) { toast('잔액이 부족합니다'); return; }
     sfx('rl_start'); setBal(+(bal() - tot).toFixed(2)); clearTimeout(resTimer); $('rlres').classList.remove('on');
-    const o = forceK ? BYK[forceK] : rollOutcome(); const idxs = []; SLICES.forEach((k, i) => { if (k == o.k) idxs.push(i); }); const ti = idxs[(Math.random() * idxs.length) | 0], f = (Math.random() - .5) * .62;
+    const o = forceK ? BYK[forceK] : rollOutcome(null, half); const idxs = []; SLICES.forEach((k, i) => { if (k == o.k) idxs.push(i); }); const ti = idxs[(Math.random() * idxs.length) | 0], f = (Math.random() - .5) * .62;
     const targetAng = mod(-((ti + .5 + f) * STEP), TAU), cur = mod(th, TAU), big = o.mult >= 50, turns = 5 + ((Math.random() * 3) | 0) + (big ? 1 : 0), delta = mod(targetAng - cur, TAU) + turns * TAU;
     spin = { t: 0, T: big ? 7.4 : 5.8, th0: th, d: delta, o, tot, ti }; spinning = true; lastIdx = idxToPtr(th); sync();
   }
@@ -302,7 +304,7 @@ export async function openRoulette(br) {
     if (guarded) { col = '#9ee08a'; h.textContent = '방어 성공!'; p.textContent = '꽝 방어권 사용 · 배팅금 환급'; b.textContent = '+' + fmt(win) + ' USDT (손실 없음)'; sfx('rl_win', 1); flashA = .3; flashC = '#c8ffb0'; coins(30); }
     else if (o.k == 'bomb') { col = '#ff6a4a'; h.textContent = '꽝!'; p.textContent = '폭탄이 터졌습니다'; b.textContent = '-' + fmt(s.tot) + ' USDT'; sfx('rl_bomb'); shake = 1; flashA = .55; flashC = '#ff5a2a'; explode(L.cx, L.cy, 1); }
     else if (o.mult >= 50) { col = '#ffd54a'; h.textContent = o.mult >= 100 ? 'JACKPOT!!' : 'BIG WIN!'; p.textContent = 'x' + o.mult + ' × 배율 ' + mul + ' × ' + fmt(amt); b.textContent = '+' + fmt(win) + ' USDT'; sfx('rl_jackpot', o.mult >= 100 ? 2 : 1); shake = .6; flashA = .6; flashC = '#ffe08a'; coins(160); confetti(120); }
-    else if (o.mult >= 5) { col = '#9ee08a'; h.textContent = 'WIN!'; p.textContent = 'x' + o.mult + ' × 배율 ' + mul + ' × ' + fmt(amt); b.textContent = '+' + fmt(win) + ' USDT'; sfx('rl_win', 2); flashA = .22; flashC = '#c8ffb0'; coins(60); }
+    else if (o.mult >= 2) { col = '#9ee08a'; h.textContent = 'WIN!'; p.textContent = 'x' + o.mult + ' × 배율 ' + mul + ' × ' + fmt(amt); b.textContent = '+' + fmt(win) + ' USDT'; sfx('rl_win', 2); flashA = .22; flashC = '#c8ffb0'; coins(60); }
     else { col = '#d9e8c0'; h.textContent = 'x1'; p.textContent = '본전! (x1 × 배율 ' + mul + ' × ' + fmt(amt) + ')'; b.textContent = '+' + fmt(win) + ' USDT'; sfx('rl_win', 1); coins(18); }
     card.style.setProperty('--rc', col); card.style.setProperty('--ry', Math.round(L.cy + L.R * 1.2) + 'px'); hl = { i: idxToPtr(th), t: 0, c: o.k == 'bomb' ? '255,90,40' : '255,226,140' }; void card.offsetWidth; card.classList.add('on'); resTimer = setTimeout(() => card.classList.remove('on'), 2600); sync();
   }
@@ -337,11 +339,9 @@ export async function openRoulette(br) {
     { const nx = W * .035, ny = H * .085, sc = Math.min(1, (W * .42) / (neon.__w - 60)); g.globalAlpha = neonF; g.drawImage(neon, nx - 30 * sc, ny - 30 * sc, neon.__w * sc, neon.__h * sc); g.globalAlpha = 1; const rg2 = g.createRadialGradient(nx + W * .2, ny + 30, 0, nx + W * .2, ny + 30, W * .5); rg2.addColorStop(0, 'rgba(255,50,30,' + (.2 * neonF) + ')'); rg2.addColorStop(1, 'rgba(255,50,30,0)'); g.fillStyle = rg2; g.fillRect(0, 0, W, H); }
     g.globalCompositeOperation = 'source-over';
     /* 휠 */
-    if (half) { g.save(); g.beginPath(); g.rect(0, 0, W, L.cy + 1); g.clip(); }
     { const R = L.R, S = wheel.__S; g.save(); g.translate(L.cx, L.cy); g.shadowColor = 'rgba(0,0,0,.7)'; g.shadowBlur = R * .12; g.shadowOffsetY = R * .05; g.fillStyle = '#1a100a'; g.beginPath(); g.arc(0, 0, R * .99, 0, TAU); g.fill(); g.shadowColor = 'transparent'; g.rotate(th); g.drawImage(wheel, -S / 2, -S / 2, S, S); g.restore();
       if (hl) { hl.t += dt; const pa = Math.max(0, 1 - hl.t / 2.6) * (.55 + .45 * Math.sin(hl.t * 9)); if (hl.t > 2.6) hl = null; else { g.save(); g.translate(L.cx, L.cy); g.rotate(th); g.globalCompositeOperation = 'lighter'; g.fillStyle = 'rgba(' + hl.c + ',' + (.3 * pa) + ')'; g.beginPath(); g.moveTo(0, 0); g.arc(0, 0, L.R * .865, -Math.PI / 2 + hl.i * STEP, -Math.PI / 2 + (hl.i + 1) * STEP); g.closePath(); g.fill(); g.restore(); } }
       g.save(); g.translate(L.cx, L.cy); g.drawImage(shade, -S / 2, -S / 2, S, S); g.restore(); /* 허브 하이라이트는 포함됨 */ }
-    if (half) { g.restore(); const R = L.R, bw = R * 2.3, bh = R * .2, bx = L.cx - bw / 2, by = L.cy; const bgp = g.createLinearGradient(0, by, 0, by + bh); bgp.addColorStop(0, '#5a3d22'); bgp.addColorStop(.12, '#7a5430'); bgp.addColorStop(1, '#2a1a0e'); g.fillStyle = bgp; g.shadowColor = 'rgba(0,0,0,.7)'; g.shadowBlur = R * .08; g.fillRect(bx, by, bw, bh); g.shadowColor = 'transparent'; g.fillStyle = 'rgba(255,225,170,.28)'; g.fillRect(bx, by, bw, 2); g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(bx, by + bh - 3, bw, 3); for (let i = 0; i < 6; i++) { g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(bx + (i + .5) * bw / 6, by + 4, 1.5, bh - 8); } g.fillStyle = '#c9a15a'; g.font = '900 ' + Math.round(R * .085) + 'px ' + FONT; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('HALF  ROULETTE · 1/2', L.cx, by + bh / 2); }
     drawPointer(g, L.cx, L.cy - L.R * .98, L.R * .2, -ptr * .8);
     /* 먼지 */
     g.globalCompositeOperation = 'lighter'; motes.forEach(m => { m.y += m.v * dt; m.x += Math.sin(t * .4 + m.ph) * .0004; if (m.y > 1) { m.y = 0; m.x = Math.random(); } const px = m.x * W, py = m.y * H, d = Math.hypot(px - lx, (py - ly) * .8) / (W * .6), a = Math.max(0, 1 - d) * .5 * (.6 + .4 * Math.sin(t * 1.3 + m.ph)); if (a > .02) { g.fillStyle = 'rgba(255,214,150,' + a + ')'; g.beginPath(); g.arc(px, py, m.r, 0, TAU); g.fill(); } }); g.globalCompositeOperation = 'source-over';

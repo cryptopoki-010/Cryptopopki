@@ -15,7 +15,7 @@ const CARDS = {
 const CKEYS = Object.keys(CARDS);
 const WEIGHTS = { pistol: 10, know: 8, intercept: 8, bomb: 8, food: 12, wrench: 12, dodge: 12, gulp: 8, poison: 10, knife: 12 };
 const CHAT = ['안녕하세요 :)', '쫄리면 뒈지시던가', '시작할게요.', '줴줴이~야', '티~원', '한번만 살려주세요.'];
-const HANDMAX = 10, CUP_MS = 15000, TURN_MS = 30000, PICK_MS = 10000, IDLE_MS = 60000;
+const HANDMAX = 10, CUP_MS = 15000, TURN_MS = 30000, PICK_MS = 10000, IDLE_MS = 60000, SUDDEN = 100;
 const other = (S, u) => (u === S.p[0] ? S.p[1] : S.p[0]);
 
 class RRGame {
@@ -36,7 +36,24 @@ class RRGame {
   mk(c, cd, got) { const k = { id: this.me.slice(0, 3) + (this.L.nid++), c }; if (c === 'bomb') { k.cd = cd == null ? 3 : cd; k.got = got == null ? -1 : got; } return k; }
   recvCard(c, fromSteal) { const S = this.S; return this.mk(c, fromSteal ? 2 : 3, S.turn === this.me ? S.turnNo : -1); }
   uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3); }
-  emit(...evs) { evs.forEach(e => { e.i = this.uid(); e.by = this.me; e.mo = this.L.mood; }); this.net.push(this.room, evs); }
+  emit(...evs) { evs.forEach(e => { e.i = this.uid(); e.by = this.me; e.mo = this.L.mood; }); if (evs.some(e => e.t !== 'chat')) this.inflight = this.now(); this.send(evs, 0); }
+  /* 전송 실패 시 재시도 (arrayUnion 은 같은 이벤트를 중복 추가하지 않는다) */
+  send(evs, n) { let p; try { p = this.net.push(this.room, evs); } catch (x) { p = Promise.reject(x); } if (p && p.catch) p.catch(x => { if (n < 8 && !this.dead) this.setT(() => this.send(evs, n + 1), 500 * (n + 1)); else console.error('[rr net]', x); }); }
+  /* 서버가 없으므로 모든 클라이언트가 같은 기준으로 '그 시점에 유효한 이벤트인지' 판정해 무효 이벤트(연타·지연으로 겹친 행동)는 무시한다 */
+  legal(e) {
+    const S = this.S, by = e.by, t = e.t;
+    switch (t) {
+      case 'start': return S.phase === 'init' && S.turnNo === 0;
+      case 'draw': case 'pass': case 'use': return S.phase === 'turn' && S.turn === by && !S.skip[by] && !S.pistol[by];
+      case 'fire': return S.phase === 'turn' && S.turn === by && !!S.pistol[by];
+      case 'skip': return S.phase === 'turn' && S.turn === by && !!S.skip[by] && !S.pistol[by];
+      case 'pick': return S.phase === 'pick' && S.turn === by;
+      case 'res': return S.phase === 'res' && S.resp === by && !!S.pend && ((e.k === 'atk' && S.pend.k === 'atk') || (e.k === 'know' && S.pend.k === 'know') || (e.k === 'steal' && S.pend.k === 'steal'));
+      case 'cupc': return S.phase === 'cup' && !S.cc[by];
+      case 'cupr': return S.phase === 'cup' && !!S.cc[S.p[0]] && !!S.cc[S.p[1]] && !S.cr[by];
+      default: return true;
+    }
+  }
   /* 표정용 체력 구간 (일부러 완벽히 일치하지 않게 흔든다) */
   remood() { const hp = this.L.hp; let m = hp > 70 ? 0 : hp > 40 ? 1 : hp > 20 ? 2 : 3; const r = this.rand(); if (r < .22) m = Math.min(3, m + 1); else if (r < .44) m = Math.max(0, m - 1); this.L.mood = m; }
   async hash(s) { try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'f' + (h >>> 0).toString(16); } }
@@ -48,7 +65,7 @@ class RRGame {
   }
   get qbusy() { return this.busy || this.q.length > 0; }
   mustAuto() { const S = this.S; return S.turn === this.me && (S.skip[this.me] || S.pistol[this.me]); }
-  canAct() { const S = this.S; return !S.over && S.phase === 'turn' && S.turn === this.me && !this.qbusy && !this.mustAuto(); }
+  canAct() { const S = this.S; if (this.inflight && this.now() - this.inflight < 5000) return false; return !S.over && S.phase === 'turn' && S.turn === this.me && !this.qbusy && !this.mustAuto(); }
   canDraw() { return this.S.n[this.me] < HANDMAX; }
   clearTurn() { this.clrT(this.tt); this.tt = null; this.clrT(this.pt); this.pt = null; }
   startTurn() {
@@ -65,6 +82,8 @@ class RRGame {
     if (S.turn === this.me) { /* 턴 종료 시 자폭 카운트다운 */
       const boom = []; L.hand.forEach(k => { if (k.c === 'bomb' && k.got !== S.turnNo) { k.cd--; if (k.cd <= 0) boom.push(k); } });
       boom.forEach(k => this.emit({ t: 'bombx', cid: k.id }));
+      /* 서든데스: 100턴이 넘으면 자기 턴이 끝날 때마다 체력이 깎인다 (무한 대치·로그 폭주 방지) */
+      if (S.turnNo >= SUDDEN) { this.hurt(2 + Math.floor((S.turnNo - SUDDEN) / 20)); this.checkDead(); }
     }
     S.turn = other(S, S.turn); S.turnNo++; S.pend = null; S.resp = null; this.startTurn();
   }
@@ -80,7 +99,9 @@ class RRGame {
   async handle(e) {
     const S = this.S, L = this.L, me = this.me, isMe = e.by === me, by = e.by, ot = other(S, by);
     S.lastT = this.now(); this.log.push(e.t); if (e.mo != null) S.mood[by] = e.mo;
+    if (isMe && e.t !== 'chat') this.inflight = 0;
     if (S.over && e.t !== 'chat') return;
+    if (!this.legal(e)) { this.log.push('x' + e.t); this.ui.update(); return; }
     switch (e.t) {
       case 'start': S.first = e.first; S.ang = e.ang; S.n[S.p[0]] = 5; S.n[S.p[1]] = 5; S.turn = e.first; S.turnNo = 1; await this.play(e); this.startTurn(); break;
       case 'draw': {
@@ -391,6 +412,7 @@ class Scene {
       case 'chat': this.say(sd, e.m); this.sfx('rr_chat'); return Promise.resolve();
       default: return Promise.resolve();
     }
+    if (typeof document !== 'undefined' && document.hidden) return Promise.resolve(); /* 백그라운드 탭: 애니메이션 생략(타이머 지연으로 진행이 멈추는 것 방지) */
     return new Promise(res => { this.an = { k, t: 0, d, data, res, once: {} }; setTimeout(() => { if (this.an && this.an.res === res) this.finish(); }, d * 1000 + 700); });
   }
   finish() { const a = this.an; if (!a) return; this.an = null; this.after(a); a.res(); }
@@ -862,7 +884,7 @@ export function openRR(br) {
     if (giveMode) ds.innerHTML = '<div class="rrdesc"><div>🖐️ <b>넘길 카드를 두 번 눌러 선택</b>하세요. 상대가 팔을 내밀면 상대 카드 한 장을 뽑아 교체합니다.</div></div>';
     else if (sk && !S.over) { const C = CARDS[sk.c]; ds.innerHTML = '<div class="rrdesc"><div><b>' + C.ic + ' ' + C.n + '</b> <small style="color:#c9a15a">[' + (C.k || '') + ']</small><br>' + C.d + (sk.c === 'bomb' ? ' (남은 ' + sk.cd + '턴)' : '') + '</div>' + (sk.c === 'bomb' ? '' : '<button id="ruse">사용</button>') + '</div>'; const u = $('ruse'); if (u) { u.disabled = !(game.canUse(sk) && canAct); u.onclick = () => useCard(sk); } }
     else ds.innerHTML = '';
-    { const opp = game.opp, bd = []; if (S.pistol[me]) bd.push('<span class="r">🔫 내 권총 · 다음 내 턴 시작에 격발</span>'); if (S.pistol[opp]) bd.push('<span class="r">🔫 상대 권총 장전됨 · 상대 턴 시작에 격발(50%)</span>'); if (S.dodge[me]) bd.push('<span>💨 회피 대기</span>'); if (S.dodge[opp]) bd.push('<span>💨 상대 회피 대기</span>'); if (S.skip[me]) bd.push('<span>😵 다음 턴 쉼</span>'); if (L.hand.some(k => k.c === 'bomb' && k.cd <= 1)) bd.push('<span class="r">💣 이번 턴 끝에 자폭!</span>'); const bh = bd.join(''); if (bh !== lastBdg) { lastBdg = bh; $('rbdg').innerHTML = bh; } }
+    { const opp = game.opp, bd = []; if (S.pistol[me]) bd.push('<span class="r">🔫 내 권총 · 다음 내 턴 시작에 격발</span>'); if (S.pistol[opp]) bd.push('<span class="r">🔫 상대 권총 장전됨 · 상대 턴 시작에 격발(50%)</span>'); if (S.dodge[me]) bd.push('<span>💨 회피 대기</span>'); if (S.dodge[opp]) bd.push('<span>💨 상대 회피 대기</span>'); if (S.skip[me]) bd.push('<span>😵 다음 턴 쉼</span>'); if (S.turnNo >= 100) bd.push('<span class="r">☠️ 서든데스 · 턴이 끝날 때마다 체력 감소</span>'); if (L.hand.some(k => k.c === 'bomb' && k.cd <= 1)) bd.push('<span class="r">💣 이번 턴 끝에 자폭!</span>'); const bh = bd.join(''); if (bh !== lastBdg) { lastBdg = bh; $('rbdg').innerHTML = bh; } }
     if (S.over && !lastOver) { lastOver = true; setTimeout(showOver, 1200); }
     if (chatOpen) renderChat();
   }
