@@ -23,7 +23,8 @@ export const FX = .2299;                                   /* front plane of key
 export const KEYS = [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['C', '0', 'OK']];
 export const KZ = [-.2787, -.3058, -.332], KY = [.198, .169, .139, .110];   /* button columns (screen-left → right) / rows (top → bottom) */
 export const SZ = [.262, .157, .053, -.050, -.154], SY = [.298, .104, -.086];  /* coin slots in the window */
-export const BIN = { z0: -.21, z1: .25, y0: -.365, y1: -.256, d: .06, zc: .02 };  /* pickup tray: protrudes d from the body */
+export const BIN = { z0: -.24, z1: .30, y0: -.365, y1: -.256, d: .16, zc: .03 };  /* pickup drawer: slides out by d (open) in front of the body; closed it is flush */
+export const DRW_X = FX + .012;                                /* front face of the drawer panel when CLOSED */
 export const COIN = { r: .046, t: .009 };
 const WIN_FLOOR = -.19;                                      /* top of the window's lower lip */
 export function keyPos(k) { for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) if (KEYS[r][c] === k) return [FX, KY[r], KZ[c]]; return [FX, KY[0], KZ[0]]; }
@@ -96,7 +97,7 @@ export const CAMS = {
   wide: { z: .0, y: -.02, w: 1.0, h: 1.25, az: .10, el: .05 },
   pad: { z: -.335, y: .15, w: .36, h: .50, az: .12, el: .08 },
   win: { z: .06, y: .10, w: .74, h: .95, az: -.12, el: .06 },
-  bin: { z: .02, y: -.28, w: .50, h: .42, az: -.10, el: .22 },
+  bin: { z: .03, y: -.27, w: .66, h: .46, az: -.10, el: .24 },
   show: { z: .02, y: -.22, w: .62, h: .5, az: 0, el: .12 }
 };
 function grabPose() { return POSES.pinch; }
@@ -149,7 +150,7 @@ export function makeVendTimeline(rs) {
     ev.push({ t: cy.coin.tLandT + (fast ? .09 : .15), n: 'vd_drop', a: .6 });
     cm(cy.coin.tFallEnd - .1, 'win'); cm(cy.coin.tLandT + (fast ? .1 : .35), 'bin');
     /* --- D. hand reaches down into the tray, pinches the coin, lifts it to the camera --- */
-    const cx = FX + BIN.d * .5, cyy = BIN.y0 + .004 + COIN.r;      /* standing coin centre */
+    const cx = DRW_X + BIN.d * .5 + .014, cyy = BIN.y0 + .004 + COIN.r;      /* standing coin centre */
     cy.rest = [cx, cyy, BIN.zc];
     const tipOn = [cx - .0075, cyy + COIN.r - .012, BIN.zc], tipHi = [cx - .0075 + .01, cyy + COIN.r + .13, BIN.zc + .02], tipOut = [cx + .12, cyy + COIN.r + .24, BIN.zc - .24];
     const tG0 = cy.coin.tLandT + (fast ? .1 : .3), dG = fast ? .42 : .8, dDown = fast ? .22 : .42, dCl = fast ? .16 : .3, dLift = fast ? .5 : .9;
@@ -165,7 +166,8 @@ export function makeVendTimeline(rs) {
     const hold = (ucrd ? g.hold + .6 : (fast ? Math.max(.7, g.hold * .55) : g.hold * .8));
     hv(tShow + hold * .5, [show[0] + .35, show[1] - .1, show[2] - .5], GRAB.yaw + .1, GRAB.pitch + .3, 0, HOLD, 'i');
     hv(tShow + hold, exitP, YAW0, PITCH0 + .25, 0, OP, 'i');
-    cy.grab = { tG0, tClose: tCl, tLift0: tL0, tShow, tTip: tipOn }; cy.tShow = tShow; cy.hold = hold; cy.tEnd = tShow + hold;
+    cy.grab = { tG0, tClose: tCl, tLift0: tL0, tShow, tTip: tipOn }; cy.tShow = tShow;
+    { const dO = fast ? .3 : .55, tO0 = cy.coin.tD - (fast ? .1 : .35), tC0 = tL0 + dLift * .55; cy.drawer = { tO0, tO1: tO0 + dO, tC0, tC1: tC0 + (fast ? .3 : .5) }; ev.push({ t: tO0, n: 'vd_roll', a: .25 }); ev.push({ t: cy.drawer.tO1, n: 'vd_clunk', a: .55 }); ev.push({ t: cy.drawer.tC1, n: 'vd_clunk', a: .45 }); } cy.hold = hold; cy.tEnd = tShow + hold;
     ev.push({ t: tCl, n: 'vd_take', a: 1 }); ev.push({ t: tShow, n: e.g == 'UR' ? 'rl_jackpot' : 'rl_win', a: e.g == 'UR' ? 1 : (e.g == 'SR' ? 2 : 1) });
     cm(tG0 - .05, 'bin'); cm(tShow - .25, 'show'); cm(tShow + hold, 'show');
     cyc.push(cy); T = cy.tEnd - (fast ? .1 : .25);
@@ -211,6 +213,11 @@ export function sampleCoin(tl, t, hand) {
     if (t < cy.tShow + .0001) { const f = hand.fk, P = f.idxTip, Q = f.thTip, m = [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2, (P[2] + Q[2]) / 2]; return { cy, p: [m[0], m[1] - COIN.r + .012, m[2]], rx: 0, ry: 0, rz: 0, vis: true, stage: 'hand', held: true }; }
   }
   return null;
+}
+/* pickup drawer 0 (closed) … 1 (fully open) */
+export function sampleDrawer(tl, t) {
+  let u = 0; for (const cy of tl.cyc) { const D = cy.drawer; if (!D) continue; if (t >= D.tO0 && t < D.tC0) u = Math.max(u, easeO(clamp((t - D.tO0) / (D.tO1 - D.tO0), 0, 1))); else if (t >= D.tC0 && t < D.tC1) u = Math.max(u, 1 - ease(clamp((t - D.tC0) / (D.tC1 - D.tC0), 0, 1))); }
+  return u;
 }
 /* shelf-cursor + display state */
 export function sampleUI(tl, t) {
@@ -380,7 +387,7 @@ export function createVendScene(opt) {
   const cyan = new THREE.PointLight(0x30d8ff, .5, 3.5, 2); cyan.position.set(-.05, .25, -.95); scene.add(cyan);
   const magenta = new THREE.PointLight(0xff3fa8, .45, 3.5, 2); magenta.position.set(-.05, .2, .95); scene.add(magenta);
   const winL = new THREE.PointLight(0xdfeaff, .45, 1.4, 2); winL.position.set(FX + .35, .10, .05); scene.add(winL);
-  const binL = new THREE.PointLight(0xffd9a0, 0, 1.0, 2); binL.position.set(FX + .04, -.30, BIN.zc); scene.add(binL);
+  const binL = new THREE.PointLight(0xffd9a0, 0, 1.0, 2); binL.position.set(DRW_X + BIN.d * .5, -.28, BIN.zc); scene.add(binL);
   const coinL = new THREE.PointLight(0xffcf70, 0, 1.2, 2); scene.add(coinL);
 
   /* ---- room ---- */
@@ -408,12 +415,19 @@ export function createVendScene(opt) {
   const curM = new THREE.Mesh(new THREE.PlaneGeometry(.122, .122), new THREE.MeshBasicMaterial({ map: cursorTex(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); curM.rotation.y = Math.PI / 2; curM.position.set(.2095, 0, 0); curM.visible = false; scene.add(curM);
   const curL = new THREE.PointLight(0x40d8ff, 0, .6, 2); scene.add(curL);
 
-  /* ---- pickup tray (protrudes from the painted hatch) ---- */
-  const trayM = new THREE.MeshStandardMaterial({ color: 0x14161b, roughness: .5, metalness: .5, envMap: env, envMapIntensity: .45 }), trayIn = new THREE.MeshStandardMaterial({ color: 0x0a0b0e, roughness: .6, metalness: .3 });
-  const tbox = (x0, x1, y0, y1, z0, z1, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), m || trayM); b.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); b.receiveShadow = SH; b.castShadow = SH; scene.add(b); return b; };
-  tbox(FX - .001, FX + BIN.d, BIN.y0, BIN.y0 + .005, BIN.z0, BIN.z1); tbox(FX - .001, FX + BIN.d, BIN.y0, BIN.y1, BIN.z0, BIN.z0 + .005); tbox(FX - .001, FX + BIN.d, BIN.y0, BIN.y1, BIN.z1 - .005, BIN.z1);
-  tbox(FX + BIN.d - .006, FX + BIN.d, BIN.y0, BIN.y0 + .014, BIN.z0, BIN.z1); tbox(FX, FX + .004, BIN.y0 + .005, BIN.y1, BIN.z0 + .005, BIN.z1 - .005, trayIn);
-  tbox(FX + .016, FX + .020, BIN.y0 + .005, BIN.y0 + .016, BIN.zc - .03, BIN.zc + .03, trayM); tbox(FX + .040, FX + .044, BIN.y0 + .005, BIN.y0 + .016, BIN.zc - .03, BIN.zc + .03, trayM);
+  /* ---- pickup drawer: slides out of the hatch before the coin drops, so the hand reaches in FRONT of the body (never through it) ---- */
+  const trayM = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: .5, metalness: .5, envMap: env, envMapIntensity: .45 }), trayIn = new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: .65, metalness: .25, envMap: env, envMapIntensity: .25 }), handleM = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, roughness: .35, metalness: 1, envMap: env, envMapIntensity: .6 });
+  const drawer = new THREE.Group(); scene.add(drawer);
+  const XF = DRW_X + BIN.d;                                    /* panel front face when open (group is shifted back by (1-u)*d) */
+  const tbox = (x0, x1, y0, y1, z0, z1, m) => { const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), m || trayM); b.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); b.receiveShadow = SH; b.castShadow = SH; drawer.add(b); return b; };
+  const xb = FX - .03, wt = .006;                              /* back end hides inside the body */
+  tbox(xb, XF - .014, BIN.y0, BIN.y0 + .004, BIN.z0, BIN.z1, trayIn);                       /* floor */
+  tbox(xb, XF - .014, BIN.y0, BIN.y1 - .01, BIN.z0, BIN.z0 + wt); tbox(xb, XF - .014, BIN.y0, BIN.y1 - .01, BIN.z1 - wt, BIN.z1);   /* side walls */
+  tbox(XF - .014, XF, BIN.y0 - .004, BIN.y1 + .004, BIN.z0 - .004, BIN.z1 + .004);          /* front panel */
+  tbox(XF, XF + .008, BIN.y0 + .03, BIN.y0 + .038, BIN.zc - .06, BIN.zc + .06, handleM);    /* pull lip */
+  tbox(XF - .012, XF - .006, BIN.y0 + .008, BIN.y0 + .016, BIN.zc - .04, BIN.zc + .04, trayM);
+  const drawerU = u => { drawer.position.x = -(1 - u) * BIN.d; drawer.visible = true; };
+  drawerU(0);
 
   /* ---- coin ---- */
   const coin = new THREE.Group(), cr = COIN.r, ct = COIN.t, coinFaces = { R: coinFace('R'), SR: coinFace('SR'), UR: coinFace('UR') };
@@ -494,6 +508,7 @@ export function createVendScene(opt) {
     /* cursor */
     if (ui.cursor >= 0 && cy) { const s = ui.cursor, z = SZ[s % 5], y = SY[Math.floor(s / 5)], pul = ui.landed ? 1 + .12 * Math.sin(t * 24) * (1 - ui.curU) : 1; curM.visible = ui.curU < 1; curM.position.set(.2095, y, z); curM.scale.set(pul, pul, 1); curM.material.opacity = ui.landed ? 1 - ui.curU : 1; curL.position.set(.26, y, z); curL.intensity = ui.curU < 1 ? .7 : 0; }
     else { curM.visible = false; curL.intensity = 0; }
+    drawerU(sampleDrawer(tl, t));
     /* coin */
     const cs = sampleCoin(tl, t, hdata);
     if (cs && cs.vis) {
