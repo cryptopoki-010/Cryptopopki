@@ -681,12 +681,139 @@ const RRCSS = `
 .rrbdg{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;min-height:0}.rrbdg span{font-size:11px;font-weight:800;border-radius:8px;padding:3px 8px;background:#2a1c12;border:1px solid #6a4e2a;color:#ffe9b0}.rrbdg span.r{border-color:#ff6a5a;color:#ff9a8a;background:#3a1410;animation:rrp 1s infinite}
 .rrc.warn{border-color:#ff4a3a;box-shadow:0 0 0 2px #ff4a3a88}.rrbox small.sub{font-size:11px;color:#9fb4cc}
 `;
-const RULES_TX = `match /rooms/{rid} {
-  allow read: if request.auth != null;
-  allow create: if request.auth != null && request.resource.data.host.uid == request.auth.uid;
-  allow update: if request.auth != null && (resource.data.host.uid == request.auth.uid || (resource.data.guest != null && resource.data.guest.uid == request.auth.uid) || (resource.data.guest == null && request.resource.data.guest.uid == request.auth.uid));
-  allow delete: if request.auth != null && (resource.data.host.uid == request.auth.uid || (resource.data.guest != null && resource.data.guest.uid == request.auth.uid));
-}`;
+const RULES_TX = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ───────── 공통 ─────────
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    // 표시용 문자열: HTML/스크립트에 쓰이는 문자 금지 (저장형 XSS 방어, 클라이언트의 이스케이프와 이중 방어)
+    function cleanStr(s, max) {
+      return s is string && s.size() >= 1 && s.size() <= max
+        && !s.matches(".*[<>&\\"'\`\\\\\\\\].*");
+    }
+
+    // ───────── 내 진행 데이터 ─────────
+    // 주의: 게임 결과(잔액 증감)는 클라이언트가 계산하므로 규칙만으로는 '정당한 값'을 증명할 수 없다.
+    //       여기서는 스키마·타입·상한만 강제한다. 서버 권위 정산은 SECURITY.md 의 '남은 위험' 참고.
+    function validUser(d) {
+      return d.keys().hasOnly(['bal','inv','invV','opens','urN','col','used','exp','eq','mine','rr','shl','tr','ts'])
+        && d.bal is number && d.bal >= 0 && d.bal <= 1000000000000000
+        && d.get('inv', {}) is map && d.get('inv', {}).size() <= 2000
+        && d.get('invV', {}) is map && d.get('invV', {}).size() <= 2000
+        && d.get('col', {}) is map && d.get('col', {}).size() <= 2000
+        && d.get('used', {}) is map && d.get('used', {}).size() <= 200
+        && d.get('mine', {}) is map
+        && d.get('rr', {}) is map
+        && d.get('opens', 0) is number && d.get('opens', 0) >= 0 && d.get('opens', 0) <= 1000000000
+        && d.get('urN', 0) is number && d.get('urN', 0) >= 0 && d.get('urN', 0) <= 1000000000
+        && d.get('exp', 0) is number && d.get('exp', 0) >= 0 && d.get('exp', 0) <= 1000000000000
+        && d.get('eq', -1) is number
+        && d.get('ts', 0) is number
+        && (!('shl' in d) || d.shl == null || d.shl is map)
+        // 가상 트레이딩 상태 (포지션·주문·현물·내역)
+        && (!('tr' in d) || d.tr == null
+            || (d.tr is map && d.tr.keys().hasOnly(['v','pos','ord','spot','hist','lev','mode','seq','last'])
+                && d.tr.get('pos', {}) is map && d.tr.get('pos', {}).size() <= 20
+                && d.tr.get('ord', []) is list && d.tr.get('ord', []).size() <= 50
+                && d.tr.get('spot', {}) is map && d.tr.get('spot', {}).size() <= 20
+                && d.tr.get('hist', []) is list && d.tr.get('hist', []).size() <= 60));
+    }
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid) && validUser(request.resource.data);
+      allow delete: if false;
+
+      match /prefs/banner {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['coins','updatedAt'])
+          && request.resource.data.coins is list
+          && request.resource.data.coins.size() <= 6;
+      }
+      // 닉네임: 24시간에 한 번. nickAt 은 서버 시각 ±5분이어야 한다(과거 값으로 쿨다운 우회 방지).
+      match /prefs/profile {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['nick','nickAt','rf','updatedAt'])
+          && request.resource.data.rf is bool
+          && (!('nick' in request.resource.data)
+              || (request.resource.data.nick is string
+                  && request.resource.data.nick.matches('^[가-힣A-Za-z0-9]{1,12}$')
+                  && request.resource.data.nickAt is number
+                  && request.resource.data.nickAt <= request.time.toMillis() + 300000
+                  && request.resource.data.nickAt >= request.time.toMillis() - 300000))
+          && (resource == null
+              || !('nick' in resource.data)
+              || request.resource.data.get('nick', '') == resource.data.nick
+              || resource.data.nickAt + 86400000 <= request.time.toMillis() + 300000);
+      }
+    }
+
+    // ───────── 랭킹 (공개 읽기) ─────────
+    function lbBalOk(uid, d) {
+      return !('bal' in d)
+        || (d.bal is number && d.bal >= 0 && d.bal <= 1000000000000000
+            && exists(/databases/$(database)/documents/users/$(uid))
+            && math.abs(get(/databases/$(database)/documents/users/$(uid)).data.bal - d.bal) <= 0.01);
+    }
+    match /leaderboard/{uid} {
+      allow read: if true;
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['n','L','bal','exp','eq','opens','rf','t'])
+        && cleanStr(request.resource.data.n, 20)
+        && request.resource.data.L is number && request.resource.data.L >= 1 && request.resource.data.L <= 1000
+        && request.resource.data.exp is number && request.resource.data.exp >= 0 && request.resource.data.exp <= 1000000000000
+        && (!('opens' in request.resource.data)
+            || (request.resource.data.opens is number && request.resource.data.opens >= 0 && request.resource.data.opens <= 1000000000))
+        && (!('eq' in request.resource.data) || request.resource.data.eq is number)
+        && (!('rf' in request.resource.data) || request.resource.data.rf is bool)
+        && (!('t' in request.resource.data) || request.resource.data.t is number)
+        && lbBalOk(uid, request.resource.data);
+      allow delete: if false;
+    }
+
+    // ───────── 러시안 룰렛 방 ─────────
+    function isHost() { return signedIn() && resource.data.host.uid == request.auth.uid; }
+    function isGuest() { return signedIn() && resource.data.guest != null && resource.data.guest.uid == request.auth.uid; }
+    function sameHost() { return request.resource.data.host.uid == resource.data.host.uid; }
+    function evOk() { return request.resource.data.get('ev', []).size() <= 1000; }
+
+    match /rooms/{rid} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.id == rid
+        && request.resource.data.host.uid == request.auth.uid
+        && cleanStr(request.resource.data.name, 16)
+        && cleanStr(request.resource.data.host.n, 20)
+        && request.resource.data.guest == null
+        && request.resource.data.status == 'open'
+        && request.resource.data.get('ev', []).size() == 0;
+      // 방장/참가자 갱신 (방장 uid 변경 불가, 이벤트 로그 상한)
+      allow update: if signedIn() && (
+        ((isHost() || isGuest()) && sameHost() && evOk())
+        // 입장: 빈 방에 '내가' guest 로 들어가며, 방장이 정한 비밀번호 해시(sec/ph)를 제시해야 한다
+        || (resource.data.guest == null
+            && resource.data.status == 'open'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest','status'])
+            && request.resource.data.status == 'joined'
+            && request.resource.data.guest.uid == request.auth.uid
+            && cleanStr(request.resource.data.guest.n, 20)
+            && request.resource.data.guest.pw == get(/databases/$(database)/documents/rooms/$(rid)/sec/ph).data.ph));
+      allow delete: if isHost() || isGuest();
+
+      // 비밀번호 해시는 방 문서와 분리 — 방장만 읽을 수 있고 다른 사용자는 볼 수 없다
+      match /sec/ph {
+        allow create: if signedIn() && getAfter(/databases/$(database)/documents/rooms/$(rid)).data.host.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['ph','uid'])
+          && request.resource.data.ph is string && request.resource.data.ph.size() <= 128;
+        allow read, update, delete: if signedIn() && get(/databases/$(database)/documents/rooms/$(rid)).data.host.uid == request.auth.uid;
+      }
+    }
+  }
+}
+`;
 function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = v => (+v).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
@@ -736,7 +863,7 @@ export function openRR(br) {
       try { const id = 'r' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), ph = await sha(id + ':' + p);
         const doc = { id, name: n, ph, host: { uid: me, n: myName }, guest: null, status: 'open', bet: 0, offer: null, ev: [], hb: Date.now(), t: Date.now() };
         await Promise.race([net.createRoom(doc), new Promise((_, rj) => setTimeout(() => rj({ code: 'timeout' }), 10000))]); roomId = id; isHost = true; enterRoom(); } catch (e) { console.error(e); const c = (e && e.code) || (e && e.message) || 'error', rm = $('rm'); if (!rm) return;
-        if (c === 'permission-denied' || c === 'timeout') { rm.innerHTML = (c === 'timeout' ? '서버 연결이 지연되어 방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' : '방을 만들 수 없습니다: Firebase 규칙에 rooms 권한이 없습니다.') + '<br><small>(오류 코드: ' + c + ' · 연결 방식: ' + (window.__fsmode || '기본(이전 index.html)') + (c === 'timeout' ? ' — 연결 방식이 기본이면 index.html을 새로 배포하고 새로고침해 주세요' : ' — Firebase 규칙에 아래 블록을 추가하고 게시해 주세요') + ')</small><br><button class="rrbtn" id="rcp" style="margin-top:6px;padding:6px 10px;font-size:12px">규칙 블록 복사</button>'; const cb = $('rcp'); if (cb) cb.onclick = () => { try { navigator.clipboard.writeText(RULES_TX); cb.textContent = '복사됨 ✓' } catch (x) { cb.textContent = '복사 실패' } } }
+        if (c === 'permission-denied' || c === 'timeout') { rm.innerHTML = (c === 'timeout' ? '서버 연결이 지연되어 방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' : '방을 만들 수 없습니다: Firebase 규칙에 rooms 권한이 없습니다.') + '<br><small>(오류 코드: ' + c + ' · 연결 방식: ' + (window.__fsmode || '기본(이전 index.html)') + (c === 'timeout' ? ' — 연결 방식이 기본이면 index.html을 새로 배포하고 새로고침해 주세요' : ' — 아래 전체 규칙을 Firebase 콘솔 → Firestore → 규칙에 붙여넣고 게시해 주세요') + ')</small><br><button class="rrbtn" id="rcp" style="margin-top:6px;padding:6px 10px;font-size:12px">전체 규칙 복사</button>'; const cb = $('rcp'); if (cb) cb.onclick = () => { try { navigator.clipboard.writeText(RULES_TX); cb.textContent = '복사됨 ✓' } catch (x) { cb.textContent = '복사 실패' } } }
         else rm.textContent = '방을 만들지 못했습니다 (' + c + ') — 네트워크를 확인해 주세요';
         const rc = $('rc'); if (rc) rc.disabled = false;
         if (c === 'timeout' && net.diag) net.diag().then(o => { const m = $('rm'); if (m) { const d = document.createElement('div'); d.style.cssText = 'font-size:11px;margin-top:6px;word-break:break-all;color:#ffd9a0'; d.textContent = '진단: ' + JSON.stringify(o); m.appendChild(d); if (o && /^429/.test(o.rest || '')) { const w = document.createElement('div'); w.style.cssText = 'margin-top:8px;font-weight:700;color:#ffb090'; w.textContent = '⚠ Firebase 무료 일일 쓰기 한도를 모두 써서 서버가 저장을 거부하는 중입니다. 한도는 매일 오후 4~5시(한국시간)쯤 초기화되며, Firebase 요금제를 Blaze로 올리면 바로 해결됩니다.'; m.appendChild(w); } } }).catch(() => { }); }
