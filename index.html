@@ -193,6 +193,131 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-
 .nke{color:var(--red,#d3372a);min-height:18px;font-size:12px;margin:4px 0}.nki{width:100%;height:44px;border-radius:12px;border:1px solid var(--line,#ccc);background:transparent;color:inherit;font:700 17px var(--f);padding:0 12px;box-sizing:border-box}.nkl{margin:8px 0 12px;padding-left:18px;font-size:12px;color:var(--mute,#888);line-height:1.6}
 .bwx{padding:10px 14px 0}.bw{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 14px;border-radius:22px;background:linear-gradient(135deg,#1c2a44,#0e1b2e);border:1px solid #2c4268;color:#fff;box-shadow:0 6px 18px rgba(14,27,46,.28),inset 0 1px 0 rgba(255,255,255,.12);position:relative;overflow:hidden}.bw:before{content:"";position:absolute;right:-30px;top:-40px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(246,220,139,.25),rgba(246,220,139,0) 70%)}.bwc{flex:none;width:38px;height:38px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}.bwt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}.bwt small{font-size:11px;color:#9fb2d4;letter-spacing:.04em}.bwt b{font-size:22px;font-weight:700;color:#F6DC8B;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bwt b i{font-style:normal;font-size:12px;color:#9fb2d4;margin-left:5px;font-weight:600}.bwb{flex:none;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);color:#fff;border-radius:999px;padding:7px 12px;font:600 12px var(--f);cursor:pointer}.bw.up #bwv{animation:bwu .7s}.bw.dn #bwv{animation:bwd .7s}@keyframes bwu{0%{color:#7CFFB0;transform:scale(1.08)}100%{color:inherit;transform:none}}@keyframes bwd{0%{color:#FF8A78;transform:scale(.96)}100%{color:inherit;transform:none}}
 .art:has(>img.ph){display:block;overflow:hidden}.art>img.ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.art>.pr,.art>.ct{z-index:2}.art:has(>img.ph)>.pr{left:auto;right:8px}.art>.ct{text-shadow:0 1px 3px rgba(0,0,0,.6)}
+/* ===================== UI v2 — clean service layer ===================== */
+:root{--out:#E9EBEF;--bg:#F3F4F6;--panel:#fff;--ink:#16191F;--mute:#6E7480;--line:#E6E8EC;--soft:#F1F2F5;--red:#E5483B;--acc:#E5483B;--navy:#111827;--sh:0 1px 2px rgba(17,24,39,.04),0 1px 1px rgba(17,24,39,.03)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--out:#07090C;--bg:#0E1116;--panel:#171B22;--ink:#ECEEF2;--mute:#9098A6;--line:#252B35;--soft:#1F242D;--red:#F0594C;--acc:#F0594C;--navy:#0A0D12;--sh:none;color-scheme:dark}}
+:root[data-theme="dark"]{--out:#07090C;--bg:#0E1116;--panel:#171B22;--ink:#ECEEF2;--mute:#9098A6;--line:#252B35;--soft:#1F242D;--red:#F0594C;--acc:#F0594C;--navy:#0A0D12;--sh:none;color-scheme:dark}
+body{letter-spacing:-.01em}
+.ic{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* header */
+header{height:56px;padding:0 16px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:saturate(1.4) blur(10px);-webkit-backdrop-filter:saturate(1.4) blur(10px)}
+.logo{gap:8px;font-size:16px;font-weight:700;letter-spacing:-.02em}
+.logo i{width:28px;height:28px;border-radius:8px;border:0;background:var(--acc);display:grid;place-items:center}
+.logo i svg{width:20px;height:20px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.logo span b{font-weight:700;color:var(--acc);margin-left:4px}
+.lang{height:32px;min-height:32px;padding:0 10px;border-radius:8px;font-size:12px;border-color:var(--line)}
+.lang b{color:var(--ink)}
+.login{height:32px;border-radius:8px;padding:0 14px;font-size:13px;background:var(--ink);color:var(--panel)}
+
+/* wallet */
+.bwx{padding:12px 16px 0}
+.bw{border-radius:16px;padding:14px 16px;gap:12px;background:var(--navy);border:0;box-shadow:none}
+.bw:before{display:none}
+.bwc{width:36px;height:36px;filter:none}
+.bwt{gap:2px}
+.bwt small{font-size:12px;color:#9AA3B5;letter-spacing:0}
+.bwt b{font-size:24px;color:#fff;letter-spacing:-.02em}
+.bwt b i{color:#9AA3B5;font-size:13px;font-weight:500}
+.bwb{border-radius:8px;background:rgba(255,255,255,.1);border-color:transparent;padding:8px 12px}
+
+/* quick menu: one panel, four tiles */
+.qk{margin-top:12px;gap:0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 4px 12px;box-shadow:var(--sh)}
+.qk button{background:none;border-radius:12px;padding:0;gap:8px;font-size:12px;font-weight:500;color:var(--ink)}
+.qk button:active{background:var(--soft)}
+.qi{position:relative;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent)}
+.qi .ic{width:22px;height:22px;stroke-width:1.8}
+.qk em{right:-10px;top:-6px;left:auto;border-radius:99px;padding:0 6px;font:700 10px/16px var(--f);background:var(--acc);color:#fff;border:2px solid var(--panel)}
+
+/* banner */
+.bn{margin-top:12px;border-radius:16px}
+.dots{margin-top:10px}.dots i{height:4px;width:4px;border-radius:2px}.dots i.on{width:16px}
+
+/* live ticker */
+.tkr{display:flex;align-items:center;gap:10px;margin-top:12px;height:40px;padding:0 4px 0 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.tkl{flex:none;display:flex;align-items:center;gap:6px;font:700 11px var(--f);letter-spacing:.08em;color:var(--acc)}
+.tkl i{width:6px;height:6px;border-radius:50%;background:var(--acc);animation:tkp 1.6s ease-in-out infinite}
+@keyframes tkp{50%{opacity:.25}}
+.wn{flex:1;min-width:0;height:40px;margin:0;border:0;border-radius:0}
+.wn:empty::before{content:"실시간 당첨 소식이 여기에 표시됩니다";position:absolute;left:0;top:0;line-height:40px;font-size:12px;color:var(--mute)}
+html[lang=en] .wn:empty::before{content:"Live wins will appear here"}
+.w{top:6px;height:28px;padding:0 10px 0 4px;gap:6px;border:0;border-radius:99px;background:var(--soft);color:var(--ink)}
+.w .av{width:20px;height:20px;background:none}.w .av svg{width:20px}
+.w .t{font-size:12px;line-height:28px;display:flex;gap:6px;align-items:center}.w .t b{font-size:12px;color:var(--acc)}.w .t div{margin:0;font-size:12px;color:var(--mute)}
+
+/* home sections */
+.gr{display:flex;flex-direction:column;gap:28px;margin-top:28px}
+.hs{display:flex;flex-direction:column;gap:12px}
+.hh{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:0 2px}
+.hh h2{margin:0;font-size:18px;font-weight:700;letter-spacing:-.02em;text-wrap:balance}
+.hh p{margin:2px 0 0;font-size:13px;color:var(--mute)}
+.gt{flex:none;width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:var(--c);color:#fff}
+.gt .ic{width:24px;height:24px;stroke-width:1.7}
+.gt.lg{width:56px;height:56px;border-radius:16px}.gt.lg .ic{width:28px;height:28px}
+.gx{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;text-align:left}
+.gx b{font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.gx b em{font-style:normal;font-size:11px;font-weight:600;color:var(--mute);background:var(--soft);border-radius:6px;padding:1px 6px}
+.gx small{font-size:13px;color:var(--mute);line-height:1.45}
+
+/* mining feature card */
+.mc{display:flex;flex-wrap:wrap;align-items:center;gap:14px;width:100%;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:var(--sh);text-align:left}
+.mc .gx b{font-size:16px}
+.mcf{flex:1 0 100%;display:flex;align-items:center;justify-content:center;gap:4px;height:44px;border-radius:12px;background:var(--ink);color:var(--panel);font-weight:600;font-size:14px}
+.mcf .ic{width:18px;height:18px;stroke-width:2}
+.mc:active .mcf{opacity:.85}
+
+/* game list */
+.gl{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:var(--sh)}
+.gi{display:flex;align-items:center;gap:14px;width:100%;padding:14px 16px;border:0;background:none;text-align:left}
+.gi+.gi{border-top:1px solid var(--line)}
+.gi:active{background:var(--soft)}
+.gp{flex:none;height:32px;padding:0 14px;border-radius:8px;background:var(--soft);font-size:13px;font-weight:600;display:grid;place-items:center}
+
+/* draw boxes */
+.bx{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bx .cd{border-radius:16px;box-shadow:var(--sh)}
+.bx .if{padding:10px 12px 12px;gap:2px}
+.bx .if b{font-size:15px}
+.bx .if .r{margin-top:8px}
+.bx .op{height:32px;border-radius:8px;padding:0 14px;background:var(--acc)}
+.pr{border-radius:6px;font-size:11px;padding:2px 7px}
+.pr.ur{background:rgba(17,24,39,.72);color:#F6DC8B;backdrop-filter:blur(4px)}
+.ct{background:rgba(17,24,39,.72);border:0;border-radius:0 10px 0 0;color:#fff;font-size:13px;padding:3px 10px 3px 6px;backdrop-filter:blur(4px)}
+.ct svg{width:15px;height:15px}
+
+/* generic surfaces used by inventory / my page / sheets */
+.cd,.pn{border-radius:16px;border-color:var(--line)}
+.pn{box-shadow:var(--sh)}
+.vt{margin:20px 0 12px;font-size:20px;letter-spacing:-.02em}
+.op{border-radius:8px;background:var(--acc)}
+.cl{border-radius:12px;height:48px}button.bt{border-radius:12px;height:48px;background:var(--acc)}
+.sheet{border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px))}
+#toast{border-radius:12px;font-size:13px;padding:11px 18px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+
+/* bottom nav */
+nav.bt{padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--panel)}
+nav.bt button{height:50px;justify-content:center;gap:3px;font-size:11px;font-weight:500;color:var(--mute);border-radius:10px}
+nav.bt .ic{width:24px;height:24px}
+nav.bt button[aria-current=page]{color:var(--ink);font-weight:600}
+nav.bt button[aria-current=page] .ic{stroke-width:2.1}
+
+/* footer */
+.ft{margin-top:40px;padding:24px 16px 16px;border-top:1px solid var(--line);color:var(--mute);font-size:12px;line-height:1.7;background:var(--bg)}
+.ft .fl{display:flex;flex-wrap:wrap;gap:8px 0;margin:0 0 14px;padding:0;background:none;border:0;position:static}
+.ft .fl a{color:var(--mute);font-weight:500;padding-right:10px;margin-right:10px;border-right:1px solid var(--line);line-height:1}
+.ft .fl a:last-child{border:0}
+.ft .fl b{color:var(--ink);font-weight:600}
+.ft p{margin:0 0 4px}.ft .cp{margin-top:12px;font-weight:500}
+
+@media (hover:hover){.gi:hover,.qk button:hover{background:var(--soft)}.mc:hover{border-color:color-mix(in srgb,var(--ink) 18%,var(--line))}}
+
+.mc .ey{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;color:#B57A0E;margin-bottom:1px}
+:root[data-theme="dark"] .mc .ey{color:#E8B04A}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .mc .ey{color:#E8B04A}}
+.em{display:flex;flex-direction:column;align-items:center;gap:6px;padding:48px 8px 8px;text-align:center;color:var(--mute);line-height:1.6}
+.em .emi{width:56px;height:56px;border-radius:18px;background:var(--soft);display:grid;place-items:center;color:var(--mute);margin-bottom:6px}
+.em .bt{max-width:240px;margin-top:16px}
+
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F6DC8B"/><stop offset=".5" stop-color="#D4A12E"/><stop offset="1" stop-color="#8F6414"/></linearGradient>
@@ -206,17 +331,11 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-
 </defs></svg>
 
 <div class="app">
-<header><a class="logo" href="#"><i>₿</i>CRYPTO GACHA</a><div class="hr"><button class="lang" id="lg" onclick="setLang()" aria-label="Language / 언어"><b>KO</b> / EN</button><button class="login" id="lgin" onclick="window.authBtn&&authBtn()">로그인</button></div></header>
+<header><a class="logo" href="#" onclick="view('home');return false" aria-label="CRYPTO GACHA 홈"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5"/><path d="M10 8v8M10 8h3.2a2 2 0 0 1 0 4H10m0 0h3.6a2 2 0 0 1 0 4H10M11.5 6.5V8M11.5 16v1.5"/></svg></i><span>CRYPTO<b>GACHA</b></span></a><div class="hr"><button class="lang" id="lg" onclick="setLang()" aria-label="Language / 언어"><b>KO</b> / EN</button><button class="login" id="lgin" onclick="window.authBtn&&authBtn()">로그인</button></div></header>
 
-<div class="bwx"><div class="bw" id="bw"><svg class="bwc" viewBox="0 0 100 100"><use href="#coin"/></svg><div class="bwt"><small>보유 달러</small><b><span id="bwv">0.00</span><i>USDT</i></b></div></div></div>
+<div class="bwx"><div class="bw" id="bw"><svg class="bwc" viewBox="0 0 100 100"><use href="#coin"/></svg><div class="bwt"><small>보유 자산</small><b><span id="bwv">0.00</span><i>USDT</i></b></div></div></div>
 <div class="vw" id="v-home"><div class="pad">
-<div class="wn" id="wn"></div>
-<div class="qk">
-<button onclick="modal('sale')"><em>무료</em><svg viewBox="0 0 48 48"><rect x="20" y="3" width="8" height="5" rx="2" fill="#C79A33"/><circle cx="24" cy="27" r="18" fill="url(#rg)"/><circle cx="24" cy="27" r="13" fill="#fff" opacity=".18"/><path d="M26 15l-8 14h6l-2 9 9-15h-6z" fill="#fff"/></svg>타임 세일</button>
-<button onclick="modal('ben')"><svg viewBox="0 0 48 48"><rect x="7" y="20" width="34" height="22" rx="3" fill="#D3372A"/><rect x="5" y="14" width="38" height="9" rx="3" fill="#E8584A"/><rect x="21" y="14" width="6" height="28" fill="#F6DC8B"/><path d="M24 14c-8-8-14 2-6 2zM24 14c8-8 14 2 6 2z" fill="#F6DC8B"/></svg>혜택 받기</button>
-<button onclick="modal('rank')"><svg viewBox="0 0 48 48"><rect x="4" y="22" width="12" height="20" fill="#4A6A9C"/><rect x="18" y="12" width="12" height="30" fill="#C79A33"/><rect x="32" y="28" width="12" height="14" fill="#F0873A"/><g fill="#fff" font-size="9" font-weight="700" text-anchor="middle" font-family="sans-serif"><text x="10" y="35">2</text><text x="24" y="30">1</text><text x="38" y="39">3</text></g></svg>랭킹</button>
-<button onclick="modal('ref')"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="19" fill="url(#rg)"/><path d="M22 14l-9 9 9 9v-5c8 0 11 2 13 7 0-9-4-14-13-15z" fill="#fff"/></svg>추천 리베이트</button>
-</div>
+<div class="qk"><button onclick="modal('sale')"><span class="qi" style="--c:#E5483B"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3 5.5 13.5H12L11 21l7.5-10.5H12z"/></svg><em>무료</em></span>타임 세일</button><button onclick="modal('ben')"><span class="qi" style="--c:#E08A1E"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="9" width="16" height="11" rx="1"/><path d="M3 9h18M12 9v11"/><path d="M12 9C10 4.5 6 5 6.5 7.5 7 9 12 9 12 9zM12 9c2-4.5 6-4 5.5-1.5C17 9 12 9 12 9z"/></svg></span>혜택 받기</button><button onclick="modal('rank')"><span class="qi" style="--c:#3B6FE0"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1.5A3.5 3.5 0 0 0 7.5 11M17 6h3v1.5a3.5 3.5 0 0 1-3.5 3.5M12 14v3M8.5 20h7l-.8-3h-5.4z"/></svg></span>랭킹</button><button onclick="modal('ref')"><span class="qi" style="--c:#16A37A"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9.5" cy="8.5" r="3.5"/><path d="M3 20c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5M18.5 8v6M15.5 11h6"/></svg></span>추천 리베이트</button></div>
 
 <div class="bnw"><div class="bn" id="bn" tabindex="0" aria-label="배너">
 <div class="sl s1 bnb" id="bnb" role="button" tabindex="0" aria-label="코인 시세 배너 (탭하여 코인 선택)"><div class="tx"><div class="iv"><span id="bsy">BTC/USDT</span><b id="bpx">--</b></div><p id="bch">불러오는 중…</p></div><svg class="ch" id="cs" viewBox="0 0 200 110" preserveAspectRatio="none" aria-hidden="true"></svg><div class="bcs" id="bcs"></div><svg class="bgear" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5A3.5 3.5 0 1 0 12 15.5 3.5 3.5 0 0 0 12 8.5zm8.4 4.3-1.6-.9a6.9 6.9 0 0 0 0-1.8l1.6-.9a.5.5 0 0 0 .2-.7l-1.6-2.8a.5.5 0 0 0-.7-.2l-1.6.9a7 7 0 0 0-1.5-.9l-.2-1.8a.5.5 0 0 0-.5-.4H9.9a.5.5 0 0 0-.5.4l-.2 1.8a7 7 0 0 0-1.5.9l-1.6-.9a.5.5 0 0 0-.7.2L3.8 9.4a.5.5 0 0 0 .2.7l1.6.9a6.9 6.9 0 0 0 0 1.8l-1.6.9a.5.5 0 0 0-.2.7l1.6 2.8c.1.2.4.3.7.2l1.6-.9c.5.4 1 .7 1.5.9l.2 1.8c0 .3.2.4.5.4h3.2c.3 0 .5-.1.5-.4l.2-1.8c.5-.2 1-.5 1.5-.9l1.6.9c.3.1.6 0 .7-.2l1.6-2.8a.5.5 0 0 0-.2-.7z" fill="currentColor"/></svg></div>
@@ -224,21 +343,16 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-
 <div class="sl s3"><div class="tx"><h2>첫 가입<br>1회 무료 뽑기</h2><p>등급별 확률 전체 공개</p></div><svg class="g" viewBox="0 0 200 200"><use href="#stack"/></svg></div>
 </div><button type="button" class="bna l" id="bpv" aria-label="이전 배너">‹</button><button type="button" class="bna r" id="bnx" aria-label="다음 배너">›</button></div>
 <div class="dots" id="dots"><i class="on"></i><i></i><i></i></div>
+<div class="tkr"><span class="tkl"><i></i>LIVE</span><div class="wn" id="wn"></div></div>
 
 
 <div class="tb" id="tb" role="tablist"></div>
 <div class="gr" id="gr"></div>
 </div></div>
 <div class="vw" id="v-inv" hidden></div><div class="vw" id="v-mine" hidden><div class="pad" id="mnroot"></div></div><div class="vw" id="v-my" hidden></div>
-<div class="ft"><div><a href="#">고객센터</a><a href="#">확률 공개</a><a href="#">이용약관</a><a href="#">개인정보처리방침</a><a href="#">책임 있는 이용</a></div>무작위 결과가 제공되며 컬렉터블의 가치는 변동될 수 있습니다. 감당할 수 있는 범위 내에서 이용해 주세요. 만 19세 이상 이용 가능합니다. 화면에 표시된 수치와 상품은 예시입니다.</div>
+<footer class="ft"><nav class="fl"><a href="#">고객센터</a><a href="#">확률 공개</a><a href="#">이용약관</a><a href="#"><b>개인정보처리방침</b></a><a href="#">책임 있는 이용</a></nav><p>무작위 결과가 제공되며 컬렉터블의 가치는 변동될 수 있습니다. 감당할 수 있는 범위 내에서 이용해 주세요. 만 19세 이상 이용 가능합니다.</p><p>화면에 표시된 수치와 상품은 예시이며, 실제 자금이 사용되지 않습니다.</p><p class="cp">© 2026 CRYPTO GACHA</p></footer>
 
-<nav class="bt" aria-label="하단 메뉴">
-<button aria-current="page" onclick="view('home')"><svg viewBox="0 0 24 24"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z" fill="currentColor"/></svg>가챠</button>
-
-<button onclick="view('inv')"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1.5" fill="currentColor" opacity=".55"/><rect x="4.5" y="10" width="15" height="10" rx="2" fill="currentColor" opacity=".55"/><rect x="9" y="13" width="6" height="2" fill="#fff"/></svg>보관함</button>
-<button onclick="view('mine')"><svg viewBox="0 0 24 24"><path d="M5 20l9-9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity=".7"/><path d="M7.500 5.500c4.500-3 10-1.500 12.500 3.500-3.500-2.500-7-3-10.500-1.500z" fill="currentColor" opacity=".55"/></svg>채굴장</button>
-<button onclick="view('my')"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4.5" fill="currentColor" opacity=".55"/><path d="M3.5 21c0-5 4-7 8.5-7s8.5 2 8.5 7z" fill="currentColor" opacity=".55"/></svg>마이페이지</button>
-</nav>
+<nav class="bt" aria-label="하단 메뉴"><button aria-current="page" onclick="view('home')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 4l8.5 6.5V19a1 1 0 0 1-1 1H15v-5.5H9V20H4.5a1 1 0 0 1-1-1z"/></svg><span>홈</span></button><button onclick="view('inv')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM3 4.5h18V8H3z"/><path d="M10 12h4"/></svg><span>보관함</span></button><button onclick="view('mine')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 9.5 4 20"/><path d="M5 7.5C9 3.5 15.5 3 20.5 6.5 17 5.8 13.5 6.3 11 8.3"/><path d="M16.5 3.5c3.5 4 4 10.5 1 15.5.7-3.5.2-7-1.8-9.5"/></svg><span>채굴장</span></button><button onclick="view('my')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20c.8-3.8 3.8-6 7.5-6s6.7 2.2 7.5 6"/></svg><span>마이</span></button></nav>
 <div class="mo" id="mo" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="mh"><h2 id="mt"></h2><button class="x" id="mx" aria-label="닫기">✕</button></div><div id="mb"></div><button class="cl" id="mc">닫기</button></div></div>
 <div id="toast" role="status"></div>
 </div>
@@ -246,7 +360,7 @@ html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}*{-webkit-tap-
 <script>
 var $=function(i){return document.getElementById(i)},tt,lang='ko';
 function toast(m){var t=$('toast');t.textContent=lang=='en'?trs(m):m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(function(){t.classList.remove('on')},1700)}
-var fm=function(v){return v.toLocaleString('ko-KR')};
+var fm=function(v){v=+v;return isFinite(v)?v.toLocaleString('ko-KR'):'0'};
 /* ===== Binance live chart banner (per-user coin list) ===== */
 var BN={coins:['BTC'],i:0,d:{},busy:{}},BN_H=['https://api.binance.com','https://data-api.binance.vision'],BN_MAX=6,
 BN_PRE=['BTC','ETH','BNB','SOL','XRP','DOGE','ADA','TRX','AVAX','LINK','DOT','TON','SUI','SHIB','PEPE','LTC','BCH','NEAR','APT','ARB','OP','ATOM','UNI','ETC','FIL','INJ','AAVE','HBAR','ICP','XLM','POL','FET','RENDER','WLD','SEI','TIA','ENA','JUP','WIF','BONK'];
@@ -329,12 +443,20 @@ function miniList(){return P.map(function(p,i){return [p,i]}).filter(function(e)
 function miniCard(e,j){var p=e[0],i=e[1],u=true;return '<div class="cd"><div class="art" style="background:'+BG[j%4]+'"><span class="pr'+(u?' ur':'')+'">UR 0.9%</span>'+(THIMG[ANIM[i]]?'<img class="ph" alt="" src="'+THIMG[ANIM[i]]+'" style="object-position:'+THPOS[ANIM[i]]+'">':gfx(p[3]))+'<span class="ct"><svg viewBox="0 0 24 24"><use href="#fl"/></svg>'+fm(p[4])+'</span></div><div class="if"><b>'+p[1]+'</b><small class="m">'+ALAB[ANIM[i]]+' · EXP +'+EXPT[i]+'</small><div class="r"><span class="p">'+p[2]+' <small>USDT</small></span><button class="op" onclick="buy('+i+')">뽑기</button></div></div></div>'}
 function multiCards(){return '<div class="cd gmc" onclick="openMulti()"><div class="gd" style="font-size:72px;line-height:1">🍺</div><div><h3>러시안 룰렛 · 유저 대결</h3><p>방을 만들고 비밀번호로 초대하세요.<br>카드 심리전 · 이긴 사람이 배팅금을 모두 가져갑니다</p><button class="op" type="button">입장</button></div></div>'}
 function spl(t){return t.split('<div class="cd gmc"').slice(1).map(function(x){return '<div class="cd gmc"'+x})}
-function sect(ic,t,sub,cards){return '<div class="zh"><b>'+ic+' '+t+'</b>'+(sub?'<span>'+sub+'</span>':'')+'</div>'+cards.join('')}
-function mineCard(){return '<div class="cd gmc" onclick="view(\'mine\')"><div class="gd" style="font-size:72px;line-height:1">⛏️</div><div><h3>채굴장</h3><p>채굴 쥐를 고용하고 업그레이드하세요.<br>접속하지 않아도 24시간 동안 채굴이 진행됩니다</p><button class="op" type="button">입장</button></div></div>'}
-function mainCards(){var g=spl(gameCards()),m=spl(multiCards());
-return sect('⛏️','채굴장','USDT를 채굴해 모으세요',[mineCard()])
-+sect('🎰','게임','룰렛 · 레이싱 · 유저 대결',[g[0],g[1],m[0]])
-+sect('🎁','뽑기','박스를 열어 코인을 수집하세요',[miniCard([P[8],8],0),miniCard([P[24],24],1)])}
+var UIC={"wheel": "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M12 3.5V10M12 14v6.5M3.5 12H10M14 12h6.5M6 6l4.6 4.6M13.4 13.4 18 18M18 6l-4.6 4.6M10.6 13.4 6 18\"/>", "flag": "<path d=\"M5 21V4\"/><path d=\"M5 4h13l-2.5 4.5L18 13H5\"/><path d=\"M9.3 4v9M13.6 4v9M5 8.5h11\"/>", "revolver": "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><circle cx=\"12\" cy=\"7.2\" r=\"1.8\"/><circle cx=\"16.2\" cy=\"9.6\" r=\"1.8\"/><circle cx=\"16.2\" cy=\"14.4\" r=\"1.8\"/><circle cx=\"12\" cy=\"16.8\" r=\"1.8\"/><circle cx=\"7.8\" cy=\"14.4\" r=\"1.8\"/><circle cx=\"7.8\" cy=\"9.6\" r=\"1.8\"/>", "pick": "<path d=\"M14.5 9.5 4 20\"/><path d=\"M5 7.5C9 3.5 15.5 3 20.5 6.5 17 5.8 13.5 6.3 11 8.3\"/><path d=\"M16.5 3.5c3.5 4 4 10.5 1 15.5.7-3.5.2-7-1.8-9.5\"/>", "chev": "<path d=\"m9.5 6 6 6-6 6\"/>"};
+function uic(k){return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">'+UIC[k]+'</svg>'}
+function sect(t,sub,body,more){return '<section class="hs"><div class="hh"><div><h2>'+t+'</h2>'+(sub?'<p>'+sub+'</p>':'')+'</div>'+(more||'')+'</div>'+body+'</section>'}
+function gRow(o){return '<button type="button" class="gi" onclick="'+o.f+'"><span class="gt" style="--c:'+o.c+'">'+uic(o.i)+'</span><span class="gx"><b>'+o.t+(o.b?'<em>'+o.b+'</em>':'')+'</b><small>'+o.d+'</small></span><span class="gp">'+o.cta+'</span></button>'}
+function mineCard(){var r=0;try{r=(window.mine&&mine.r)?Object.keys(mine.r).length:0}catch(e){}
+return '<button type="button" class="mc" onclick="view(\'mine\')"><span class="gt lg" style="--c:#D9961A">'+uic('pick')+'</span><span class="gx"><span class="ey">MAIN</span><b>채굴장</b><small>채굴 쥐를 고용하고 업그레이드하세요. 접속하지 않아도 24시간 동안 자동으로 채굴됩니다.</small></span><span class="mcf"><span>입장하기</span>'+uic('chev')+'</span></button>'}
+function mainCards(){
+return sect('내 채굴장','USDT를 채굴해 모으세요',mineCard())
++sect('게임','룰렛 · 레이싱 · 유저 대결','<div class="gl">'
+ +gRow({f:'openGame()',c:'#E5483B',i:'wheel',t:'럭키 룰렛',b:'최대 x5000',d:'배율과 금액을 정하고 룰렛을 돌리세요',cta:'플레이'})
+ +gRow({f:'openRace()',c:'#3B6FE0',i:'flag',t:'자동차 레이싱',b:'1등 ×5',d:'8자 서킷 3바퀴 · 드리프트와 아이템',cta:'플레이'})
+ +gRow({f:'openMulti()',c:'#7A4FE0',i:'revolver',t:'러시안 룰렛',b:'1:1 대결',d:'비밀번호 방에서 카드 심리전 · 승자 독식',cta:'입장'})
+ +'</div>')
++sect('뽑기','박스를 열어 코인을 수집하세요','<div class="bx">'+miniCard([P[8],8],0)+miniCard([P[24],24],1)+'</div>')}
 function grid(){$('gr').innerHTML=mainCards();apply($('gr'))}
 var CATCSS=document.createElement('style');CATCSS.textContent='.zh{grid-column:1/-1;display:flex;flex-direction:column;gap:2px;padding:10px 4px 0;text-align:left}.zh b{font-size:17px}.zh span{font-size:12px;opacity:.7}.zn{grid-column:1/-1;font-size:13px;font-weight:700;padding:10px 12px;border-radius:12px;text-align:left}.zn.d{background:#3a2c0e;color:#f5cf6a;border:1px solid #6a5220}.zn.f{background:#0f2e22;color:#7be0b0;border:1px solid #1f5a42}.bdg{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin:2px 0 4px}.bdg.d{background:#d9a43a;color:#2a1a02}.bdg.s{background:#7a5a2a;color:#fff3d0}.bdg.f{background:#1f9a6a;color:#fff}';document.head.appendChild(CATCSS);
 /* views + theme */
@@ -456,6 +578,7 @@ function pick(g){var a=[];IT.forEach(function(t,i){if(t[1]==g)a.push(i)});return
 /* ===== i18n (ko -> en), longest key first ===== */
 var D='로그인|Log in;로그인 화면으로 이동합니다|Opening login;CG 컬렉터블 지수|CG Collectible Index;오늘의 인기 컬렉션을 확인하세요|Check out todays popular collections;열어보고,|Open it,;행운을 찾으세요|find your luck;다음 크립토 컬렉터블|Your next crypto collectible;첫 가입|First sign-up;1회 무료 뽑기|1 free draw;무료 1회 뽑기|1 free draw;등급별 확률 전체 공개|Full odds disclosure;무료|FREE;타임 세일|Time Sale;혜택 받기|Rewards;랭킹|Ranking;추천 리베이트|Referral Rebate;슈퍼 드롭 박스|Super Drop Box;킹 박스|King Box;세이프 박스|Safe Box;신규|New;등급별 확률 공개|Odds disclosed;뽑기 확인|Confirm Draw;뽑기 결과|Draw Result;뽑기|Draw;구매 개수|Quantity;총 결제|Total;구매 후 잔액|Balance after;닫기|Close;종료까지|Ends in;고객센터|Support;확률 공개|Odds;이용약관|Terms;개인정보처리방침|Privacy;책임 있는 이용|Responsible Use;가챠|Gacha;컬렉션|Collection;보관함 보기|Open inventory;보관함|Inventory;마이페이지|My Page;무작위 결과가 제공되며 컬렉터블의 가치는 변동될 수 있습니다. 감당할 수 있는 범위 내에서 이용해 주세요. 만 19세 이상 이용 가능합니다. 화면에 표시된 수치와 상품은 예시입니다.|Results are random and collectible values may change. Please participate within your means. Ages 19+ only. Figures and products shown are samples.;첫 가입 보너스|Sign-up bonus;출석 체크|Check-in;받기|Claim;완료|Done;친구 초대 리베이트|Friend referral rebate;초대 코드로 리베이트를 받으세요|Earn rebates with your invite code;보기|View;오픈 횟수 기준|By number of opens;아직 집계된 순위가 없습니다.|No ranking data yet.;내 초대 코드|My invite code;코드 복사|Copy code;초대 1~9명|1-9 invites;10~29명|10-29 invites;30명 이상|30+ invites;리베이트 3%|Rebate 3%;리베이트|Rebate;초대받은 친구의 뽑기 금액 기준입니다.|Based on invited friends draw amounts.;(예시)|(sample);레벨 업!|LEVEL UP!;잔액이 부족합니다|Insufficient balance;보유 잔액|Balance;보유 수량|Items held;보유|Held;판매 +|Sold +;판매|Sell;지급|credited;충전|Top up;테스트 충전|Test top-up;총 오픈|Total opens;UR 획득|UR obtained;수집률|Completion;화면 테마 전환|Switch theme;알림 설정 준비 중입니다|Notifications coming soon;알림 설정|Notifications;고객센터로 연결합니다|Connecting to support;로그아웃되었습니다|Logged out;로그아웃|Log out;프로필 테두리를 장착했습니다|Frame equipped;테두리를 해제했습니다|Frame removed;프로필 테두리|Profile frame;장착중|Equipped;장착|Equip;기본|Default;전체|All;수집|Collected;컬렉션에서 아이템을 뽑으면 테두리로 장착할 수 있습니다.|Draw items to equip them as profile frames.;보관 중인 컬렉터블이 없습니다.|No collectibles in your inventory.;가챠에서 첫 뽑기를 해보세요.|Try your first draw in Gacha.;가챠 보러가기|Go to Gacha;개당|each;평가액|Value;사용|used;잔액|Balance;코드를 복사했습니다|Code copied;이미 사용했습니다|Already used;프레임|Frame;럭키 레드 박스|Lucky Red Box;골든 코인 러시|Golden Coin Rush;오렌지 캡슐|Orange Capsule;문샷 박스|Moonshot Box;킹 사토시|King Satoshi;블랙 킹 박스|Black King Box;로열 네이비|Royal Navy;레드 킹|Red King;제이드 볼트|Jade Vault;세이프 스타터|Safe Starter;민트 세이프|Mint Safe;로즈 세이프|Rose Safe;스프링 에디션|Spring Edition;타이거 토큰|Tiger Token;민트 시리즈|Mint Series;골드러시 II|Gold Rush II;제네시스 코인|Genesis Coin;사토시 골드|Satoshi Gold;문 크라운|Moon Crown;로열 스택|Royal Stack;제이드 토큰|Jade Token;오렌지 스파크|Orange Spark;네이비 인장|Navy Seal;로즈 코인|Rose Coin;민트 칩|Mint Chip;나이트 토큰|Night Token;브론즈 코인|Bronze Coin;실버 칩|Silver Chip;코퍼 토큰|Copper Token;플레인 토큰|Plain Token;레드 인장|Red Seal;블루 인장|Blue Seal;그레이 칩|Gray Chip;도트 토큰|Dot Token;친구초대 무료 박스|Friend Invite Free Box;친구 초대 혜택|Friend Invite Rewards;① 친구 초대 무료 박스|1. Friend invite free boxes;② 친구 추천 리베이트|2. Friend referral rebate;친구가 가입하면 무료 박스 3개를 드려요.|Get 3 free boxes when a friend joins.;획득 코인 가치|Coin value;보유 무료 박스|Free boxes held;열기|Open;시연: 친구 초대 완료 처리|Demo: mark invite complete;등급|Rarity;확률|Odds;연출|Animation;대포 운석|Cannon Meteor;물수제비|Stone Skipping;낚시|Fishing;무료 박스가 부족합니다|Not enough free boxes;무료 박스가 없습니다|No free boxes;획득 코인 가치 합계|Total coin value;친구 초대 완료|Invite complete;배너 코인 선택|Banner coins;코인 시세 배너|Coin price banner';
 D+=';벽 부수기 테마|Wall Breaker Theme;벽 부수기|Wall Breaker;아이스 브레이커|Ice Breaker;에너지 웨이브|Energy Wave;월 크래셔|Wall Crasher;메가 브레이크|Mega Break;전체 판매|Sell all;판매할 아이템이 없습니다|No items to sell';
+D+=';보유 자산|Balance;입장하기|Enter;플레이|Play;입장|Enter;최대 x5000|Up to x5000;1등 ×5|1st ×5;1:1 대결|1v1;자동차 레이싱|Racing;러시안 룰렛|Russian Roulette;럭키 룰렛|Lucky Roulette;채굴장|Mining;내 채굴장|My Mine;게임|Games;뽑기|Draw;보관함|Storage;마이|My;홈|Home;USDT를 채굴해 모으세요|Mine and collect USDT;룰렛 · 레이싱 · 유저 대결|Roulette · Racing · PvP;박스를 열어 코인을 수집하세요|Open boxes and collect coins;배율과 금액을 정하고 룰렛을 돌리세요|Set a multiplier and spin;8자 서킷 3바퀴 · 드리프트와 아이템|3 laps · drift and items;비밀번호 방에서 카드 심리전 · 승자 독식|Private rooms · card mind game · winner takes all;채굴 쥐를 고용하고 업그레이드하세요. 접속하지 않아도 24시간 동안 자동으로 채굴됩니다.|Hire mining rats and upgrade. Mining runs for 24h even offline.;고객센터|Support;확률 공개|Odds;이용약관|Terms;개인정보처리방침|Privacy;책임 있는 이용|Responsible play';
 var EV={},EK=[];D.split(';').forEach(function(p){var a=p.split('|');EV[a[0]]=a[1];EK.push(a[0])});[['낚시 테마','Fishing Theme'],['물수제비 테마','Stone Skipping Theme'],['바주카 테마','Bazooka Theme'],['바주카 운석','Bazooka Meteor']].forEach(function(p){EV[p[0]]=p[1];EK.push(p[0])});EK.sort(function(a,b){return b.length-a.length});
 function trs(s){EK.forEach(function(k){if(s.indexOf(k)>-1)s=s.split(k).join(EV[k])});return s.replace(/(\d+)회/g,'$1x').replace(/(\d+)개/g,'$1 pcs')}
 function apply(root){var w=document.createTreeWalker(root||document.body,NodeFilter.SHOW_TEXT),n,a=[];while(n=w.nextNode())if(!/^(SCRIPT|STYLE)$/.test(n.parentNode.nodeName))a.push(n);
@@ -1733,13 +1856,13 @@ function nickUI(){if(!logged()){toast('로그인 후 닉네임을 설정할 수 
  setTimeout(function(){inp.focus()},50)}
 /* ===== collection / inventory / profile views ===== */
 function ri(){var ks=Object.keys(inv),tot=0,n=0;ks.forEach(function(i){tot+=invV[i];n+=inv[i]});
-$('v-inv').innerHTML='<div class="pad"><div class="vt">보관함<small>'+n+'개 · 평가액 '+f2(tot)+' USDT</small></div>'+(ks.length?'<button class="op" style="width:100%;height:40px;margin-bottom:10px" onclick="sellAll()">전체 판매 · '+f2(tot)+' USDT</button>':'')+(ks.length?'<div class="pn">'+ks.map(function(i){var t=IT[i];return '<div class="rw"><span class="th">'+tk(i)+'</span><div><b>'+t[0]+'</b> '+chip(t[1])+'<small>×'+inv[i]+' · 개당 '+f2(invV[i]/inv[i])+' USDT</small></div><button class="op" onclick="sell('+i+')">판매</button></div>'}).join('')+'</div>':'<div class="em">보관 중인 컬렉터블이 없습니다.<br>가챠에서 첫 뽑기를 해보세요.<button class="bt" onclick="view(\'home\')">가챠 보러가기</button></div>')+'</div>';apply($('v-inv'))}
+$('v-inv').innerHTML='<div class="pad"><div class="vt">보관함<small>'+n+'개 · 평가액 '+f2(tot)+' USDT</small></div>'+(ks.length?'<button class="op" style="width:100%;height:40px;margin-bottom:10px" onclick="sellAll()">전체 판매 · '+f2(tot)+' USDT</button>':'')+(ks.length?'<div class="pn">'+ks.map(function(i){var t=IT[i];return '<div class="rw"><span class="th">'+tk(i)+'</span><div><b>'+t[0]+'</b> '+chip(t[1])+'<small>×'+inv[i]+' · 개당 '+f2(invV[i]/inv[i])+' USDT</small></div><button class="op" onclick="sell('+i+')">판매</button></div>'}).join('')+'</div>':'<div class="em"><span class="emi"><svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM3 4.5h18V8H3z\"/><path d=\"M10 12h4\"/></svg></span>보관 중인 컬렉터블이 없습니다.<br>가챠에서 첫 뽑기를 해보세요.<button class="bt" onclick="view(\'home\')">가챠 보러가기</button></div>')+'</div>';apply($('v-inv'))}
 function sell(i){if(!inv[i])return;var a=invV[i]/inv[i];inv[i]--;invV[i]-=a;if(!inv[i]){delete inv[i];delete invV[i]}bal=+(bal+a).toFixed(2);toast('판매 +'+f2(a)+' USDT');ri()}
 function rm(){rmr();if(window.loadRank&&!rm.b){rm.b=1;loadRank().then(function(){rm.b=0;syncRf();if(cvw=='my')rmr()}).catch(function(){rm.b=0})}}
 function rmr(){var L=lv(),own=Object.keys(col),n=0,k;for(k in inv)n+=inv[k];
 $('v-my').innerHTML='<div class="pad"><div class="vt">마이페이지</div><div class="pn" style="display:flex;gap:14px;align-items:center;padding:14px">'+(myFr()>=0?avt(-1,60,myFr()):fr(-1,76))+'<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:6px;min-width:0"><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(dispName())+'</b><button class="pen" aria-label="닉네임 변경" onclick="nickUI()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 20h4L19.500 8.500l-4-4L4 16z"/><path d="M13.500 6.500l4 4"/></svg></button></div><div style="display:flex;justify-content:space-between;margin:4px 0"><b style="color:var(--red)">Lv '+L.L+'</b><small style="color:var(--mute)">EXP '+f1(L.c)+' / '+f1(L.n)+'</small></div><div class="pbar"><i style="width:'+L.c/L.n*100+'%"></i></div></div></div>'+
 rkPanel()+
-'<div class="pn" style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;padding:14px"><div><small style="color:var(--mute)">보유 잔액</small><div style="font-size:24px;font-weight:700">'+kbal(bal)+' <small style="font-size:13px">USDT</small></div></div><button class="op" onclick="bal=+(bal+1000000).toFixed(2);toast(\'충전 +1,000,000 USDT\');rm()">충전</button></div><div class="st"><div><small>총 오픈</small><b>'+opens+'회</b></div><div><small>UR 획득</small><b>'+urN+'개</b></div><div><small>보유 수량</small><b>'+n+'개</b></div><div><small>수집률</small><b>'+Math.round(own.length/IT.length*100)+'%</b></div></div><div class="pn mn" style="margin-top:10px"><button onclick="theme()">화면 테마 전환<span>›</span></button><button onclick="toast(\'알림 설정 준비 중입니다\')">알림 설정<span>›</span></button><button onclick="toast(\'고객센터로 연결합니다\')">고객센터<span>›</span></button><button onclick="toast(\'로그아웃되었습니다\')">로그아웃<span>›</span></button></div></div>';apply($('v-my'))}
+'<div class="pn" style="margin-top:10px;display:flex;justify-content:space-between;align-items:center;padding:14px"><div><small style="color:var(--mute)">보유 잔액</small><div style="font-size:24px;font-weight:700">'+kbal(bal)+' <small style="font-size:13px">USDT</small></div></div>'+(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?'<button class="op" onclick="bal=+(bal+1000000).toFixed(2);toast(\'[개발용] 충전 +1,000,000 USDT\');rm()">충전</button>':'')+'</div><div class="st"><div><small>총 오픈</small><b>'+opens+'회</b></div><div><small>UR 획득</small><b>'+urN+'개</b></div><div><small>보유 수량</small><b>'+n+'개</b></div><div><small>수집률</small><b>'+Math.round(own.length/IT.length*100)+'%</b></div></div><div class="pn mn" style="margin-top:10px"><button onclick="theme()">화면 테마 전환<span>›</span></button><button onclick="toast(\'알림 설정 준비 중입니다\')">알림 설정<span>›</span></button><button onclick="toast(\'고객센터로 연결합니다\')">고객센터<span>›</span></button><button onclick="toast(\'로그아웃되었습니다\')">로그아웃<span>›</span></button></div></div>';apply($('v-my'))}
 window.rv_inv=ri;window.rv_my=rm;
 /* ===== 3D rotating best-item result ===== */
 function showResult(rs,I){try{var bg0=1;rs.forEach(function(e){bg0=Math.max(bg0,RK5[e.g]>=4?3:e.g=='SR'?2:1)});SFX.ev('result',bg0)}catch(e){}
@@ -1769,8 +1892,10 @@ function doSellAll(){var tot=0;Object.keys(inv).forEach(function(i){tot+=invV[i]
 </script><script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signOut,onAuthStateChanged}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import{getFirestore,initializeFirestore,doc,getDoc,setDoc,collection,getDocs,query,orderBy,limit,where,onSnapshot,updateDoc,deleteDoc,arrayUnion,runTransaction}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import{getFirestore,initializeFirestore,doc,getDoc,setDoc,collection,getDocs,query,orderBy,limit,where,onSnapshot,updateDoc,deleteDoc,arrayUnion,runTransaction,writeBatch}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyCb4iTiqxc4ZrZX_gQicMO8t_zcUSea884",authDomain:"cryptopopki.firebaseapp.com",projectId:"cryptopopki",storageBucket:"cryptopopki.firebasestorage.app",messagingSenderId:"86462668135",appId:"1:86462668135:web:4ff382adc27ceae46723c2"});
+try{if(window.APPCHECK_KEY){const ac=await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-check.js');ac.initializeAppCheck(app,{provider:new ac.ReCaptchaV3Provider(window.APPCHECK_KEY),isTokenAutoRefreshEnabled:true})}}catch(e){console.warn('appcheck',e)}
+const san=s=>String(s==null?'':s).replace(/[<>&"'`\\\u0000-\u001f]/g,'').trim().slice(0,20)||'user';
 const auth=getAuth(app),db=(()=>{try{return (window.__fsmode='longpoll',initializeFirestore(app,{experimentalForceLongPolling:true,useFetchStreams:false}))}catch(e){return getFirestore(app)}})();let user=null,last='',ready=false,cur=null;
 const snap=()=>JSON.parse(JSON.stringify({bal:window.bal,inv:window.inv,invV:window.invV,opens:window.opens,urN:window.urN,col:window.col,used:window.used,exp:window.exp,eq:window.eq,mine:window.mine,rr:window.rrst,shl:window.shl||null}));
 const btn=()=>document.getElementById('lgin');
@@ -1781,7 +1906,7 @@ function mirror(){if(!user||!ready)return mt;try{const d=snap(),j=JSON.stringify
 setInterval(mirror,200);
 let sq=Promise.resolve();const save=f=>(sq=sq.then(()=>save1(f),()=>save1(f)));
 let lastW=0,lastLb='',lastLbT=0;
-async function save1(force){if(!user||!ready)return;const d=snap(),j=JSON.stringify(d);if(force!==true&&j===last)return;if(force!==true&&force!=='now'&&Date.now()-lastW<20000)return;const mts=mirror(true);lastW=Date.now();try{d.ts=mts;await setDoc(doc(db,'users',user.uid),d);const lb={n:window.ME,L:window.lv().L,bal:+(+d.bal).toFixed(2),exp:+d.exp,eq:+d.eq,opens:+d.opens,rf:!!window.rf,t:Date.now()};const lk=JSON.stringify([lb.n,lb.L,lb.bal,lb.exp,lb.eq,lb.opens,lb.rf]);if(force!==true&&lk===lastLb&&Date.now()-lastLbT<6e5){last=j;return}try{await setDoc(doc(db,'leaderboard',user.uid),lb);lastLb=lk;lastLbT=Date.now();window.__lbS='내 랭킹 저장 성공 · 잔고 '+lb.bal}catch(e2){window.__lbS='내 랭킹 저장 거부: '+(e2&&e2.code||'error')+' → Firebase 규칙 미게시/불일치';console.error('leaderboard(bal) 저장 실패',e2&&e2.code,e2);if(!window.__lbW){window.__lbW=1;try{toast('랭킹 저장 실패 ('+(e2&&e2.code||'error')+') · Firebase 규칙에서 leaderboard의 bal 필드를 허용해야 합니다')}catch(x){}}const o=Object.assign({},lb);delete o.bal;await setDoc(doc(db,'leaderboard',user.uid),o)}last=j}catch(e){console.error('save',e)}}
+async function save1(force){if(!user||!ready)return;const d=snap(),j=JSON.stringify(d);if(force!==true&&j===last)return;if(force!==true&&force!=='now'&&Date.now()-lastW<20000)return;const mts=mirror(true);lastW=Date.now();try{d.ts=mts;await setDoc(doc(db,'users',user.uid),d);const lb={n:san(window.ME),L:window.lv().L,bal:+(+d.bal).toFixed(2),exp:+d.exp,eq:+d.eq,opens:+d.opens,rf:!!window.rf,t:Date.now()};const lk=JSON.stringify([lb.n,lb.L,lb.bal,lb.exp,lb.eq,lb.opens,lb.rf]);if(force!==true&&lk===lastLb&&Date.now()-lastLbT<6e5){last=j;return}try{await setDoc(doc(db,'leaderboard',user.uid),lb);lastLb=lk;lastLbT=Date.now();window.__lbS='내 랭킹 저장 성공 · 잔고 '+lb.bal}catch(e2){window.__lbS='내 랭킹 저장 거부: '+(e2&&e2.code||'error')+' → Firebase 규칙 미게시/불일치';console.error('leaderboard(bal) 저장 실패',e2&&e2.code,e2);if(!window.__lbW){window.__lbW=1;try{toast('랭킹 저장 실패 ('+(e2&&e2.code||'error')+') · Firebase 규칙에서 leaderboard의 bal 필드를 허용해야 합니다')}catch(x){}}const o=Object.assign({},lb);delete o.bal;await setDoc(doc(db,'leaderboard',user.uid),o)}last=j}catch(e){console.error('save',e)}}
 onAuthStateChanged(auth,async u=>{if(cur&&(!u||u.uid!==cur)){location.reload();return}if(u)cur=u.uid;user=u;ready=false;const b=btn();
 if(!u){window.UID='guest';try{localStorage.removeItem('cg_last_uid')}catch(e){}if(window.bnSwitch)window.bnSwitch();if(b)b.textContent='로그인';return}
 if(b)b.textContent='로그아웃';window.UID=u.uid;try{localStorage.setItem('cg_last_uid',u.uid)}catch(e){}if(window.bnSwitch)window.bnSwitch();
@@ -1797,18 +1922,18 @@ window.saveProfile=async()=>{if(!user)return false;const o={rf:!!window.rf,updat
 (function(){const RR='rooms';
 window.MGNET={
  async listRooms(){const s=await getDocs(query(collection(db,RR),where('status','==','open'),limit(40)));return s.docs.map(d=>{const x=d.data();return{id:x.id||d.id,name:x.name,host:x.host,t:x.t,hb:x.hb,status:x.status}})},
- async createRoom(d){await setDoc(doc(db,RR,d.id),d)},
+ async createRoom(d){const ph=d.ph,room=Object.assign({},d);delete room.ph;const b=writeBatch(db);b.set(doc(db,RR,d.id),room);b.set(doc(db,RR,d.id,'sec','ph'),{ph:ph,uid:user.uid});await b.commit()},
  async diag(){const out={};try{out.online=navigator.onLine;out.uid=user?user.uid:null;if(!user){out.err='로그인 안 됨(auth.user 없음)';return out}const t0=Date.now(),tk=await user.getIdToken();out.tok=Date.now()-t0+'ms';const id='zdiag_'+user.uid.slice(0,8),base='https://firestore.googleapis.com/v1/projects/cryptopopki/databases/(default)/documents/rooms/'+id;
  const ac=new AbortController();setTimeout(()=>ac.abort(),8000);const t1=Date.now();const r=await fetch(base,{method:'PATCH',signal:ac.signal,headers:{'Authorization':'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify({fields:{host:{mapValue:{fields:{uid:{stringValue:user.uid}}}},t:{integerValue:String(Date.now())}}})});out.rest=r.status+' '+(Date.now()-t1)+'ms';if(!r.ok){const j=await r.text();out.msg=j.slice(0,220)}else{fetch(base,{method:'DELETE',headers:{'Authorization':'Bearer '+tk}}).catch(()=>{})}}catch(e){out.err=(e&&e.name)+': '+(e&&e.message)}return out},
- async joinRoom(id,guest,ph){try{return await runTransaction(db,async tx=>{const r=doc(db,RR,id),s=await tx.get(r);if(!s.exists())return{ok:false,msg:'방이 사라졌습니다'};const x=s.data();if(x.ph!==ph)return{ok:false,msg:'비밀번호가 맞지 않습니다'};if(x.status!=='open'||x.guest)return{ok:false,msg:'이미 사용 중인 방입니다'};tx.update(r,{guest:guest,status:'joined'});return{ok:true}})}catch(e){console.error(e);return{ok:false,msg:'입장 실패 ('+(e.code||'error')+')'}}},
+ async joinRoom(id,guest,ph){try{const jr=await runTransaction(db,async tx=>{const r=doc(db,RR,id),s=await tx.get(r);if(!s.exists())return{ok:false,msg:'방이 사라졌습니다'};const x=s.data();if(x.status!=='open'||x.guest)return{ok:false,msg:'이미 사용 중인 방입니다'};tx.update(r,{guest:Object.assign({},guest,{pw:ph}),status:'joined'});return{ok:true}});if(jr&&jr.ok){try{await updateDoc(doc(db,RR,id),{guest:guest})}catch(e){}}return jr}catch(e){console.error(e);if(e&&e.code==='permission-denied')return{ok:false,msg:'비밀번호가 맞지 않거나 입장할 수 없는 방입니다'};return{ok:false,msg:'입장 실패 ('+(e.code||'error')+')'}}},
  watch(id,cb,err){return onSnapshot(doc(db,RR,id),{includeMetadataChanges:true},s=>{if(s.metadata.hasPendingWrites)return;if(!s.exists()&&s.metadata.fromCache)return;cb(s.exists()?s.data():null)},err)},
  patch(id,o){return updateDoc(doc(db,RR,id),o)},
  push(id,evs){return updateDoc(doc(db,RR,id),{ev:arrayUnion(...evs)})},
  remove(id){return deleteDoc(doc(db,RR,id))}
 }})();
-window.setNick=async n=>{if(!user||!ready)return '로그인 상태를 확인해주세요';const pn=window.NICK,pa=window.nickAt;if(pn&&Date.now()<pa+864e5)return '24시간 후에 다시 변경할 수 있습니다';window.NICK=n;window.nickAt=Date.now();window.ME=n;const ok=await window.saveProfile();if(ok){try{await setDoc(doc(db,'leaderboard',user.uid),{n:n,L:window.lv().L,bal:+(+window.bal).toFixed(2),exp:+window.exp,eq:+window.eq,opens:+window.opens,rf:!!window.rf,t:Date.now()});(window.RANK||[]).forEach(r=>{if(r.me)r.n=n})}catch(e){console.error(e)}}if(!ok){window.NICK=pn;window.nickAt=pa;window.ME=pn||((user.displayName||'user').slice(0,3))+'***';return '저장에 실패했습니다 (규칙/네트워크 확인)'}return true};
+window.setNick=async n=>{if(!user||!ready)return '로그인 상태를 확인해주세요';const pn=window.NICK,pa=window.nickAt;if(pn&&Date.now()<pa+864e5)return '24시간 후에 다시 변경할 수 있습니다';window.NICK=n;window.nickAt=Date.now();window.ME=n;const ok=await window.saveProfile();if(ok){try{await setDoc(doc(db,'leaderboard',user.uid),{n:san(n),L:window.lv().L,bal:+(+window.bal).toFixed(2),exp:+window.exp,eq:+window.eq,opens:+window.opens,rf:!!window.rf,t:Date.now()});(window.RANK||[]).forEach(r=>{if(r.me)r.n=n})}catch(e){console.error(e)}}if(!ok){window.NICK=pn;window.nickAt=pa;window.ME=pn||((user.displayName||'user').slice(0,3))+'***';return '저장에 실패했습니다 (규칙/네트워크 확인)'}return true};
 window.bnCloudSave=async a=>{if(!user)return;try{await setDoc(doc(db,'users',user.uid,'prefs','banner'),{coins:a,updatedAt:Date.now()})}catch(e){}};
-window.loadRank=async()=>{try{const seen=new Map();let mine=null,ok=false;const add=d=>{const x=d.data(),me=!!user&&d.id===user.uid;if(me)mine=x;seen.set(d.id,{rf:x.rf!==false,n:(me&&window.ME)?window.ME:(x.n||'user***'),L:x.L||1,bal:me?(+window.bal||0):(typeof x.bal==='number'?x.bal:null),eq:(typeof x.eq==='number')?x.eq:-1,o:x.opens||0,me:me})};
+window.loadRank=async()=>{try{const seen=new Map();let mine=null,ok=false;const add=d=>{const x=d.data(),me=!!user&&d.id===user.uid;if(me)mine=x;seen.set(d.id,{rf:x.rf!==false,n:(me&&window.ME)?window.ME:san(x.n||'user***'),L:Math.min(1000,Math.max(1,(+x.L|0)||1)),bal:me?(+window.bal||0):((typeof x.bal==='number'&&isFinite(x.bal))?x.bal:null),eq:(typeof x.eq==='number'&&isFinite(x.eq))?(x.eq|0):-1,o:Math.max(0,+x.opens||0),me:me})};
 try{(await getDocs(query(collection(db,'leaderboard'),orderBy('bal','desc'),limit(100)))).docs.forEach(add);ok=true}catch(e){console.error('rank(bal) 조회 실패',e)}
 try{(await getDocs(query(collection(db,'leaderboard'),orderBy('exp','desc'),limit(200)))).docs.forEach(d=>{if(!seen.has(d.id))add(d)});ok=true}catch(e){console.error('rank(exp) 조회 실패',e)}
 if(!ok)throw new Error('leaderboard 조회 실패');
