@@ -636,22 +636,29 @@ var mine={start:0,done:0,mice:1,mb:1,m1:0,m2:0,t1:0,t2:0,lvl:0,sh:0,bo:0,sum:0,t
 var MNC={cyc:10000,day:864e5,at:9400,micePrice:500,miceMax:100,lvlPrice:1000,lvlMax:Infinity,lvlStep:.2,shieldPrice:1e4,boostPrice:1e5,boostMs:18e5,boostX:30,
  turP:1e6,turY:1e4,turCyc:6e4,accP:1e4,accMs:18e5,accX:2,fuseP:1e4,fuseOk:.9,uM1:5,uM2:10,uT1:5,uT2:10};
 ['micePrice','lvlPrice','shieldPrice','boostPrice','turP','turY','accP','fuseP'].forEach(function(k){MNC[k]*=KRW});
+/* 2026-10 개편: 고정 가격(원) */
+MNC.micePrice=1e6;MNC.turP=1e7;MNC.batP=1e7;MNC.turY=1e5;MNC.lvlPrice=1e5;MNC.shieldPrice=5e5;MNC.accP=1e6;MNC.accStep=.2;MNC.fuseP=0;
+/* 수레: m = 생쥐·거북이·박쥐 채굴량 배율, s = 이동(채굴) 속도 배율 — 영구 */
+var MNCART=[{n:'수레',p:0,m:1,s:1,ic:'🛒'},{n:'고급 수레',p:1e7,m:2,s:1.5,ic:'🛒'},{n:'용달차',p:1e8,m:6,s:3,ic:'🛻'},{n:'람보르기니',p:1e10,m:30,s:8,ic:'🏎️'}];
 var MNSK={base:{n:'기본 (채굴장)',b:0,p:0,ic:'⛏️'},emerald:{n:'에메랄드 광산',b:.5,p:5e5,ic:'💚'},gold:{n:'금 광산',b:3,p:2e6,ic:'🥇'},diamond:{n:'다이아 광산',b:10,p:1e8,ic:'💎'}};
-Object.keys(MNSK).forEach(function(k){MNSK[k].p*=KRW});
+Object.keys(MNSK).forEach(function(k){MNSK[k].p*=KRW});MNSK.emerald.p=5e7;MNSK.gold.p=5e8;MNSK.diamond.p=5e9;
 function mnNorm(o){o=o||{};var now=Date.now(),st=+o.start>0?+o.start:0,to=st?Math.min(now,st+MNC.day):0,sk=(Array.isArray(o.skins)?o.skins:[]).filter(function(k){return MNSK[k]});if(sk.indexOf('base')<0)sk.unshift('base');
  var m0=o.mice==null?1:Math.min(MNC.miceMax,Math.max(0,o.mice|0));
  return{start:st,done:o.done|0,mice:m0,mb:Math.max(1,(o.mb|0)||(m0+(o.m1|0)+(o.m2|0))||1),m1:Math.max(0,o.m1|0),m2:Math.max(0,o.m2|0),t1:Math.max(0,o.t1|0),t2:Math.max(0,o.t2|0),lvl:Math.min(MNC.lvlMax,Math.max(0,o.lvl|0)),sh:Math.max(0,o.sh|0),bo:+o.bo>0?+o.bo:0,sum:+o.sum>0?+o.sum:0,
-  tur:Math.max(0,o.tur|0),td:Math.max(0,o.td|0),ae:+o.ae>0?+o.ae:0,vt:(o.vt==null)?(st?to-st:0):Math.max(0,+o.vt||0),lt:(o.lt==null)?to:(+o.lt||0),skins:sk,skin:(sk.indexOf(o.skin)>=0?o.skin:'base'),fs:Math.max(0,o.fs|0),ff:Math.max(0,o.ff|0)}}
+  tur:Math.max(0,o.tur|0),td:Math.max(0,o.td|0),ae:+o.ae>0?+o.ae:0,vt:(o.vt==null)?(st?to-st:0):Math.max(0,+o.vt||0),lt:(o.lt==null)?to:(+o.lt||0),skins:sk,skin:(sk.indexOf(o.skin)>=0?o.skin:'base'),fs:Math.max(0,o.fs|0),ff:Math.max(0,o.ff|0),bat:Math.max(0,o.bat|0),b1:Math.max(0,o.b1|0),b2:Math.max(0,o.b2|0),cart:Math.min(MNCART.length-1,Math.max(0,o.cart|0)),acc:Math.max(0,o.acc|0)}}
 function mnRw(st,i,j){var h=(Math.floor(st/1000)^Math.imul(i+1,2654435761)^Math.imul(j+1,40503))|0;h=Math.imul(h^(h>>>15),2246822507);h=Math.imul(h^(h>>>13),3266489909);h^=h>>>16;return Math.round((1+((h>>>0)/4294967296)*2)*100)/100}
-function mnMul(){return 1+MNC.lvlStep*(mine.lvl|0)+((MNSK[mine.skin]||MNSK.base).b)}
+function mnCart(){return MNCART[Math.min(MNCART.length-1,mine.cart|0)]}
+function mnMul(){return (1+MNC.lvlStep*(mine.lvl|0)+((MNSK[mine.skin]||MNSK.base).b))*mnCart().m}
+function mnSpd(){return mnCart().s*(1+MNC.accStep*(mine.acc|0))}
 /* 효율 단위: 0성 생쥐=1, 1성=5, 2성=1성×10=50 / 거북이도 동일 */
 function mnUM(){return (mine.mice|0)+MNC.uM1*(mine.m1|0)+MNC.uM1*MNC.uM2*(mine.m2|0)}
 function mnUT(){return (mine.tur|0)+MNC.uT1*(mine.t1|0)+MNC.uT1*MNC.uT2*(mine.t2|0)}
+function mnUB(){return (mine.bat|0)+MNC.uT1*(mine.b1|0)+MNC.uT1*MNC.uT2*(mine.b2|0)}
 function mnCyc(i){var n=mnUM(),s=0,e=Math.min(n,200);for(var j=0;j<e;j++)s+=mnRw(mine.start,i,j);if(n>e)s+=(n-e)*2;return Math.round(s*mnMul()*KRW)}
-function mnTurPay(){return Math.round(mnUT()*MNC.turY*mnMul())}
+function mnTurPay(){return Math.round((mnUT()+mnUB())*MNC.turY*mnMul())}
 /* 가상 시계: 실제 경과 시간 + (가속 구간과 겹친 시간 × (배속-1)) */
-function mnVAdv(now){if(!mine.start)return;var to=Math.min(now,mine.start+MNC.day),from=mine.lt||mine.start;if(to>from){var ac=Math.max(0,Math.min(to,+mine.ae||0)-from);mine.vt=(+mine.vt||0)+(to-from)+ac*(MNC.accX-1);mine.lt=to}}
-function mnVNow(now){if(!mine.start)return 0;var to=Math.min(now,mine.start+MNC.day),from=mine.lt||mine.start,v=+mine.vt||0;if(to>from){var ac=Math.max(0,Math.min(to,+mine.ae||0)-from);v+=(to-from)+ac*(MNC.accX-1)}return v}
+function mnVAdv(now){if(!mine.start)return;var to=Math.min(now,mine.start+MNC.day),from=mine.lt||mine.start;if(to>from){mine.vt=(+mine.vt||0)+(to-from)*mnSpd();mine.lt=to}}
+function mnVNow(now){if(!mine.start)return 0;var to=Math.min(now,mine.start+MNC.day),from=mine.lt||mine.start,v=+mine.vt||0;if(to>from)v+=(to-from)*mnSpd();return v}
 function mnDueV(v){if(v<MNC.at)return 0;return Math.floor((v-MNC.at)/MNC.cyc)+1}
 function mnSum(){return +(+mine.sum||0).toFixed(2)}
 function expM(){return Date.now()<(+mine.bo||0)?MNC.boostX:1}
@@ -665,17 +672,21 @@ function mnStart(){var now=Date.now();if(mine&&mine.start&&now<mine.start+MNC.da
 function fmtK(v){v=+v;if(!isFinite(v))return '∞';if(v<1e4)return Math.round(v).toLocaleString('ko-KR');var U=['','만','억','조','경','해','자','양','구','간','정'],k=0;while(v>=1e4&&k<U.length-1){v/=1e4;k++}return (v>=100?Math.round(v):Math.round(v*100)/100).toLocaleString('ko-KR')+U[k]}
 function kbal(v){v=+v;if(!isFinite(v))return '∞';var neg=v<0;v=Math.abs(v);if(v<1e4)return (neg?'-':'')+Math.round(v).toLocaleString('ko-KR');var n=BigInt(Math.floor(v)),U=['','만','억','조','경','해','자','양','구','간','정'],g=[],i=0;while(n>0n&&i<U.length-1){g.push([Number(n%10000n),U[i]]);n/=10000n;i++}if(n>0n)g.push([Number(n),U[i]]);g.reverse();var o=g.filter(function(x){return x[0]>0}).slice(0,3).map(function(x){return x[0].toLocaleString('ko-KR')+x[1]}).join(' ');return (neg?'-':'')+o}
 window.kbal=kbal;
-function mnMouseP(){return MNC.micePrice*Math.pow(2,Math.max(0,(mine.mb|0||1)-1))}
+function mnMouseP(){return MNC.micePrice}
 function mnMiceN(){return (mine.mice|0)+(mine.m1|0)+(mine.m2|0)}
 function mnMS(ms){ms=Math.max(0,Math.ceil(ms/1000));var m=Math.floor(ms/60),s=ms%60;return m+'분 '+('0'+s).slice(-2)+'초'}
-function mnShopList(){var now=Date.now(),left=Math.max(0,(+mine.bo||0)-now),aleft=Math.max(0,(+mine.ae||0)-now),mc=mnMiceN(),lv=mine.lvl|0,L=[];
+function mnShopList(){var now=Date.now(),left=Math.max(0,(+mine.bo||0)-now),mc=mnMiceN(),lv=mine.lvl|0,L=[],ct=mine.cart|0,nx=MNCART[ct+1];
  L.push({g:'아이템'});
  L.push({id:'boost',ic:'⚡',name:'경험치 부스트 3000%',desc:'30분 동안 얻는 경험치가 '+MNC.boostX+'배. 구매하면 남은 시간에 30분이 더해집니다.',st:left>0?'적용 중 · 남은 '+mnMS(left):'미적용',price:MNC.boostPrice,max:false});
  L.push({id:'shield',ic:'🛡️',name:'룰렛 꽝 방어권',desc:'룰렛에서 꽝(폭탄)이 나오면 1장을 써서 배팅금을 돌려받습니다.',st:'보유 '+(mine.sh|0)+'장',price:MNC.shieldPrice,max:false});
- L.push({id:'mouse',ic:'🐭',name:'채굴 생쥐 +1마리',desc:'생쥐가 1마리 늘 때마다 사이클 보상이 한 마리분 더해집니다. 구매할 때마다 가격이 2배 (합성해도 가격은 내려가지 않습니다).',st:mc+' / '+MNC.miceMax+'마리 (1성·2성 포함)',price:mc>=MNC.miceMax?0:mnMouseP(),max:mc>=MNC.miceMax});
- L.push({id:'lvl',ic:'⛏️',name:'채굴량 +0.2배',desc:'채굴 보상 배율이 0.2씩 오릅니다. 구매 횟수 제한 없음.',st:'구매 '+lv+'회',price:MNC.lvlPrice,max:false});
- L.push({id:'turtle',ic:'🐢',name:'드릴 거북이',desc:'1마리당 1분마다 '+fmtK(MNC.turY)+'원를 채굴합니다. 고정 가격, 수량 제한 없음.',st:'보유 '+((mine.tur|0)+(mine.t1|0)+(mine.t2|0))+'마리 · 1분당 '+fmtK(mnTurPay())+'원',price:MNC.turP,max:false});
- L.push({id:'accel',ic:'⏩',name:'채굴장 가속권 (200%)',desc:'30분 동안 채굴 속도 '+MNC.accX+'배. 여러 개 쓰면 시간이 늘어납니다.',st:aleft>0?'가속 중 · 남은 '+mnMS(aleft):'미사용',price:MNC.accP,max:false});
+ L.push({id:'lvl',ic:'⛏️',name:'채굴량 +0.2배',desc:'채굴 보상 배율이 0.2씩 오릅니다(생쥐·거북이·박쥐 모두). 구매 횟수 제한 없음.',st:'구매 '+lv+'회 · 현재 채굴량 ×'+mnMul().toFixed(1),price:MNC.lvlPrice,max:false});
+ L.push({id:'accel',ic:'⏩',name:'채굴장 가속권 (영구)',desc:'채굴·이동 속도가 영구히 +'+MNC.accStep+'배 빨라집니다. 구매 횟수 제한 없음.',st:'구매 '+(mine.acc|0)+'회 · 현재 속도 ×'+mnSpd().toFixed(1),price:MNC.accP,max:false});
+ L.push({g:'일꾼'});
+ L.push({id:'mouse',ic:'🐭',name:'채굴 생쥐 +1마리',desc:'생쥐가 1마리 늘 때마다 사이클 보상이 한 마리분 더해집니다. 고정 가격.',st:mc+' / '+MNC.miceMax+'마리 (1성·2성 포함)',price:mc>=MNC.miceMax?0:mnMouseP(),max:mc>=MNC.miceMax});
+ L.push({id:'turtle',ic:'🐢',name:'드릴 거북이',desc:'1마리당 1분마다 '+fmtK(MNC.turY)+'원(채굴량 배율 적용)을 채굴합니다. 고정 가격, 수량 제한 없음.',st:'보유 '+((mine.tur|0)+(mine.t1|0)+(mine.t2|0))+'마리 · 효율 '+mnUT(),price:MNC.turP,max:false});
+ L.push({id:'bat',ic:'🦇',name:'하늘 박쥐',desc:'하늘을 날며 광석을 나릅니다. 드릴 거북이와 같은 가격·같은 능력(1분마다 '+fmtK(MNC.turY)+'원).',st:'보유 '+((mine.bat|0)+(mine.b1|0)+(mine.b2|0))+'마리 · 효율 '+mnUB(),price:MNC.batP,max:false});
+ L.push({g:'수레 업그레이드 (영구)'});
+ L.push(nx?{id:'cart',ic:nx.ic,name:mnCart().n+' → '+nx.n,desc:'생쥐·거북이·박쥐 채굴량 ×'+nx.m+', 이동·채굴 속도 ×'+nx.s+' (지금 ×'+mnCart().m+' · ×'+mnCart().s+')',st:'현재 '+mnCart().n,price:nx.p,max:false}:{id:'cart',ic:mnCart().ic,name:mnCart().n+' (최고 단계)',desc:'채굴량 ×'+mnCart().m+', 속도 ×'+mnCart().s,st:'최고 단계',price:0,max:true});
  L.push({g:'채굴장 스킨'});
  ['base','emerald','gold','diamond'].forEach(function(k){var d=MNSK[k],own=mine.skins.indexOf(k)>=0,on=mine.skin==k;
   L.push({id:own?'eq_'+k:'sk_'+k,ic:d.ic,name:d.n,desc:d.b?'채굴량 +'+Math.round(d.b*100)+'% (채굴량 배율에 더해집니다)':'기본 채굴장입니다.',st:on?'장착 중':own?'보유 중':'미보유',price:own?0:d.p,max:false,free:own,own:own,on:on})});
@@ -689,12 +700,14 @@ function mnBuy1(id){var it=mnShopList().filter(function(x){return x.id==id})[0];
  else if(id=='mouse'){mine.mice=(mine.mice|0)+1;mine.mb=(mine.mb|0||1)+1}
  else if(id=='lvl')mine.lvl=(mine.lvl|0)+1;
  else if(id=='turtle')mine.tur=(mine.tur|0)+1;
- else if(id=='accel'){var b2=Math.max(Date.now(),+mine.ae||0);mine.ae=b2+MNC.accMs}
+ else if(id=='bat')mine.bat=(mine.bat|0)+1;
+ else if(id=='accel')mine.acc=(mine.acc|0)+1;
+ else if(id=='cart')mine.cart=Math.min(MNCART.length-1,(mine.cart|0)+1);
  else if(id.slice(0,3)=='sk_'){var k=id.slice(3);if(mine.skins.indexOf(k)<0)mine.skins.push(k);mine.skin=k}
  return{ok:true,paid:it.price,name:it.name,msg:it.name+' 구매 완료 (−'+fmtK(it.price)+'원)'}}
 /* 수량 구매(x1/x10/x100): 최대 n개, 잔액·상한이 허락하는 만큼 */
-function mnQuote(id,n){if(id.slice(0,3)=='eq_'||id.slice(0,3)=='sk_')return{k:1,total:0};var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it||it.max)return{k:0,total:0};var b=bal,tot=0,k=0,p=it.price,cap=n;if(id=='mouse')cap=Math.min(n,Math.max(0,MNC.miceMax-mnMiceN()));for(var i=0;i<cap;i++){if(b<p-1e-9)break;b-=p;tot+=p;k++;if(id=='mouse')p*=2}return{k:k,total:tot}}
-function mnBuy(id,n){n=Math.max(1,n|0);if(id.slice(0,3)=='eq_'||id.slice(0,3)=='sk_'||n==1)return mnBuy1(id);
+function mnQuote(id,n){if(id.slice(0,3)=='eq_'||id.slice(0,3)=='sk_')return{k:1,total:0};var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it||it.max)return{k:0,total:0};var b=bal,tot=0,k=0,p=it.price,cap=n;if(id=='mouse')cap=Math.min(n,Math.max(0,MNC.miceMax-mnMiceN()));if(id=='cart')cap=1;for(var i=0;i<cap;i++){if(b<p-1e-9)break;b-=p;tot+=p;k++}return{k:k,total:tot}}
+function mnBuy(id,n){n=Math.max(1,n|0);if(id.slice(0,3)=='eq_'||id.slice(0,3)=='sk_'||id=='cart'||n==1)return mnBuy1(id);
  var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it)return{ok:false,msg:'알 수 없는 상품'};if(it.max)return{ok:false,msg:'이미 최대입니다'};
  var q=mnQuote(id,n),k=q.k;if(!k)return{ok:false,msg:'잔액이 부족합니다'};
  mnTick();var before=bal,c=0,paid=0;
@@ -704,11 +717,12 @@ function mnBuy(id,n){n=Math.max(1,n|0);if(id.slice(0,3)=='eq_'||id.slice(0,3)=='
   else if(id=='shield')mine.sh=(mine.sh|0)+k;
   else if(id=='lvl')mine.lvl=(mine.lvl|0)+k;
   else if(id=='turtle')mine.tur=(mine.tur|0)+k;
-  else if(id=='accel')mine.ae=Math.max(Date.now(),+mine.ae||0)+MNC.accMs*k}
- var ef={boost:'경험치 부스트 +'+(30*c)+'분',shield:'방어권 +'+c+'장',lvl:'채굴량 +'+(MNC.lvlStep*c).toFixed(1)+'배',turtle:'거북이 +'+c+'마리',accel:'가속 +'+(30*c)+'분',mouse:'생쥐 +'+c+'마리'}[id]||'';
+  else if(id=='bat')mine.bat=(mine.bat|0)+k;
+  else if(id=='accel')mine.acc=(mine.acc|0)+k}
+ var ef={boost:'경험치 부스트 +'+(30*c)+'분',shield:'방어권 +'+c+'장',lvl:'채굴량 +'+(MNC.lvlStep*c).toFixed(1)+'배',turtle:'거북이 +'+c+'마리',bat:'박쥐 +'+c+'마리',accel:'속도 +'+(MNC.accStep*c).toFixed(1)+'배',mouse:'생쥐 +'+c+'마리'}[id]||'';
  return{ok:true,count:c,paid:paid,msg:it.name+' ×'+c+' 구매 · '+ef+' (−'+fmtK(paid)+'원)'+(c<n?' · 잔액/상한으로 '+c+'개만 구매':'')}}
-/* ---- 합성: 같은 종류·같은 단계끼리만. 비용 1만, 성공 90%. 실패하면 재료와 합성비가 모두 사라집니다 ---- */
-var MNF=[{id:'m0',k:'m',from:0,need:2,f:'mice',t:'m1'},{id:'m1',k:'m',from:1,need:3,f:'m1',t:'m2'},{id:'t0',k:'t',from:0,need:2,f:'tur',t:'t1'},{id:'t1',k:'t',from:1,need:2,f:'t1',t:'t2'}];
+/* ---- 합성: 같은 종류·같은 단계끼리만. 비용 무료, 성공 90%. 실패하면 재료가 사라집니다 ---- */
+var MNF=[{id:'m0',k:'m',from:0,need:2,f:'mice',t:'m1'},{id:'m1',k:'m',from:1,need:3,f:'m1',t:'m2'},{id:'t0',k:'t',from:0,need:2,f:'tur',t:'t1'},{id:'t1',k:'t',from:1,need:2,f:'t1',t:'t2'},{id:'b0',k:'b',from:0,need:2,f:'bat',t:'b1'},{id:'b1',k:'b',from:1,need:2,f:'b1',t:'b2'}];
 function mnFuseList(){return MNF.map(function(r){var have=mine[r.f]|0;return{id:r.id,k:r.k,from:r.from,to:r.from+1,need:r.need,have:have,cost:MNC.fuseP,chance:MNC.fuseOk,can:have>=r.need&&bal>=MNC.fuseP-1e-9,
   noBal:have>=r.need&&bal<MNC.fuseP-1e-9}})}
 function mnRand(){try{var a=new Uint32Array(1);crypto.getRandomValues(a);return a[0]/4294967296}catch(e){return Math.random()}}
@@ -728,7 +742,7 @@ function mnFuseAll(){mnTick();var rows=[],W=0,Lz=0,cost=0;MNF.forEach(function(r
  mine.fs=(mine.fs|0)+W;mine.ff=(mine.ff|0)+Lz;if(!rows.length)return{ok:false,msg:'합성할 수 있는 재료나 잔액이 없습니다'};return{ok:true,win:W,lose:Lz,cost:cost,rows:rows,msg:'한번에 합성 완료 · 성공 '+W+'회 · 실패 '+Lz+'회'}}
 function mnUseShield(){if((mine.sh|0)>0){mine.sh--;return true}return false}
 setInterval(mnTick,1000);document.addEventListener('visibilitychange',function(){if(!document.hidden)mnTick()});
-window.rv_mine=function(){var el=$('mnroot');el.innerHTML='';var tk=++MNtok;if(MNm){MNm.stop();MNm=null}import('./mine.js').then(function(m){if(tk!==MNtok||cvw!='mine')return;MNm=m.mountMine(el,{cur:{k:KRW,u:'원',d:0},getMine:function(){return mine},start:mnStart,sumDone:mnSum,shop:mnShopList,buy:mnBuy,fuseList:mnFuseList,fuse:mnFuse,fuseAll:mnFuseAll,fuseBulk:mnFuseBulk,fuseStat:function(){return{s:mine.fs|0,f:mine.ff|0}},quote:mnQuote,fmtBal:kbal,units:function(){return{um:mnUM(),ut:mnUT()}},mul:mnMul,vnow:mnVNow,turPay:mnTurPay,loggedIn:function(){return !!window.UID&&!!window.__rdy},toast:toast,sfx:function(n,a,b){SFX.ev(n,a,b)},getBal:function(){return bal},setBal:function(v){bal=v}});apply(el)}).catch(function(e){toast('채굴장을 불러오지 못했습니다');console.error('[mine]',e)})};
+window.rv_mine=function(){var el=$('mnroot');el.innerHTML='';var tk=++MNtok;if(MNm){MNm.stop();MNm=null}import('./mine.js').then(function(m){if(tk!==MNtok||cvw!='mine')return;MNm=m.mountMine(el,{cur:{k:KRW,u:'원',d:0},getMine:function(){return mine},start:mnStart,sumDone:mnSum,shop:mnShopList,buy:mnBuy,fuseList:mnFuseList,fuse:mnFuse,fuseAll:mnFuseAll,fuseBulk:mnFuseBulk,fuseStat:function(){return{s:mine.fs|0,f:mine.ff|0}},quote:mnQuote,fmtBal:kbal,units:function(){return{um:mnUM(),ut:mnUT(),ub:mnUB()}},cart:function(){return{t:mine.cart|0,n:mnCart().n,m:mnCart().m,s:mnCart().s}},spd:mnSpd,mul:mnMul,vnow:mnVNow,turPay:mnTurPay,loggedIn:function(){return !!window.UID&&!!window.__rdy},toast:toast,sfx:function(n,a,b){SFX.ev(n,a,b)},getBal:function(){return bal},setBal:function(v){bal=v}});apply(el)}).catch(function(e){toast('채굴장을 불러오지 못했습니다');console.error('[mine]',e)})};
 var TRp=null;window.TRm=null;
 function trLoad(){if(!TRp)TRp=import('./trade.js').then(function(m){window.TRm=m.getTrade({rate:KRW,getBal:function(){return +bal||0},setBal:function(v){bal=+v||0;try{bwUpd()}catch(e){}},getState:function(){return window.trd},setState:function(x){window.trd=x},toast:toast});return window.TRm}).catch(function(e){TRp=null;toast('트레이딩 모듈을 불러오지 못했습니다');console.error('[trade]',e);return null});return TRp}
 window.trBg=function(){var t=window.trd;if(window.TRm){window.TRm.reload();return}if(t&&((t.pos&&Object.keys(t.pos).length)||(t.ord&&t.ord.length)))trLoad().then(function(x){x&&x.ensure()})};
