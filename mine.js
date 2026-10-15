@@ -207,16 +207,18 @@ function drawTurtle(g, x, y, T, work, idx, tier) {
 }
 
 /* ================= 마운트 ================= */
+let CU = 'USDT', CK = 1;
 export function mountMine(el, br) {
+  CU = (br.cur && br.cur.u) || 'USDT'; CK = (br.cur && br.cur.k) || 1;
   br = br || {};
   const getBal = br.getBal || (() => 0), setBal = br.setBal || (() => { }), sfx = br.sfx || (() => { });
-  const fmt = v => (+v).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtK = v => { v = +v; if (!isFinite(v)) return '∞'; if (v < 1e4) return v.toLocaleString('ko-KR', { maximumFractionDigits: 2 }); const U = ['', '만', '억', '조', '경', '해', '자', '양', '구', '간', '정']; let k = 0; while (v >= 1e4 && k < U.length - 1) { v /= 1e4; k++; } return (v >= 100 ? Math.round(v) : Math.round(v * 100) / 100).toLocaleString('ko-KR') + U[k]; };
+  const fmt = v => (+v).toLocaleString('ko-KR', { minimumFractionDigits: CK > 1 ? 0 : 2, maximumFractionDigits: CK > 1 ? 0 : 2 });
+  const fmtK = v => { v = +v; if (!isFinite(v)) return '∞'; if (v < 1e4) return v.toLocaleString('ko-KR', { maximumFractionDigits: CK > 1 ? 0 : 2 }); const U = ['', '만', '억', '조', '경', '해', '자', '양', '구', '간', '정']; let k = 0; while (v >= 1e4 && k < U.length - 1) { v /= 1e4; k++; } return (v >= 100 ? Math.round(v) : Math.round(v * 100) / 100).toLocaleString('ko-KR') + U[k]; };
   const fmtB = v => (br.fmtBal ? br.fmtBal(v) : fmt(v));
   if (!document.getElementById('mncss')) { const s = document.createElement('style'); s.id = 'mncss'; s.textContent = CSS; document.head.appendChild(s); }
   const root = document.createElement('div'); root.className = 'mn';
   root.innerHTML = '<div class="mnst"><button class="on" data-v="m">채굴장</button><button data-v="s">상점</button><button data-v="f">합성</button></div>' +
-    '<div class="mnv" id="mnm"><div class="mnhd"><div><b id="mnstt">대기 중</b><small id="mnrem">-</small><small id="mnbuf"></small></div><button id="mngo">채굴 시작</button></div><div class="mnc"><canvas></canvas></div><div class="mnin"><div><small>이번 24시간 채굴</small><b id="mntot">0.00</b><i>USDT</i></div><div><small>완료 사이클</small><b id="mncyc">0</b><i>회</i></div><div><small>직전 보상</small><b id="mnlast">-</b></div></div><p class="mnnt">시작 후 24시간 동안은 이 화면을 닫아도 채굴이 계속됩니다. 24시간이 지나면 채굴 시작 버튼을 다시 눌러야 해요. 1사이클 10초, 보상 1~3 USDT.</p><p class="mnnt" id="mnlg" style="color:var(--m-wn)"></p></div>' +
+    '<div class="mnv" id="mnm"><div class="mnhd"><div><b id="mnstt">대기 중</b><small id="mnrem">-</small><small id="mnbuf"></small></div><button id="mngo">채굴 시작</button></div><div class="mnc"><canvas></canvas></div><div class="mnin"><div><small>이번 24시간 채굴</small><b id="mntot">0</b><i>' + CU + '</i></div><div><small>완료 사이클</small><b id="mncyc">0</b><i>회</i></div><div><small>직전 보상</small><b id="mnlast">-</b></div></div><p class="mnnt">시작 후 24시간 동안은 이 화면을 닫아도 채굴이 계속됩니다. 24시간이 지나면 채굴 시작 버튼을 다시 눌러야 해요. 1사이클 10초, 보상 ' + (CK > 1 ? (CK).toLocaleString('ko-KR') + '~' + (3 * CK).toLocaleString('ko-KR') : '1~3') + CU + '.</p><p class="mnnt" id="mnlg" style="color:var(--m-wn)"></p></div>' +
     '<div class="mnv" id="mns" hidden></div><div class="mnv" id="mnf" hidden></div>';
   el.appendChild(root);
   const cv = root.querySelector('canvas'), g = cv.getContext('2d'), $ = id => root.querySelector('#' + id);
@@ -245,7 +247,7 @@ export function mountMine(el, br) {
     const qb = '<div class="mnq"><span>구매 수량</span>' + [1, 10, 100].map(n => '<button data-q="' + n + '"' + (shopQ === n ? ' class="on"' : '') + '>x' + n + '</button>').join('') + '</div>';
     const lab = x => { if (x.max) return '최대'; if (pend && pend.id === x.id) return '한 번 더 눌러 구매'; if (x.free || shopQ === 1 || !br.quote) return x.priceTxt; const q = br.quote(x.id, shopQ); return q.k ? ('x' + q.k + ' · ' + fmtK(q.total)) : x.priceTxt; };
     const cant = x => x.max || !x.can;
-    $('mns').innerHTML = '<div class="mnbal">보유 잔액 <b>' + fmtB(getBal()) + '</b> USDT</div>' + qb + L.map(x => x.g ? '<h4 class="mngh">' + x.g + '</h4>' : '<div class="mnit"><div class="ic">' + x.ic + '</div><div class="bd"><b>' + x.name + '</b><p>' + x.desc + '</p><small>' + x.st + '</small></div><button data-id="' + x.id + '"' + (cant(x) ? ' disabled' : '') + (pend && pend.id === x.id ? ' class="ask"' : x.on ? ' class="on"' : '') + '>' + lab(x) + '</button></div>').join('') + '<p class="mnnt">구매한 효과는 계정에 저장됩니다. 수량(x1/x10/x100)을 고른 뒤 구매 버튼을 두 번 눌러야 결제돼요. 잔액이 모자라면 살 수 있는 만큼만 구매합니다.</p>';
+    $('mns').innerHTML = '<div class="mnbal">보유 잔액 <b>' + fmtB(getBal()) + '</b>' + CU + '</div>' + qb + L.map(x => x.g ? '<h4 class="mngh">' + x.g + '</h4>' : '<div class="mnit"><div class="ic">' + x.ic + '</div><div class="bd"><b>' + x.name + '</b><p>' + x.desc + '</p><small>' + x.st + '</small></div><button data-id="' + x.id + '"' + (cant(x) ? ' disabled' : '') + (pend && pend.id === x.id ? ' class="ask"' : x.on ? ' class="on"' : '') + '>' + lab(x) + '</button></div>').join('') + '<p class="mnnt">구매한 효과는 계정에 저장됩니다. 수량(x1/x10/x100)을 고른 뒤 구매 버튼을 두 번 눌러야 결제돼요. 잔액이 모자라면 살 수 있는 만큼만 구매합니다.</p>';
   }
   $('mns').onclick = e => {
     const qbtn = e.target.closest('button[data-q]'); if (qbtn) { shopQ = +qbtn.dataset.q; window.__mnQ = shopQ; pend = null; sfx('rl_tick'); shop(true); return; }
@@ -276,10 +278,10 @@ export function mountMine(el, br) {
     const u = br.units ? br.units() : { um: 0, ut: 0 };
     const hold = (k, a, b, c, tot) => '<div class="mnfh"><img src="' + iconURL(k, 0) + '"><div><b>' + NAMES[k][0] + '</b><span>0성 ' + a + ' · 1성 ' + b + ' · 2성 ' + c + '</span><small>총 효율 ' + tot + '마리분</small></div></div>';
     const st = br.fuseStat ? br.fuseStat() : { s: 0, f: 0 }, anyCan = L.some(x => x.can), askA = pendF && pendF.id === '*';
-    let h = '<div class="mnbal">보유 잔액 <b>' + fmtB(getBal()) + '</b> USDT</div><div class="mnfst"><span>누적 합성</span><b class="ok">성공 ' + st.s + '회</b><b class="no">실패 ' + st.f + '회</b></div><button class="mnall' + (askA ? ' ask' : '') + '" data-f="*"' + (anyCan && !fxBusy ? '' : ' disabled') + '>' + (fxBusy ? '합성 중…' : askA ? '한 번 더 눌러 한번에 합성' : anyCan ? '⚡ 한번에 합성하기' : '합성할 재료/잔액이 없어요') + '</button><div class="mnfs">' + hold('m', m.mice | 0, m.m1 | 0, m.m2 | 0, u.um) + hold('t', m.tur | 0, m.t1 | 0, m.t2 | 0, u.ut) + '</div>';
+    let h = '<div class="mnbal">보유 잔액 <b>' + fmtB(getBal()) + '</b>' + CU + '</div><div class="mnfst"><span>누적 합성</span><b class="ok">성공 ' + st.s + '회</b><b class="no">실패 ' + st.f + '회</b></div><button class="mnall' + (askA ? ' ask' : '') + '" data-f="*"' + (anyCan && !fxBusy ? '' : ' disabled') + '>' + (fxBusy ? '합성 중…' : askA ? '한 번 더 눌러 한번에 합성' : anyCan ? '⚡ 한번에 합성하기' : '합성할 재료/잔액이 없어요') + '</button><div class="mnfs">' + hold('m', m.mice | 0, m.m1 | 0, m.m2 | 0, u.um) + hold('t', m.tur | 0, m.t1 | 0, m.t2 | 0, u.ut) + '</div>';
     h += L.map(x => {
-      const nm = NAMES[x.k], ask = pendF && pendF.id === x.id, lab = fxBusy ? '합성 중…' : ask ? '한 번 더 눌러 합성' : x.have < x.need ? '재료 부족' : x.noBal ? '잔액 부족' : '합성하기 · 1만 USDT';
-      return '<div class="mfc"><div class="mfr"><div class="mfi"><img src="' + iconURL(x.k, x.from) + '"><em>×' + x.need + '</em></div><div class="mfa">▶</div><div class="mfi to"><img src="' + iconURL(x.k, x.to) + '"><em>×1</em></div></div><div class="mfd"><b>' + nm[x.from] + ' ' + x.need + '마리 → ' + nm[x.to] + '</b><small>보유 <u>' + x.have + '</u> / 필요 ' + x.need + ' · 비용 ' + x.cost.toLocaleString('en-US') + ' USDT · 성공 ' + Math.round(x.chance * 100) + '%</small><small class="mfe">' + nm[x.to] + ' = ' + EFFN[x.k][x.to] + '</small><small class="mfw">실패 시 재료 ' + x.need + '마리와 합성비가 모두 사라집니다</small></div><button data-f="' + x.id + '"' + (x.can && !fxBusy ? '' : ' disabled') + (ask ? ' class="ask"' : '') + '>' + lab + '</button><button class="mfb' + (pendF && pendF.id === 'b:' + x.id ? ' ask' : '') + '" data-f="b:' + x.id + '"' + (x.can && !fxBusy ? '' : ' disabled') + '>' + (pendF && pendF.id === 'b:' + x.id ? '한 번 더 눌러 한번에 합성' : '한번에 합성하기 (가능한 만큼)') + '</button></div>';
+      const nm = NAMES[x.k], ask = pendF && pendF.id === x.id, lab = fxBusy ? '합성 중…' : ask ? '한 번 더 눌러 합성' : x.have < x.need ? '재료 부족' : x.noBal ? '잔액 부족' : '합성하기 · 1만' + CU + '';
+      return '<div class="mfc"><div class="mfr"><div class="mfi"><img src="' + iconURL(x.k, x.from) + '"><em>×' + x.need + '</em></div><div class="mfa">▶</div><div class="mfi to"><img src="' + iconURL(x.k, x.to) + '"><em>×1</em></div></div><div class="mfd"><b>' + nm[x.from] + ' ' + x.need + '마리 → ' + nm[x.to] + '</b><small>보유 <u>' + x.have + '</u> / 필요 ' + x.need + ' · 비용 ' + x.cost.toLocaleString('en-US') + '' + CU + ' · 성공 ' + Math.round(x.chance * 100) + '%</small><small class="mfe">' + nm[x.to] + ' = ' + EFFN[x.k][x.to] + '</small><small class="mfw">실패 시 재료 ' + x.need + '마리와 합성비가 모두 사라집니다</small></div><button data-f="' + x.id + '"' + (x.can && !fxBusy ? '' : ' disabled') + (ask ? ' class="ask"' : '') + '>' + lab + '</button><button class="mfb' + (pendF && pendF.id === 'b:' + x.id ? ' ask' : '') + '" data-f="b:' + x.id + '"' + (x.can && !fxBusy ? '' : ' disabled') + '>' + (pendF && pendF.id === 'b:' + x.id ? '한 번 더 눌러 한번에 합성' : '한번에 합성하기 (가능한 만큼)') + '</button></div>';
     }).join('') + '<p class="mnnt">같은 종류·같은 성급끼리만 합성할 수 있어요. 합성 버튼은 두 번 눌러야 진행됩니다.</p>';
     $('mnf').innerHTML = h;
   }
@@ -295,7 +297,7 @@ export function mountMine(el, br) {
   function showBulk(ra) {
     sfx(ra.win ? 'mn_fuse_ok' : 'mn_fuse_fail', 1);
     const o = document.createElement('div'); o.className = 'mnbr';
-    o.innerHTML = '<div class="bx"><h3>⚡ 한번에 합성 결과</h3><div class="bs"><div class="ok"><small>성공</small><b>' + ra.win + '회</b></div><div class="no"><small>실패</small><b>' + ra.lose + '회</b></div></div><div class="br">' + ra.rows.map(x => '<div><span>' + NAMES[x.k][x.from] + ' → ' + NAMES[x.k][x.to] + '</span><em>성공 ' + x.w + ' · 실패 ' + x.l + '</em></div>').join('') + '</div><p>합성 비용 <b>' + fmtK(ra.cost) + ' USDT</b> 사용 · 총 ' + (ra.win + ra.lose) + '회 시도</p><button>확인</button></div>';
+    o.innerHTML = '<div class="bx"><h3>⚡ 한번에 합성 결과</h3><div class="bs"><div class="ok"><small>성공</small><b>' + ra.win + '회</b></div><div class="no"><small>실패</small><b>' + ra.lose + '회</b></div></div><div class="br">' + ra.rows.map(x => '<div><span>' + NAMES[x.k][x.from] + ' → ' + NAMES[x.k][x.to] + '</span><em>성공 ' + x.w + ' · 실패 ' + x.l + '</em></div>').join('') + '</div><p>합성 비용 <b>' + fmtK(ra.cost) + '' + CU + '</b> 사용 · 총 ' + (ra.win + ra.lose) + '회 시도</p><button>확인</button></div>';
     o.onclick = ev => { if (ev.target === o || ev.target.tagName === 'BUTTON') o.remove(); }; document.body.appendChild(o);
   }
   function runFx(win, k, to, done) {

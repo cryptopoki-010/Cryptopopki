@@ -40,7 +40,7 @@ export function capForLev(sym, lev) { const b = brackets(sym); let cap = 0; for 
 export function maxLevFor(sym, notional) { return bracket(sym, notional).maxLev; }
 
 const r8 = v => Math.round(v * 1e8) / 1e8;
-export function newState() { return { v: 2, pos: {}, ord: [], spot: {}, hist: [], lev: {}, mode: {}, seq: 1, last: Date.now() }; }
+export function newState() { return { v: 3, usdt: 0, pos: {}, ord: [], spot: {}, hist: [], lev: {}, mode: {}, seq: 1, last: Date.now() }; }
 export function norm(S) {
   S = S && typeof S === 'object' ? S : newState();
   const n = newState();
@@ -49,6 +49,7 @@ export function norm(S) {
   n.spot = S.spot && typeof S.spot === 'object' ? S.spot : {};
   n.hist = Array.isArray(S.hist) ? S.hist.slice(0, MAX_HIST) : [];
   n.lev = S.lev || {}; n.mode = S.mode || {}; n.seq = +S.seq || 1; n.last = +S.last || Date.now();
+  n.usdt = Math.max(0, +S.usdt || 0);
   for (const k in n.pos) { const p = n.pos[k]; if (!p || !(p.q > 0) || !(p.ep > 0)) delete n.pos[k]; }
   for (const k in n.lev) n.lev[k] = Math.min(n.lev[k], maxLevSym(k));
   return n;
@@ -215,6 +216,23 @@ export function applyFunding(S, w, sym, rate, mark, t) {
   p.fund = r8((p.fund || 0) - amt); p.fT = t || Date.now();
   hist(S, { s: sym, mk: 'fut', act: 'fund', side: p.side, q: p.q, px: mark, pnl: -amt, fee: 0, rate, t: t || Date.now() });
   return { s: sym, amt, rate };
+}
+
+/* ---------------- KRW ⇄ USDT swap (fixed rate, no fee) ----------------
+ * KRW → USDT : usdt = floor(krw / rate, 0.01), only krw = usdt × rate is charged
+ * USDT → KRW : krw = floor(usdt × rate), limited to the available USDT (cross losses reduce it)
+ */
+export function swapIn(S, krwBal, krw, rate) {
+  krw = Math.floor(+krw || 0); if (!(krw > 0)) return fail('금액을 입력해 주세요'); if (krw > krwBal) return fail('원화 잔액이 부족합니다');
+  const usdt = Math.floor(krw / rate * 100) / 100; if (usdt < 0.01) return fail('최소 ' + Math.ceil(rate * 0.01).toLocaleString('ko-KR') + '원 이상 바꿀 수 있습니다');
+  const cost = Math.round(usdt * rate); S.usdt = r8((+S.usdt || 0) + usdt);
+  hist(S, { s: 'KRW→USDT', mk: 'swap', act: 'swapIn', q: usdt, px: rate, krw: cost }); return { ok: true, usdt, krw: cost };
+}
+export function swapOut(S, usdt, rate, marks) {
+  usdt = Math.floor((+usdt || 0) * 100) / 100; if (!(usdt >= 0.01)) return fail('0.01 USDT 이상 입력해 주세요');
+  const av = avail(S, +S.usdt || 0, marks); if (usdt > av + 1e-9) return fail('바꿀 수 있는 USDT는 ' + (Math.floor(av * 100) / 100).toLocaleString('en-US') + ' 입니다 (교차 포지션 손실·증거금 제외)');
+  const krw = Math.floor(usdt * rate); S.usdt = r8(Math.max(0, S.usdt - usdt));
+  hist(S, { s: 'USDT→KRW', mk: 'swap', act: 'swapOut', q: usdt, px: rate, krw }); return { ok: true, usdt, krw };
 }
 
 /* ---------------- spot ---------------- */

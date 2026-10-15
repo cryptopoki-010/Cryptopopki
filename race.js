@@ -202,6 +202,7 @@ function drawCar(g, spec, x, y, w, o) {
 }
 
 /* ---------------- 풍경 ---------------- */
+let CU = 'USDT';
 let SC = null, SIGNS = ['CRYPTO', 'GACHA', 'x5 WIN', 'DRIFT!', 'TOP 3', 'USDT'];
 const hsh = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 function initScenery() {
@@ -455,6 +456,8 @@ const CSS = `
 
 export async function openRace(br) {
   br = br || {};
+  if (br.cur && br.cur.k > 1 && !DIFFS.__krw) { Object.keys(DIFFS).filter(k => k !== '__krw').forEach(k => { DIFFS[k].fee *= br.cur.k; if (isFinite(DIFFS[k].max)) DIFFS[k].max *= br.cur.k; }); CFG.fee *= br.cur.k; CFG.minBet *= br.cur.k; DIFFS.__krw = 1; }
+  CU = (br.cur && br.cur.u) || 'USDT';
   const getBal = br.getBal || (() => 0), setBal = br.setBal || (() => { }), toast = br.toast || (() => { }), sfx = br.sfx || (() => { });
   const eng = br.engine || { start() { }, set() { }, stop() { } };
   if (!document.getElementById('rccss')) { const s = document.createElement('style'); s.id = 'rccss'; s.textContent = CSS; document.head.appendChild(s); }
@@ -467,7 +470,7 @@ export async function openRace(br) {
     '커브에서 창이 열리면 <b>1초 안에</b> DRIFT! 못 누르면 기회 끝, <b>잘못 누르면 속도 50% 감소</b>. 타이밍이 정확할수록 가속·추월 확률(12/20/30%)이 올라요.<br>반 바퀴마다 <b>아이템 🎁</b> 지급(2칸): ⚡부스터 · 🚀미사일 · 🛡️방어권 — <b>두 번 눌러</b> 사용. 상대 9명도 아이템을 씁니다!</div>' +
     '<div class="rch3">난이도</div><div class="rcdf" id="rcdf"><button data-d="easy">쉬움</button><button data-d="normal">보통</button><button data-d="hard">어려움</button></div>' +
     '<div class="rch3">① 내 차 선택</div><div class="rcgrid" id="rcg"></div>' +
-    '<div class="rch3">② 배팅금 입력</div><div class="rcbet"><div class="rcin"><input id="rcin" inputmode="numeric" autocomplete="off" placeholder="10,000,000,000"><span>USDT</span></div><div class="rcprev" id="rcpv"></div>' +
+    '<div class="rch3">② 배팅금 입력</div><div class="rcbet"><div class="rcin"><input id="rcin" inputmode="numeric" autocomplete="off" placeholder="10,000,000,000"><span>' + CU + '</span></div><div class="rcprev" id="rcpv"></div>' +
     '<div class="rcch" id="rcch"><button data-a="min">최소</button><button data-a="p100">+</button><button data-a="p1000">++</button><button data-a="x2">×2</button><button data-a="max">MAX</button></div>' +
     '<div class="rcsum" id="rcsum"></div><div class="rcerr" id="rcerr"></div></div></div>' +
     '<div class="rcbar" id="rcbar"><button class="rcgo" id="rcgo">START (3초 후 출발)</button></div>' +
@@ -498,11 +501,11 @@ export async function openRace(br) {
   const inp = $('rcin');
   function sync() {
     [...grid.children].forEach(d => d.classList.toggle('on', +d.dataset.i === sel));
-    $('rcb').textContent = kfmt(bal()) + ' USDT'; $('rcpv').textContent = bet > 0 ? '= ' + kfmt(bet) + ' USDT' : '';
+    $('rcb').textContent = kfmt(bal()) + '' + CU + ''; $('rcpv').textContent = bet > 0 ? '= ' + kfmt(bet) + '' + CU + '' : '';
     const need = fee + bet; let err = '';
-    if (bet < minBet) err = '최소 배팅금은 ' + kfmt(minBet) + ' USDT 입니다'; else if (bet > maxBet) err = '최대 배팅금은 ' + kfmt(maxBet) + ' USDT 입니다'; else if (need > bal() + 1e-6) err = '잔액이 부족합니다 (필요: ' + kfmt(need) + ' USDT)'; else if (sel < 0) err = '먼저 자동차를 선택하세요';
+    if (bet < minBet) err = '최소 배팅금은 ' + kfmt(minBet) + '' + CU + ' 입니다'; else if (bet > maxBet) err = '최대 배팅금은 ' + kfmt(maxBet) + '' + CU + ' 입니다'; else if (need > bal() + 1e-6) err = '잔액이 부족합니다 (필요: ' + kfmt(need) + '' + CU + ')'; else if (sel < 0) err = '먼저 자동차를 선택하세요';
     $('rcerr').textContent = err;
-    $('rcsum').innerHTML = '총 지출 <b>' + kfmt(need) + ' USDT</b> (입장료 ' + kfmt(fee) + ' + 배팅금 ' + kfmt(bet) + ')<br>1등 <b>' + kfmt(bet * 5) + '</b> · 2등 <b>' + kfmt(bet * 2) + '</b> · 3등 <b>' + kfmt(fee) + '</b> (입장료 환급)';
+    $('rcsum').innerHTML = '총 지출 <b>' + kfmt(need) + '' + CU + '</b> (입장료 ' + kfmt(fee) + ' + 배팅금 ' + kfmt(bet) + ')<br>1등 <b>' + kfmt(bet * 5) + '</b> · 2등 <b>' + kfmt(bet * 2) + '</b> · 3등 <b>' + kfmt(fee) + '</b> (입장료 환급)';
     $('rcgo').disabled = !!err;
   }
   function setBet(v) { bet = Math.max(0, Math.min(Math.floor(v) || 0, Math.min(maxBet, 9e15))); inp.value = bet ? bet.toLocaleString('en-US') : ''; sync(); }
@@ -511,7 +514,7 @@ export async function openRace(br) {
   function setDiff(d) {
     if (phase !== 'sel' || !DIFFS[d]) return; diff = d; const D = DIFFS[d]; fee = D.fee; minBet = D.fee; maxBet = D.max;
     [...$('rcdf').children].forEach(b => b.classList.toggle('on', b.dataset.d === d));
-    $('rcrl').innerHTML = '<b>' + D.n + '</b> · 입장료 <b>' + kfmt(fee) + ' USDT</b> (결과와 상관없이 소모) · 최소 배팅금 <b>' + kfmt(minBet) + '</b> · 최대 배팅금 <b>' + (isFinite(maxBet) ? kfmt(maxBet) + ' USDT' : '무제한') + '</b><br>상대 차 속도 <b>' + D.ai + '</b> (정확한 드리프트 기준)';
+    $('rcrl').innerHTML = '<b>' + D.n + '</b> · 입장료 <b>' + kfmt(fee) + '' + CU + '</b> (결과와 상관없이 소모) · 최소 배팅금 <b>' + kfmt(minBet) + '</b> · 최대 배팅금 <b>' + (isFinite(maxBet) ? kfmt(maxBet) + '' + CU + '' : '무제한') + '</b><br>상대 차 속도 <b>' + D.ai + '</b> (정확한 드리프트 기준)';
     const cs = $('rcch').children; cs[0].textContent = '최소 ' + kfmt(minBet); cs[1].textContent = '+' + kfmt(minBet); cs[2].textContent = '+' + kfmt(minBet * 10); inp.placeholder = minBet.toLocaleString('en-US');
     setBet(minBet);
   }
@@ -524,7 +527,7 @@ export async function openRace(br) {
     if (phase !== 'sel') return; sync(); if ($('rcgo').disabled) return;
     paid = fee + bet; setBal(bal() - paid); settled = false;
     CFG.aiX = DIFFS[diff].aiX; sim = createRace(newSeed(), sel); cd = 3; cdLast = 4; phase = 'count'; root.classList.add('pl'); acc = 0; camInit = false; msgs = []; prevRank = 0; dfx = null; finT = -1; goT = 0; shiftT = 1; gearNow = gearOld = 1;
-    toast('입장료 ' + kfmt(fee) + ' + 배팅금 ' + kfmt(bet) + ' USDT 차감');
+    toast('입장료 ' + kfmt(fee) + ' + 배팅금 ' + kfmt(bet) + '' + CU + ' 차감');
   }
   $('rcgo').onclick = startCountdown;
   function startRace() { phase = 'race'; root.classList.add('race'); goT = 0; sfx('rc_go'); eng.start(); prevRank = sim.rank(sim.P); lastGoodRank = prevRank; }
@@ -538,7 +541,7 @@ export async function openRace(br) {
     const ttl = r.rank === 1 ? '🏆 1등!' : r.rank === 2 ? '🥈 2등!' : r.rank === 3 ? '🥉 3등 (입장료 환급)' : r.rank + '등 · 아쉬워요';
     const sub = r.rank === 1 ? '배팅금 ×5 지급' : r.rank === 2 ? '배팅금 ×2 지급' : r.rank === 3 ? '입장료 환급 · 배팅금은 몰수' : '입장료와 배팅금을 모두 몰수당했습니다';
     $('rcres').querySelector('.cd2').innerHTML = '<h3 class="' + cls + '">' + ttl + '</h3><p>' + CARS[sel].n + ' (#' + (sel + 1) + ') · 기록 ' + r.time.toFixed(1) + '초<br>' + sub + '</p>' +
-      '<div>지급 <span class="big">' + kfmt(r.pay) + ' USDT</span></div><div style="margin-top:4px">순손익 <span class="big ' + (r.net >= 0 ? 'w' : 'l') + '">' + (r.net >= 0 ? '+' : '−') + kfmt(Math.abs(r.net)) + ' USDT</span></div>' +
+      '<div>지급 <span class="big">' + kfmt(r.pay) + '' + CU + '</span></div><div style="margin-top:4px">순손익 <span class="big ' + (r.net >= 0 ? 'w' : 'l') + '">' + (r.net >= 0 ? '+' : '−') + kfmt(Math.abs(r.net)) + '' + CU + '</span></div>' +
       '<div style="font-size:11px;color:#9fb0cc;margin-top:8px">드리프트 성공 ' + sim.D.ok + '/6 (PERFECT ' + sim.D.grades[2] + ') · 오입력 ' + sim.D.wrong + ' · 아이템 사용 ' + sim.P.used + ' · 피격 ' + sim.P.hit + ' · 방어 ' + sim.P.blocked + '</div><div class="ord">' + ord.map((c, i) => '<span class="' + (c.id === sel ? 'me' : '') + '">' + (i + 1) + '위 #' + (c.id + 1) + '</span>').join('') + '</div>' +
       '<div class="bt"><button id="rcex">나가기</button><button class="p" id="rcag">다시 하기</button></div>';
     $('rcres').classList.add('on'); $('rcex').onclick = close; $('rcag').onclick = again; sfx(r.rank <= 3 ? 'rc_win' : 'rc_lose');
@@ -547,7 +550,7 @@ export async function openRace(br) {
   function close() {
     if (!alive) return; let r = null;
     if (phase === 'count' && !settled) { setBal(bal() + paid); settled = true; toast('출발 전 취소 · 입장료와 배팅금 환불'); }
-    else if (phase === 'race' || (phase === 'fin' && !settled)) { r = settle(); if (r) toast(r.rank + '등 정산 · ' + (r.pay ? '+' + kfmt(r.pay) : '지급 없음') + ' USDT'); }
+    else if (phase === 'race' || (phase === 'fin' && !settled)) { r = settle(); if (r) toast(r.rank + '등 정산 · ' + (r.pay ? '+' + kfmt(r.pay) : '지급 없음') + '' + CU + ''); }
     alive = false; cancelAnimationFrame(raf); window.removeEventListener('resize', onR); window.removeEventListener('keydown', onKey); eng.stop(); root.remove(); document.body.style.overflow = ''; if (br.onClose) br.onClose();
   }
   root.querySelector('.rcx').onclick = () => { if (phase === 'race') { $('rccf').classList.add('on'); } else close(); };

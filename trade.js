@@ -5,7 +5,7 @@ import { Feed, SYMS } from './trade-feed.js';
 
 const IVS = [['1m', '1분'], ['5m', '5분'], ['15m', '15분'], ['30m', '30분'], ['1h', '1시간'], ['4h', '4시간'], ['1d', '1일'], ['1w', '1주']];
 const LEVS = [1, 2, 3, 5, 10, 20, 25, 50, 75, 100, 125, 150];
-const ACT = { open: '진입', add: '추가 진입', close: '시장가 종료', limit: '지정가 체결', tp: 'TP 체결', sl: 'SL 체결', liq: '강제 청산', buy: '매수', sell: '매도', 'm+': '증거금 추가', 'm-': '증거금 회수', fund: '펀딩비' };
+const ACT = { open: '진입', add: '추가 진입', close: '시장가 종료', limit: '지정가 체결', tp: 'TP 체결', sl: 'SL 체결', liq: '강제 청산', buy: '매수', sell: '매도', 'm+': '증거금 추가', 'm-': '증거금 회수', fund: '펀딩비', swapIn: '원화 → USDT 스왑', swapOut: 'USDT → 원화 스왑' };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = v => { const x = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(x) ? x : 0; };
 const dec = p => p >= 100 ? 2 : p >= 10 ? 3 : p >= 1 ? 4 : p >= .1 ? 5 : 6;
@@ -36,8 +36,10 @@ class Trade {
   P(sym) { return this.feed.last(sym || this.U.sym, this.U.mk) || 0; }
   Pf(sym) { return this.feed.last(sym || this.U.sym, 'fut') || 0; }
   Pm(sym) { return (this.feed.marks()[(sym || this.U.sym) + 'USDT']) || this.Pf(sym); }
-  w() { return { bal: +this.br.getBal() || 0 }; }
-  commit(w) { if (w) this.br.setBal(Math.round(w.bal * 1e6) / 1e6); this.br.setState(this.S); }
+  w() { return { bal: +this.S.usdt || 0 }; }                       // trade wallet (USDT), separate from the site's KRW balance
+  commit(w) { if (w) this.S.usdt = Math.max(0, Math.round(w.bal * 1e8) / 1e8); this.br.setState(this.S); }
+  rate() { return +this.br.rate || 1300; }
+  krw() { return +this.br.getBal() || 0; }
   async ensure() {
     if (this.started) return; this.started = true;
     this.hold = true; await this.feed.start();
@@ -111,10 +113,10 @@ class Trade {
       '<div class="trmk" role="tablist"><button data-a="mk" data-v="spot">현물</button><button data-a="mk" data-v="fut">선물 <small>USDⓈ-M</small></button></div>' +
       '<div class="triv"><div class="trivs">' + IVS.map(v => '<button data-a="iv" data-v="' + v[0] + '">' + v[1] + '</button>').join('') + '</div><button class="trset" data-a="cset" aria-label="차트 설정"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button></div>' +
       '<div class="trch" id="tchart"></div>' +
-      '<div class="trw" id="twal"></div>' +
+      '<div class="trsw" id="tswap"></div><div class="trw" id="twal"></div>' +
       '<div class="tro" id="tord"></div>' +
       '<div class="trtabs" id="ttabs"></div><div class="trlist" id="tlist"></div>' +
-      '<p class="trnote">모든 거래는 가상 USDT로 이루어지는 모의 투자입니다. 시세는 Binance 공개 데이터입니다. 선물은 USDⓈ-M 무기한 계약의 체결가로 주문·TP/SL이 체결되고, 청산은 마크 가격 기준이며, 펀딩비는 Binance 실제 펀딩 시각·요율로 정산됩니다. 청산가는 Binance 공식 공식과 구간별 유지증거금표로 계산합니다.</p>' +
+      '<p class="trnote">트레이드는 별도의 USDT 지갑으로 거래하는 모의 투자입니다. 원화 잔액은 스왑(1 USDT = 고정 환율)으로 USDT로 바꿔 쓰고, 수익은 다시 원화로 바꿀 수 있습니다. 시세는 Binance 공개 데이터이며, 선물은 USDⓈ-M 무기한 체결가로 주문·TP/SL이 체결되고 청산은 마크 가격 기준, 펀딩비는 실제 펀딩 시각·요율로 정산됩니다.</p>' +
       '<div class="trsh" id="tsh" hidden><div class="trshb" role="dialog" aria-modal="true"><div class="trshh"><b id="tsht"></b><button data-a="shx" aria-label="닫기">✕</button></div><div id="tshc"></div></div></div>';
     r.addEventListener('click', e => this.onClick(e));
     r.addEventListener('input', e => this.onInput(e));
@@ -180,7 +182,47 @@ class Trade {
     const crossEq = w.bal + mCross + eqC;
     return { bal: w.bal, up, mIso, mCross, spotV, res, mr: mCross ? MMc / crossEq : 0, total: w.bal + mIso + mCross + up + spotV + res };
   }
+  renderSwapBar() {
+    const el = this.$('tswap'); if (!el) return; const u = +this.S.usdt || 0, k = this.krw(), r = this.rate();
+    el.innerHTML = '<div class="trsw1"><small>USDT 지갑</small><b>' + fN(u, 2) + ' <i>USDT</i></b><span>≈ ' + fN(u * r, 0) + '원</span></div><div class="trsw1"><small>원화 잔액</small><b>' + fN(k, 0) + ' <i>원</i></b><span>1 USDT = ' + fN(r, 0) + '원</span></div><button class="trswb" data-a="swap">원화 ⇄ USDT<br><small>스왑</small></button>'
+      + (u < 0.01 && !Object.keys(this.S.pos).length && !Object.keys(this.S.spot).length ? '<p class="trswh">트레이드는 USDT로만 거래합니다. 먼저 <b>스왑</b>으로 원화를 USDT로 바꿔 주세요.</p>' : '');
+  }
+  swapSheet(dir0) {
+    let dir = dir0 || 'in';
+    const r = this.rate();
+    const body = '<div class="trseg"><button data-a="sd" data-v="in" aria-pressed="true">원화 → USDT</button><button data-a="sd" data-v="out" aria-pressed="false">USDT → 원화</button></div>'
+      + '<label class="trin"><span id="swl">보낼 원화</span><input id="swamt" inputmode="decimal" autocomplete="off" placeholder="0"><em id="swu">원</em></label>'
+      + '<div class="trpct">' + [10, 25, 50, 75, 100].map(v => '<button data-a="sp" data-v="' + v + '">' + v + '%</button>').join('') + '</div>'
+      + '<div class="trswarr">↓</div><div class="trswout"><small>받는 금액</small><b id="swget">0</b></div>'
+      + '<div class="trinfo" id="swinf"></div><button class="trgo" data-a="swok">스왑하기</button>'
+      + '<p class="trhint">고정 환율 1 USDT = ' + fN(r, 0) + '원, 수수료는 없습니다. 원화 → USDT는 0.01 USDT 단위로 바꾸고 남는 원화는 차감되지 않습니다. 교차 포지션의 미실현 손실과 주문·포지션에 묶인 증거금은 원화로 바꿀 수 없습니다.</p>';
+    const maxSrc = () => dir === 'in' ? Math.floor(this.krw()) : Math.floor(E.avail(this.S, +this.S.usdt || 0, this.pairs()) * 100) / 100;
+    const info = () => {
+      const v = num(this.R.querySelector('#swamt').value), mx = maxSrc();
+      let get = 0, used = 0;
+      if (dir === 'in') { const q = Math.floor(Math.min(v, this.krw()) / r * 100) / 100; get = q; used = Math.round(q * r); this.R.querySelector('#swget').textContent = fN(get, 2) + ' USDT'; }
+      else { const q = Math.floor(v * 100) / 100; get = Math.floor(q * r); used = q; this.R.querySelector('#swget').textContent = fN(get, 0) + '원'; }
+      this.R.querySelector('#swinf').innerHTML = '<div><span>' + (dir === 'in' ? '바꿀 수 있는 원화' : '바꿀 수 있는 USDT') + '</span><b>' + (dir === 'in' ? fN(mx, 0) + '원' : fN(mx, 2) + ' USDT') + '</b></div>'
+        + (dir === 'in' && v > 0 ? '<div><span>실제 차감 원화</span><b>' + fN(used, 0) + '원</b></div>' : '')
+        + '<div><span>스왑 후 USDT 지갑</span><b>' + fN((+this.S.usdt || 0) + (dir === 'in' ? get : -used), 2) + ' USDT</b></div><div><span>스왑 후 원화 잔액</span><b>' + fN(this.krw() + (dir === 'in' ? -used : get), 0) + '원</b></div>'
+        + (v > mx + 1e-9 ? '<p class="trwarn">보유량보다 많습니다</p>' : '');
+    };
+    const setDir = d => { dir = d; this.R.querySelectorAll('[data-a=sd]').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === d)); this.R.querySelector('#swl').textContent = d === 'in' ? '보낼 원화' : '보낼 USDT'; this.R.querySelector('#swu').textContent = d === 'in' ? '원' : 'USDT'; this.R.querySelector('#swamt').value = ''; info(); };
+    this.sheet('원화 ⇄ USDT 스왑', body, (a, v) => {
+      if (a === 'sd') setDir(v);
+      if (a === 'sp') { const mx = maxSrc(), x = mx * v / 100; this.R.querySelector('#swamt').value = dir === 'in' ? String(Math.floor(x)) : String(Math.floor(x * 100) / 100); info(); }
+      if (a === 'swok') {
+        const v = num(this.R.querySelector('#swamt').value); let res;
+        if (dir === 'in') { res = E.swapIn(this.S, this.krw(), v, r); if (res.ok) this.br.setBal(Math.round(this.krw() - res.krw)); }
+        else { res = E.swapOut(this.S, v, r, this.pairs()); if (res.ok) this.br.setBal(Math.round(this.krw() + res.krw)); }
+        if (!res.ok) return this.br.toast(res.err);
+        this.commit(); this.closeSheetUI(); this.renderAll(); this.br.toast(dir === 'in' ? fN(res.krw, 0) + '원 → ' + fN(res.usdt, 2) + ' USDT 스왑 완료' : fN(res.usdt, 2) + ' USDT → ' + fN(res.krw, 0) + '원 스왑 완료');
+      }
+    }, e => { if (e.target.id === 'swamt') info(); });
+    setDir(dir);
+  }
   renderWallet() {
+    this.renderSwapBar();
     const a = this.acct(), el = this.$('twal'); if (!el) return;
     el.innerHTML = this.U.mk === 'fut'
       ? '<div><small>사용 가능</small><b>' + fU(E.avail(this.S, a.bal, this.pairs())) + '</b></div><div><small>미실현 손익</small><b class="' + (a.up >= 0 ? 'up' : 'dn') + '">' + sgn(a.up) + '</b></div><div><small>사용 중 증거금</small><b>' + fU(a.mIso + a.mCross) + '</b></div><div><small>교차 마진율</small><b class="' + (a.mr > .8 ? 'dn' : '') + '">' + (a.mr ? (a.mr * 100).toFixed(2) + '%' : '-') + '</b></div>'
@@ -272,7 +314,7 @@ class Trade {
       const ks = Object.keys(this.S.spot);
       el.innerHTML = ks.length ? ks.map(k => { const h = this.S.spot[k], mk = prices[k] || 0, v = h.q * mk, avg = h.cost / h.q, pl = v - h.cost, s = k.replace(/USDT$/, ''); return '<div class="trord"><div><b>' + s + '</b><small>평단 ' + fN(avg, dec(avg)) + '</small></div><div class="kv"><span>보유 <b>' + fN(h.q, qdec(mk) + 2) + '</b></span><span>평가액 <b>' + fU(v) + '</b></span><span>평가손익 <b class="' + (pl >= 0 ? 'up' : 'dn') + '">' + sgn(pl) + ' (' + pct(pl / h.cost * 100) + ')</b></span></div><button class="trsm" data-a="sellall" data-v="' + k + '">전량 매도</button></div>'; }).join('') : '<div class="tremp">보유 중인 현물 코인이 없습니다</div>';
     } else {
-      el.innerHTML = this.S.hist.length ? '<div class="trhist">' + this.S.hist.map(h => '<div><span><b>' + esc(h.s) + '</b> ' + (ACT[h.act] || esc(h.act)) + (h.mk === 'fut' && h.side ? ' · ' + (h.side > 0 ? '롱' : '숏') : '') + '<small>' + tm(h.t) + '</small></span><span>' + (h.q ? fN(h.q, qdec(h.px) + 2) + ' @ ' + fN(h.px, dec(h.px)) : fU(h.amt || 0) + ' USDT') + (h.pnl != null ? '<b class="' + (h.pnl - (h.fee || 0) >= 0 ? 'up' : 'dn') + '">' + sgn(h.pnl - (h.act === 'sell' ? 0 : (h.fee || 0))) + '</b>' : h.fee ? '<small>수수료 ' + fU(h.fee) + '</small>' : '') + '</span></div>').join('') + '</div>' : '<div class="tremp">체결 내역이 없습니다</div>';
+      el.innerHTML = this.S.hist.length ? '<div class="trhist">' + this.S.hist.map(h => '<div><span><b>' + esc(h.s) + '</b> ' + (ACT[h.act] || esc(h.act)) + (h.mk === 'fut' && h.side ? ' · ' + (h.side > 0 ? '롱' : '숏') : '') + '<small>' + tm(h.t) + '</small></span><span>' + (h.mk === 'swap' ? fN(h.q, 2) + ' USDT · ' + fN(h.krw, 0) + '원' : h.q ? fN(h.q, qdec(h.px) + 2) + ' @ ' + fN(h.px, dec(h.px)) : fU(h.amt || 0) + ' USDT') + (h.pnl != null ? '<b class="' + (h.pnl - (h.fee || 0) >= 0 ? 'up' : 'dn') + '">' + sgn(h.pnl - (h.act === 'sell' ? 0 : (h.fee || 0))) + '</b>' : h.fee ? '<small>수수료 ' + fU(h.fee) + '</small>' : '') + '</span></div>').join('') + '</div>' : '<div class="tremp">체결 내역이 없습니다</div>';
     }
   }
   posCard(p, prices, bal) {
@@ -321,6 +363,7 @@ class Trade {
       case 'plev': { const s = v.replace(/USDT$/, ''); if (s !== U.sym) { U.sym = s; this.saveU(); this.loadChart(); this.renderAll(); } this.levSheet(); break; }
       case 'fx': this.fxSheet(v); break;
       case 'shx': this.closeSheetUI(); break;
+      case 'swap': this.swapSheet(); break;
       default: if (this.sheetAct) this.sheetAct(a, v, b);
     }
   }
@@ -358,7 +401,7 @@ class Trade {
         if (isLmt && !marketable) { r = E.placeLimit(this.S, w, { s: pair, mk: 'fut', side, q, px, lev, mode }, prices); if (r.ok && tpsl) r.ord.tpsl = tpsl; }
         else { r = E.openFut(this.S, w, prices, { s: pair, side, q, px: cur, lev, mode }); if (r.ok && tpsl && this.S.pos[pair] && this.S.pos[pair].side === side) { const t = E.setTpSl(this.S, pair, tpsl.tp, tpsl.sl, this.lastF()); if (!t.ok) this.br.toast('TP/SL 미설정: ' + t.err); } }
       }
-      if (!r.ok) return this.br.toast(r.err);
+      if (!r.ok) return this.br.toast(r.err + (/잔액/.test(r.err) ? ' · 스왑으로 원화를 USDT로 바꿔 주세요' : ''));
       this.commit(w);
       this.br.toast(isLmt && !marketable ? '지정가 주문이 등록되었습니다' : (U.mk === 'spot' ? (side > 0 ? '매수 체결' : '매도 체결') : (r.act === 'add' ? '추가 진입 체결 · 새 평단 ' + fN(r.pos.ep, dec(cur)) : r.act === 'open' ? (side > 0 ? '롱' : '숏') + ' 포지션 진입' : '포지션 감소/종료')) + (marketable ? ' (지정가가 시장가보다 유리해 즉시 체결)' : ''));
       this.$('oqty').value = ''; this.renderAll(); this.chartLines(); this.closeSheetUI();
@@ -551,6 +594,13 @@ const CSS = `
 .trset svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
 .trch{height:clamp(260px,46vh,380px);border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel);touch-action:pan-y;position:relative}
 .trcv{display:block;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.trsw{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;align-items:stretch}
+.trsw1{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.trsw1 small{font-size:10.5px;color:var(--mute)}.trsw1 b{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.trsw1 b i{font-style:normal;font-size:11px;color:var(--mute);font-weight:500}.trsw1 span{font-size:10.5px;color:var(--mute)}
+.trswb{border:0;border-radius:12px;background:var(--ink);color:var(--panel);font-weight:700;font-size:13px;padding:0 14px;line-height:1.2}.trx .trswb{color:var(--panel)}.trswb small{font-size:10.5px;font-weight:500;opacity:.8}
+.trswh{grid-column:1/-1;margin:0;font-size:12px;line-height:1.5;padding:8px 12px;border-radius:10px;background:var(--soft);color:var(--ink)}
+.trswarr{text-align:center;font-size:18px;color:var(--mute);margin:-4px 0}
+.trswout{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;background:var(--soft)}.trswout small{color:var(--mute);font-size:12.5px}.trswout b{font-size:18px;font-variant-numeric:tabular-nums}
 .trw{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .trw>div{background:var(--panel);padding:8px 10px;display:flex;flex-direction:column;gap:1px;min-width:0}
 .trw small{font-size:10.5px;color:var(--mute);white-space:nowrap}.trw b{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

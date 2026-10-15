@@ -714,7 +714,8 @@ service cloud.firestore {
         && (!('shl' in d) || d.shl == null || d.shl is map)
         // 가상 트레이딩 상태 (포지션·주문·현물·내역)
         && (!('tr' in d) || d.tr == null
-            || (d.tr is map && d.tr.keys().hasOnly(['v','pos','ord','spot','hist','lev','mode','seq','last'])
+            || (d.tr is map && d.tr.keys().hasOnly(['v','usdt','pos','ord','spot','hist','lev','mode','seq','last'])
+                && d.tr.get('usdt', 0) is number && d.tr.get('usdt', 0) >= 0 && d.tr.get('usdt', 0) <= 1000000000000
                 && d.tr.get('pos', {}) is map && d.tr.get('pos', {}).size() <= 20
                 && d.tr.get('ord', []) is list && d.tr.get('ord', []).size() <= 50
                 && d.tr.get('spot', {}) is map && d.tr.get('spot', {}).size() <= 20
@@ -816,10 +817,12 @@ service cloud.firestore {
 `;
 function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let CU = 'USDT';
 const money = v => (+v).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
 async function sha(s) { try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); } catch (e) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return 'f' + (h >>> 0).toString(16); } }
 
 export function openRR(br) {
+  CU = (br.cur && br.cur.u) || 'USDT';
   const net = br.net, me = (br.uid && br.uid()) || '', myName = (br.name && br.name()) || '플레이어';
   const toast = br.toast || (() => { }), sfx = br.sfx || (() => { });
   if (document.getElementById('rrov')) return;
@@ -930,21 +933,21 @@ export function openRR(br) {
     const g = d.guest; let h = '<div class="rrpn" id="rrroomp"><h4>🔒 ' + esc(d.name) + '</h4><p>방장 ' + esc(d.host.n) + (g ? ' · 상대 ' + esc(g.n) : '') + '</p></div>';
     if (isHost) {
       if (!g) h += '<div class="rrpn"><h4>상대를 기다리는 중…</h4><p>다른 유저가 방 목록에서 이 방을 찾아 비밀번호로 입장하면 배팅금을 정할 수 있어요.</p></div><button class="rrbtn g" id="rl">방 닫기</button>';
-      else if (d.status === 'offer') h += '<div class="rrpn"><h4>상대의 응답을 기다리는 중…</h4><div class="rrbig">' + money(d.offer.bet) + ' USDT</div><p>상대가 OK를 누르면 게임이 시작됩니다. X를 누르면 배팅금을 다시 정해야 합니다.</p></div><button class="rrbtn g" id="rl">방 닫기</button>';
+      else if (d.status === 'offer') h += '<div class="rrpn"><h4>상대의 응답을 기다리는 중…</h4><div class="rrbig">' + money(d.offer.bet) + '' + CU + '</div><p>상대가 OK를 누르면 게임이 시작됩니다. X를 누르면 배팅금을 다시 정해야 합니다.</p></div><button class="rrbtn g" id="rl">방 닫기</button>';
       else if (d.status === 'ok') h += '<div class="rrpn"><h4>상대가 수락했습니다</h4><p>게임을 시작하는 중…</p></div>';
       else if (!d.gr) h += '<div class="rrpn"><h4>상대 ' + esc(g.n) + ' 님이 입장했습니다</h4><p>상대가 “준비 완료”를 누르면 배팅금을 정할 수 있어요.</p></div><button class="rrbtn g" id="rl">방 닫기</button>';
-      else { const mx = Math.floor(Math.min(bal(), +g.bal || 0)); h += '<div class="rrpn"><h4>배팅금 정하기</h4><p>상대 보유 ' + money(g.bal) + ' USDT · 내 보유 ' + money(bal()) + ' USDT<br>1 ~ ' + money(mx) + ' USDT 까지 입력할 수 있어요.</p>' + (d.note ? '<div class="rrmsg">상대가 배팅금을 거절했습니다. 다시 정해 주세요.</div>' : '') + '<input id="bt" inputmode="numeric" placeholder="배팅금 (USDT)" value=""><div class="rrmsg" id="bm"></div><button class="rrbtn" id="bo"' + (mx < 1 ? ' disabled' : '') + '>이 금액으로 제안</button></div><button class="rrbtn g" id="rl">방 닫기</button>'; }
+      else { const mx = Math.floor(Math.min(bal(), +g.bal || 0)); h += '<div class="rrpn"><h4>배팅금 정하기</h4><p>상대 보유 ' + money(g.bal) + '' + CU + ' · 내 보유 ' + money(bal()) + '' + CU + '<br>1 ~ ' + money(mx) + '' + CU + ' 까지 입력할 수 있어요.</p>' + (d.note ? '<div class="rrmsg">상대가 배팅금을 거절했습니다. 다시 정해 주세요.</div>' : '') + '<input id="bt" inputmode="numeric" placeholder="배팅금 (' + CU + ')" value=""><div class="rrmsg" id="bm"></div><button class="rrbtn" id="bo"' + (mx < 1 ? ' disabled' : '') + '>이 금액으로 제안</button></div><button class="rrbtn g" id="rl">방 닫기</button>'; }
     } else {
-      if (d.status === 'offer') h += '<div class="rrpn"><h4>방장이 제안한 배팅금</h4><div class="rrbig">' + money(d.offer.bet) + ' USDT</div><p>OK를 누르면 게임이 시작되고 배팅금이 즉시 차감됩니다. 이긴 사람이 양쪽 배팅금을 모두 가져가요.<br>내 보유 ' + money(bal()) + ' USDT</p><div class="rrrow"><button class="rrbtn g" id="bx">X (거절)</button><button class="rrbtn ok" id="bk">OK</button></div></div><button class="rrbtn g" id="rl">방 나가기</button>';
+      if (d.status === 'offer') h += '<div class="rrpn"><h4>방장이 제안한 배팅금</h4><div class="rrbig">' + money(d.offer.bet) + '' + CU + '</div><p>OK를 누르면 게임이 시작되고 배팅금이 즉시 차감됩니다. 이긴 사람이 양쪽 배팅금을 모두 가져가요.<br>내 보유 ' + money(bal()) + '' + CU + '</p><div class="rrrow"><button class="rrbtn g" id="bx">X (거절)</button><button class="rrbtn ok" id="bk">OK</button></div></div><button class="rrbtn g" id="rl">방 나가기</button>';
       else if (d.status === 'ok') h += '<div class="rrpn"><h4>수락했습니다</h4><p>방장이 게임을 시작하는 중…</p></div>';
-      else if (!d.gr) h += '<div class="rrpn"><h4>준비가 되면 눌러주세요</h4><p>내 보유 ' + money(bal()) + ' USDT · 준비 완료를 누르면 방장이 배팅금을 제안할 수 있어요.</p><button class="rrbtn ok" id="gr">준비 완료</button></div><button class="rrbtn g" id="rl">방 나가기</button>';
+      else if (!d.gr) h += '<div class="rrpn"><h4>준비가 되면 눌러주세요</h4><p>내 보유 ' + money(bal()) + '' + CU + ' · 준비 완료를 누르면 방장이 배팅금을 제안할 수 있어요.</p><button class="rrbtn ok" id="gr">준비 완료</button></div><button class="rrbtn g" id="rl">방 나가기</button>';
       else h += '<div class="rrpn"><h4>방장이 배팅금을 정하는 중…</h4><p>잠시만 기다려 주세요.</p></div><button class="rrbtn g" id="rl">방 나가기</button>';
     }
     body.innerHTML = h;
     const rl = $('rl'); if (rl) rl.onclick = async () => { if (isHost) { cleanup(true); } else { cleanup(false); await net.patch(roomId, { guest: null, status: 'open', offer: null, gr: false }).catch(() => { }); } showLobby(); };
     if ($('gr')) $('gr').onclick = async () => { $('gr').disabled = true; try { await net.patch(roomId, { gr: true, guest: { uid: me, n: myName, bal: +bal() } }); sfx('rl_tick'); } catch (e) { toast('전송 실패'); $('gr').disabled = false; } };
     if ($('bo')) $('bo').onclick = async () => {
-      const mx = Math.floor(Math.min(bal(), +d.guest.bal || 0)), v = Math.floor(+$('bt').value); if (!(v >= 1)) return $('bm').textContent = '1 USDT 이상 입력해 주세요'; if (v > mx) return $('bm').textContent = '최대 ' + money(mx) + ' USDT 까지 가능합니다';
+      const mx = Math.floor(Math.min(bal(), +d.guest.bal || 0)), v = Math.floor(+$('bt').value); if (!(v >= 1)) return $('bm').textContent = '1' + CU + ' 이상 입력해 주세요'; if (v > mx) return $('bm').textContent = '최대 ' + money(mx) + '' + CU + ' 까지 가능합니다';
       $('bo').disabled = true; try { await net.patch(roomId, { status: 'offer', offer: { bet: v, t: Date.now() }, note: null }); sfx('rl_tick'); } catch (e) { $('bm').textContent = '제안하지 못했습니다'; $('bo').disabled = false; }
     };
     if ($('bk')) $('bk').onclick = async () => { const b = +d.offer.bet; if (bal() < b) { toast('잔액이 부족합니다'); return; } $('bk').disabled = true; $('bx').disabled = true; try { await net.patch(roomId, { status: 'ok', okv: d.offer.t, okBal: +bal() }); sfx('rl_start'); } catch (e) { toast('전송 실패'); } };
@@ -1053,7 +1056,7 @@ export function openRR(br) {
     const why = ab ? '상대의 잔액이 부족해 게임이 취소되었습니다' : draw ? '두 사람의 체력이 동시에 0이 되어 무승부입니다' : O.resign ? (won ? '상대가 항복했습니다' : '항복했습니다') : O.claim ? (won ? '상대가 응답하지 않았습니다' : '시간 초과') : (won ? '상대의 체력이 모두 소진되었습니다' : '체력이 모두 소진되었습니다');
     const ttl = ab ? '⚠️ 게임 취소' : draw ? '🤝 무승부' : won ? '🏆 승리!' : '💀 패배…', amt = ab || draw ? '±0' : (won ? '+' + money(bet) : '-' + money(bet)), col = ab || draw ? '#cfe0f5' : won ? '#7affb0' : '#ff8a7a';
     const st = br.getStat ? br.getStat() : null;
-    m.innerHTML = '<div class="rrbox ' + (won ? 'w' : draw || ab ? 'd' : 'l') + '"><h3>' + ttl + '</h3><p>' + why + '</p><div class="rrbig" style="color:' + col + '">' + amt + ' USDT</div><p>' + (ab || draw ? '배팅금 ' + money(bet) + ' USDT 가 반환되었습니다.' : won ? '양쪽 배팅금 ' + money(bet * 2) + ' USDT 를 가져갔습니다.' : '배팅금을 잃었습니다.') + '<br>내 최종 체력 ' + Math.max(0, Math.round(game.L.hp)) + '%' + (st ? '<br><small class="sub">전적 ' + (st.w | 0) + '승 ' + (st.l | 0) + '패 ' + (st.d | 0) + '무</small>' : '') + '</p><div class="rrmsg" id="orsg" style="color:#ffe27a;text-align:center"></div><div class="rrrow"><button class="rrbtn g" id="ob">나가기</button><button class="rrbtn" id="orm"' + (ab || bal() < bet ? ' disabled' : '') + '>🔁 재대결</button></div></div>'; ov.querySelector('.rrg').appendChild(m);
+    m.innerHTML = '<div class="rrbox ' + (won ? 'w' : draw || ab ? 'd' : 'l') + '"><h3>' + ttl + '</h3><p>' + why + '</p><div class="rrbig" style="color:' + col + '">' + amt + '' + CU + '</div><p>' + (ab || draw ? '배팅금 ' + money(bet) + '' + CU + ' 가 반환되었습니다.' : won ? '양쪽 배팅금 ' + money(bet * 2) + '' + CU + ' 를 가져갔습니다.' : '배팅금을 잃었습니다.') + '<br>내 최종 체력 ' + Math.max(0, Math.round(game.L.hp)) + '%' + (st ? '<br><small class="sub">전적 ' + (st.w | 0) + '승 ' + (st.l | 0) + '패 ' + (st.d | 0) + '무</small>' : '') + '</p><div class="rrmsg" id="orsg" style="color:#ffe27a;text-align:center"></div><div class="rrrow"><button class="rrbtn g" id="ob">나가기</button><button class="rrbtn" id="orm"' + (ab || bal() < bet ? ' disabled' : '') + '>🔁 재대결</button></div></div>'; ov.querySelector('.rrg').appendChild(m);
     m.querySelector('#ob').onclick = () => { leaveNote(); game.destroy(); game = null; stopScene(); cleanup(isHost); alive = false; clearInterval(lobT); window.removeEventListener('resize', onResize); ov.remove(); document.body.style.overflow = ''; br.onClose && br.onClose(); };
     m.querySelector('#orm').onclick = async () => { const b = m.querySelector('#orm'); b.disabled = true; b.textContent = '상대 수락 대기…'; try { await net.patch(roomId, isHost ? { rmh: curGid } : { rmg: curGid }); } catch (e) { toast('전송 실패'); b.disabled = false; b.textContent = '🔁 재대결'; } };
     updateRematch();
