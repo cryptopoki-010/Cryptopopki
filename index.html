@@ -1783,7 +1783,8 @@ const MK=()=>'cg_pend_'+(user?user.uid:'x');let mj='',mt=0;
 function mirror(){if(!user||!ready)return mt;try{const d=snap(),j=JSON.stringify(d);if(j!==mj){mj=j;mt=Date.now();localStorage.setItem(MK(),JSON.stringify({ts:mt,d:d}))}}catch(e){}return mt}
 setInterval(mirror,200);
 let sq=Promise.resolve();const save=f=>(sq=sq.then(()=>save1(f),()=>save1(f)));
-async function save1(force){if(!user||!ready)return;const d=snap(),j=JSON.stringify(d);if(!force&&j===last)return;const mts=mirror(true);try{d.ts=mts;await setDoc(doc(db,'users',user.uid),d);const lb={n:window.ME,L:window.lv().L,bal:+(+d.bal).toFixed(2),exp:+d.exp,eq:+d.eq,opens:+d.opens,rf:!!window.rf,t:Date.now()};try{await setDoc(doc(db,'leaderboard',user.uid),lb);window.__lbS='내 랭킹 저장 성공 · 잔고 '+lb.bal}catch(e2){window.__lbS='내 랭킹 저장 거부: '+(e2&&e2.code||'error')+' → Firebase 규칙 미게시/불일치';console.error('leaderboard(bal) 저장 실패',e2&&e2.code,e2);if(!window.__lbW){window.__lbW=1;try{toast('랭킹 저장 실패 ('+(e2&&e2.code||'error')+') · Firebase 규칙에서 leaderboard의 bal 필드를 허용해야 합니다')}catch(x){}}const o=Object.assign({},lb);delete o.bal;await setDoc(doc(db,'leaderboard',user.uid),o)}last=j}catch(e){console.error('save',e)}}
+let lastW=0,lastLb='',lastLbT=0;
+async function save1(force){if(!user||!ready)return;const d=snap(),j=JSON.stringify(d);if(force!==true&&j===last)return;if(force!==true&&force!=='now'&&Date.now()-lastW<20000)return;const mts=mirror(true);lastW=Date.now();try{d.ts=mts;await setDoc(doc(db,'users',user.uid),d);const lb={n:window.ME,L:window.lv().L,bal:+(+d.bal).toFixed(2),exp:+d.exp,eq:+d.eq,opens:+d.opens,rf:!!window.rf,t:Date.now()};const lk=JSON.stringify([lb.n,lb.L,lb.bal,lb.exp,lb.eq,lb.opens,lb.rf]);if(force!==true&&lk===lastLb&&Date.now()-lastLbT<6e5){last=j;return}try{await setDoc(doc(db,'leaderboard',user.uid),lb);lastLb=lk;lastLbT=Date.now();window.__lbS='내 랭킹 저장 성공 · 잔고 '+lb.bal}catch(e2){window.__lbS='내 랭킹 저장 거부: '+(e2&&e2.code||'error')+' → Firebase 규칙 미게시/불일치';console.error('leaderboard(bal) 저장 실패',e2&&e2.code,e2);if(!window.__lbW){window.__lbW=1;try{toast('랭킹 저장 실패 ('+(e2&&e2.code||'error')+') · Firebase 규칙에서 leaderboard의 bal 필드를 허용해야 합니다')}catch(x){}}const o=Object.assign({},lb);delete o.bal;await setDoc(doc(db,'leaderboard',user.uid),o)}last=j}catch(e){console.error('save',e)}}
 onAuthStateChanged(auth,async u=>{if(cur&&(!u||u.uid!==cur)){location.reload();return}if(u)cur=u.uid;user=u;ready=false;const b=btn();
 if(!u){window.UID='guest';try{localStorage.removeItem('cg_last_uid')}catch(e){}if(window.bnSwitch)window.bnSwitch();if(b)b.textContent='로그인';return}
 if(b)b.textContent='로그아웃';window.UID=u.uid;try{localStorage.setItem('cg_last_uid',u.uid)}catch(e){}if(window.bnSwitch)window.bnSwitch();
@@ -1820,8 +1821,8 @@ await Promise.all(miss.map(async([k,v])=>{try{const r=await getDoc(doc(db,'users
 window.RANK=[...seen.values()].sort((a,b)=>(b.bal==null?-1:b.bal)-(a.bal==null?-1:a.bal)).slice(0,100);
 if(mine&&(mine.rf!==false)!==!!window.rf&&ready)save(true)}catch(e){console.error(e);window.RANK=[];toast('랭킹을 불러오지 못했습니다')}};
 setInterval(()=>save(false),800);
-document.addEventListener('visibilitychange',()=>{mirror();if(document.hidden)save(false)});
-window.addEventListener('pagehide',()=>{mirror();save(false)});window.addEventListener('beforeunload',mirror);
+document.addEventListener('visibilitychange',()=>{mirror();if(document.hidden)save('now')});
+window.addEventListener('pagehide',()=>{mirror();save('now')});window.addEventListener('beforeunload',mirror);
 </script>
 <script>
 /* ===== SFX: 외부 파일 없이 WebAudio로 합성하는 테마별 사운드 ===== */
