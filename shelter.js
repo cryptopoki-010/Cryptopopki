@@ -154,10 +154,10 @@ export function heroStats(s) {
   s.ar.forEach((t, si) => { if (t > 0) { const it = armorItem(si, t - 1); hp += it.hp; df += it.df / 100; gs += it.sp; ms += it.ms } });
   return { w, dmg: w.d * (1 + .04 * (up[0] | 0)), iv: w.iv / (1 + gs), range: w.r, ranged: !!w.g, hpMax: hp, df: Math.min(.75, df), sp: 72 * (1 + ms) };
 }
-const mFn = age => 1 + Math.min(age / 3600, 1200) / 6, rewM = m => Math.pow(m, 1.25);
+const mFn = age => 1 + Math.min(age / 3600, 1200) / 3.5, rewM = m => Math.pow(m, 1.25);
 const intv = age => Math.max(1.6, 10 - age / 3600 * .33);
 const SD = .2, SDB = .28, HORDE_HP = .35, HORDE_ATK = .5, HORDE_MT = 1, ZCAP = 600, BOSS_T = 60, BOSS_LEAVE = 90, BOSS_PAUSE = 45, REGEN = .0003, BOSS_X = 50, BOSS_ATK = 3, BOSS_MEAT = 10, BOSS_START = 1800;
-const hordeN = age => Math.min(320, 8 + Math.floor(age / 3600 * 14)), hordeI = age => Math.max(15, 38 - age / 3600 * .6);
+const hordeN = age => Math.min(500, 100 + Math.floor(age / 3600 * 30)), hordeI = age => Math.max(14, 40 - age / 3600 * .8);
 export const lamFn = age => hordeN(age) / hordeI(age) * 1.125 + 1 / intv(age);
 const bossRamp = bn => Math.min(1, .005 + bn / 720), bossMul = bn => BOSS_X * bossRamp(bn) * (bn < 720 ? 1 : 1 + Math.min(bn - 720, 720) / 60 * .1), bossAtkMul = bn => BOSS_ATK * Math.min(1, .02 + bn / 720);
 function mix(age) {
@@ -682,7 +682,7 @@ export function openShelter(ctx) {
       h += '<h4>크리처 도감 (현재 강도 적용)</h4>' + Object.keys(ZT).map(k => { const z = ZT[k], un = S.age >= z.un; return '<div class="bs"><span>' + (k === 'bomb' ? '💣' : '🧟') + '</span><div><b>' + z.n + (un ? '' : ' (🔒 ' + Math.ceil((z.un - S.age) / 60) + '분 후 등장)') + '</b><small>체력 ' + Math.round(z.hp * mm) + ' · ' + (z.atk ? '공격 ' + Math.round(z.atk * (1 + (mm - 1) * .5)) + '/초' : '접촉 시 자폭 (울타리 파괴 · 쉘터 피해 ' + Math.round(150 + 50 * (mm - 1)) + ')') + ' · 처치 시 고기 ' + (z.mt * rewM(mm)).toFixed(1) + '</small></div></div>' }).join('');
       if ((S.ex | 0) >= 8) h += '<h4>🤖 메카봇</h4>' + MECH.map(m => '<div class="bs"><span>' + m.ic + '</span><div><b>' + m.n + '</b><small>' + m.d + ' · 체력 ' + fmtN(m.hp) + '</small></div></div>').join('');
       h += '<h4>👹 보스 (매 분 등장 · 첫 보스는 30분 뒤 · ' + fmtN(S.bkl | 0) + '회 격파)</h4>' + BOSS.map((b, i) => '<div class="bs"><span>👹</span><div><b>' + b.n + '</b><small>체력 ' + fmtN(Math.round(b.hp * bossMul(S.bn | 0) * mm)) + ' · 공격 ' + Math.round(b.atk * BOSS_ATK * (1 + (mm - 1) * .5)) + ' · 처치 시 고기 ' + fmtN(Math.round(bossMeat(S, S.bn | 0))) + '<br>' + b.d + '</small></div></div>').join('') + '<p class="nt">보스는 ' + BOSS_LEAVE + '초 안에 못 잡으면 도망가고 쉘터에 피해를 줍니다. 붉은 표시 구역은 곧 스킬이 터지는 곳이라 캐릭터가 피합니다.</p>';
-      h += '<p class="nt">• 모든 캐릭터와 크리처는 쉘터와 울타리를 통과할 수 없어요. 막히면 벽을 부수거나 남쪽 문으로 돌아갑니다.<br>• 쉘터가 무너지면 ' + F(BUILD) + ' USDT를 다시 내고 처음부터 시작합니다.<br>• 시간이 지날수록 좀비가 강해지고(최대 ×5) 새 종류가 나타납니다.</p>';
+      h += '<p class="nt">• 모든 캐릭터와 크리처는 쉘터와 울타리를 통과할 수 없어요. 막히면 벽을 부수거나 남쪽 문으로 돌아갑니다.<br>• 쉘터가 무너지면 ' + F(BUILD) + ' USDT를 다시 내고 처음부터 시작합니다.<br>• 시간이 지날수록 좀비가 계속 강해지고(1시간마다 체력·공격 약 +29%, 처치 보상도 함께 증가) 새 종류가 나타납니다. 처음부터 수백 마리가 몰려옵니다.</p>';
     }
     L.innerHTML = h; hud();
   }
