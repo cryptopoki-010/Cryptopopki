@@ -395,6 +395,80 @@ header{gap:8px}
 .ft .ftl{width:auto;height:30px;min-height:30px;padding:0 12px 0 30px;margin:0 0 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237B818C' stroke-width='1.8'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18'/%3E%3C/svg%3E") 9px 50%/15px no-repeat;font-size:12px;font-weight:600;color:var(--ink)}
 
 nav.bt{grid-template-columns:repeat(5,1fr)}
+/* ===================== responsive: portrait / landscape / tablet / desktop ===================== */
+/* tablet portrait: wider single column */
+@media (min-width:700px) and (orientation:portrait){
+  .app{max-width:760px}
+  nav.bt{max-width:760px}
+  .pg{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .pg .pc.wide{grid-column:1/-1}
+  .pc.wide .pcv{aspect-ratio:16/6}
+  #v-my .pad{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  #v-my .pad>.vt,#v-my .pad>.pn.mn{grid-column:1/-1}
+  #v-my .pad>*{margin-top:0!important}
+  .mo{align-items:center}.sheet{border-radius:20px;max-height:86dvh}
+}
+
+/* wide: landscape phones, tablets in landscape, desktop — side rail navigation */
+@media (min-width:900px), (orientation:landscape) and (max-height:560px) and (min-width:560px){
+  body{background:var(--out)}
+  .app{max-width:none;margin:0 0 0 calc(84px + env(safe-area-inset-left,0px));padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));min-height:100dvh}
+  header{padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+  .pad{max-width:1200px;margin-inline:auto;padding-left:20px;padding-right:max(20px,env(safe-area-inset-right,0px))}
+  .ft{padding-left:calc(50% - 580px);padding-right:calc(50% - 580px)}
+  @media (max-width:1240px){.ft{padding-left:20px;padding-right:20px}}
+
+  nav.bt{left:0;top:0;bottom:0;right:auto;transform:none;width:calc(84px + env(safe-area-inset-left,0px));max-width:none;height:auto;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;padding:72px 8px calc(12px + env(safe-area-inset-bottom,0px)) calc(8px + env(safe-area-inset-left,0px));border-top:0;border-right:1px solid var(--line);grid-template-columns:none}
+  nav.bt button{height:60px;flex:none;border-radius:12px;gap:4px;font-size:11px}
+  nav.bt button[aria-current=page]{background:var(--soft)}
+  #toast{bottom:calc(24px + env(safe-area-inset-bottom,0px));left:calc(50% + 42px)}
+
+  /* modal sheets become centred dialogs */
+  .mo{align-items:center;padding:16px}
+  .sheet{border-radius:20px;max-width:560px;max-height:calc(100dvh - 32px);padding-bottom:20px}
+
+  /* home: hero + quick menu side by side */
+  #v-home>.pad{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);column-gap:16px;align-items:stretch}
+  #v-home>.pad>.bnw{grid-column:1;grid-row:1}
+  #v-home>.pad>.dots{grid-column:1;grid-row:2}
+  #v-home>.pad>.qk{grid-column:2;grid-row:1/3;margin-top:12px;grid-template-columns:repeat(2,1fr);align-content:center;row-gap:14px}
+  #v-home>.pad>.tkr,#v-home>.pad>.tb,#v-home>.pad>.gr{grid-column:1/-1}
+  .sl{height:clamp(120px,24vh,190px)}
+
+  /* store grid */
+  .pg{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));grid-auto-flow:row dense;gap:14px}
+  .pg .pc.wide{grid-column:span 2}
+  .pc.wide .pcv{aspect-ratio:16/7}
+
+  /* my page */
+  #v-my .pad{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  #v-my .pad>.vt,#v-my .pad>.pn.mn{grid-column:1/-1}
+  #v-my .pad>*{margin-top:0!important}
+
+  /* inventory rows in two columns */
+  #v-inv .pn{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:24px}
+
+  /* mining: scene left, controls right */
+  .mn #mnm:not([hidden]){display:grid;grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr);column-gap:16px;row-gap:10px;align-items:start}
+  .mn #mnm>.mnc{grid-column:1;grid-row:1/span 4;max-width:calc((100dvh - 120px) * 1.3);width:100%;justify-self:center}
+  .mn #mnm>:not(.mnc){grid-column:2}
+  .mn #mns:not([hidden]),.mn #mnf:not([hidden]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px;align-items:start}
+  .mn #mns>.mnbal,.mn #mns>.mnq,.mn #mns>.mngh,.mn #mns>.mnnt,.mn #mnf>.mnbal,.mn #mnf>.mnfst,.mn #mnf>.mnall,.mn #mnf>.mnfs,.mn #mnf>.mnnt{grid-column:1/-1}
+}
+
+/* short landscape (phones): tighter vertical rhythm */
+@media (orientation:landscape) and (max-height:560px) and (min-width:560px){
+  header{height:48px}
+  .cat{top:calc(48px + env(safe-area-inset-top,0px))}
+  nav.bt{padding-top:58px;gap:2px}
+  nav.bt button{height:52px}
+  .sl{height:clamp(104px,30vh,140px)}
+  .qk{padding:10px 4px}
+  .qi{width:38px;height:38px;border-radius:12px}
+  .gr{margin-top:16px}
+  .vt{margin:12px 0 8px}
+}
+
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F6DC8B"/><stop offset=".5" stop-color="#D4A12E"/><stop offset="1" stop-color="#8F6414"/></linearGradient>

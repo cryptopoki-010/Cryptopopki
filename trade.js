@@ -610,4 +610,22 @@ const CSS = `
 .trfx code{display:block;padding:10px;border-radius:10px;background:var(--soft);font-size:12px;line-height:1.5;white-space:normal;word-break:break-word}
 .trbig{font-size:14px}.trbig b{font-size:17px}
 .trliq{text-align:center;display:flex;flex-direction:column;gap:6px}.trliq>b{font-size:18px}.trliq p{margin:0;font-size:13px;line-height:1.55;color:var(--mute)}
+
+@media (min-width:900px), (orientation:landscape) and (max-height:560px) and (min-width:560px){
+.trx{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,360px);column-gap:16px;row-gap:10px;align-items:start}
+.trx>*{grid-column:1;min-width:0}
+.trx>.tro{grid-column:2;grid-row:1/span 12;position:sticky;top:calc(68px + env(safe-area-inset-top,0px));max-height:calc(100dvh - 84px);overflow:auto;overscroll-behavior:contain}
+.trch{height:clamp(240px,calc(100dvh - 230px),640px)}
+.trw{grid-template-columns:repeat(4,minmax(0,1fr))}
+.trsh{align-items:center;padding:16px}
+.trshb{border-radius:20px;max-width:520px;max-height:calc(100dvh - 32px);padding-bottom:18px}
+.trpos .kv.g3{grid-template-columns:repeat(6,minmax(0,1fr))}
+}
+@media (orientation:landscape) and (max-height:560px) and (min-width:560px){
+.trx{padding-top:8px;row-gap:8px}
+.trx>.tro{top:calc(56px + env(safe-area-inset-top,0px));max-height:calc(100dvh - 64px);padding:10px;gap:8px}
+.trch{height:max(220px,calc(100dvh - 130px))}
+.trin{height:40px}.trbtn2 button,.trgo{height:44px}
+}
+@media (min-width:700px) and (orientation:portrait){.trch{height:clamp(320px,42vh,520px)}}
 `;
