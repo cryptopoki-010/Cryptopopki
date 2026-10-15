@@ -1772,9 +1772,9 @@ function doSellAll(){var tot=0;Object.keys(inv).forEach(function(i){tot+=invV[i]
 </script><script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,signOut,onAuthStateChanged}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import{getFirestore,doc,getDoc,setDoc,collection,getDocs,query,orderBy,limit,where,onSnapshot,updateDoc,deleteDoc,arrayUnion,runTransaction}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import{getFirestore,initializeFirestore,doc,getDoc,setDoc,collection,getDocs,query,orderBy,limit,where,onSnapshot,updateDoc,deleteDoc,arrayUnion,runTransaction}from"https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const app=initializeApp({apiKey:"AIzaSyCb4iTiqxc4ZrZX_gQicMO8t_zcUSea884",authDomain:"cryptopopki.firebaseapp.com",projectId:"cryptopopki",storageBucket:"cryptopopki.firebasestorage.app",messagingSenderId:"86462668135",appId:"1:86462668135:web:4ff382adc27ceae46723c2"});
-const auth=getAuth(app),db=getFirestore(app);let user=null,last='',ready=false,cur=null;
+const auth=getAuth(app),db=(()=>{try{return initializeFirestore(app,{experimentalAutoDetectLongPolling:true,useFetchStreams:false})}catch(e){return getFirestore(app)}})();let user=null,last='',ready=false,cur=null;
 const snap=()=>JSON.parse(JSON.stringify({bal:window.bal,inv:window.inv,invV:window.invV,opens:window.opens,urN:window.urN,col:window.col,used:window.used,exp:window.exp,eq:window.eq,mine:window.mine,rr:window.rrst,shl:window.shl||null}));
 const btn=()=>document.getElementById('lgin');
 window.authBtn=async()=>{if(user){if(ready)await save(true);await signOut(auth);location.reload();return}

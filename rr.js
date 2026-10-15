@@ -681,6 +681,12 @@ const RRCSS = `
 .rrbdg{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;min-height:0}.rrbdg span{font-size:11px;font-weight:800;border-radius:8px;padding:3px 8px;background:#2a1c12;border:1px solid #6a4e2a;color:#ffe9b0}.rrbdg span.r{border-color:#ff6a5a;color:#ff9a8a;background:#3a1410;animation:rrp 1s infinite}
 .rrc.warn{border-color:#ff4a3a;box-shadow:0 0 0 2px #ff4a3a88}.rrbox small.sub{font-size:11px;color:#9fb4cc}
 `;
+const RULES_TX = `match /rooms/{rid} {
+  allow read: if request.auth != null;
+  allow create: if request.auth != null && request.resource.data.host.uid == request.auth.uid;
+  allow update: if request.auth != null && (resource.data.host.uid == request.auth.uid || (resource.data.guest != null && resource.data.guest.uid == request.auth.uid) || (resource.data.guest == null && request.resource.data.guest.uid == request.auth.uid));
+  allow delete: if request.auth != null && (resource.data.host.uid == request.auth.uid || (resource.data.guest != null && resource.data.guest.uid == request.auth.uid));
+}`;
 function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const money = v => (+v).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
@@ -729,7 +735,10 @@ export function openRR(br) {
       $('rc').disabled = true; $('rm').textContent = '방을 만드는 중…';
       try { const id = 'r' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4), ph = await sha(id + ':' + p);
         const doc = { id, name: n, ph, host: { uid: me, n: myName }, guest: null, status: 'open', bet: 0, offer: null, ev: [], hb: Date.now(), t: Date.now() };
-        await net.createRoom(doc); roomId = id; isHost = true; enterRoom(); } catch (e) { console.error(e); { const c = (e && e.code) || 'error'; $('rm').textContent = c === 'permission-denied' ? '방을 만들 수 없습니다: Firebase 규칙에 rooms 권한이 없습니다 (firestore.rules를 게시해 주세요)' : '방을 만들지 못했습니다 (' + c + ') — 네트워크를 확인해 주세요'; }; $('rc').disabled = false; }
+        await Promise.race([net.createRoom(doc), new Promise((_, rj) => setTimeout(() => rj({ code: 'timeout' }), 10000))]); roomId = id; isHost = true; enterRoom(); } catch (e) { console.error(e); const c = (e && e.code) || (e && e.message) || 'error', rm = $('rm'); if (!rm) return;
+        if (c === 'permission-denied' || c === 'timeout') { rm.innerHTML = (c === 'timeout' ? '서버 응답이 없어 방을 만들지 못했습니다.' : '방을 만들 수 없습니다: Firebase 규칙에 rooms 권한이 없습니다.') + '<br><small>Firebase 콘솔 → Firestore → 규칙에 아래 블록을 추가하고 게시해 주세요. (오류 코드: ' + c + ')</small><br><button class="rrbtn" id="rcp" style="margin-top:6px;padding:6px 10px;font-size:12px">규칙 블록 복사</button>'; const cb = $('rcp'); if (cb) cb.onclick = () => { try { navigator.clipboard.writeText(RULES_TX); cb.textContent = '복사됨 ✓' } catch (x) { cb.textContent = '복사 실패' } } }
+        else rm.textContent = '방을 만들지 못했습니다 (' + c + ') — 네트워크를 확인해 주세요';
+        const rc = $('rc'); if (rc) rc.disabled = false; }
     };
   }
   function drawJoin(pane) {
