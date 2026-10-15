@@ -394,7 +394,7 @@ header{gap:8px}
 .login{white-space:nowrap}
 .ft .ftl{width:auto;height:30px;min-height:30px;padding:0 12px 0 30px;margin:0 0 14px;border:1px solid var(--line);border-radius:8px;background:var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237B818C' stroke-width='1.8'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18'/%3E%3C/svg%3E") 9px 50%/15px no-repeat;font-size:12px;font-weight:600;color:var(--ink)}
 
-nav.bt{grid-template-columns:repeat(5,1fr)}
+nav.bt{grid-template-columns:repeat(6,1fr)}
 /* ===================== responsive: portrait / landscape / tablet / desktop ===================== */
 /* tablet portrait: wider single column */
 @media (min-width:700px) and (orientation:portrait){
@@ -470,6 +470,17 @@ nav.bt{grid-template-columns:repeat(5,1fr)}
 }
 
 @media (max-width:439px){.bw b i{display:inline}}
+
+.chg{display:flex;flex-direction:column;gap:12px;padding-top:14px;max-width:520px;margin:0 auto}
+.chgc{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh);padding:20px;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center}
+.chgl{font-size:12px;color:var(--mut,#888);letter-spacing:.04em}
+.chgv{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.chgb{width:100%;height:64px;border:0;border-radius:16px;background:var(--acc,#3b5bff);color:#fff;font-size:18px;font-weight:800;cursor:pointer;transition:transform .08s}
+.chgb:active{transform:scale(.97)}
+.chgs{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.chgs div{background:var(--soft);border-radius:12px;padding:10px}
+.chgs b{display:block;font-size:16px;font-variant-numeric:tabular-nums}
+.chgn{font-size:12px;color:var(--mut,#888);line-height:1.5}
 </style></head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
 <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F6DC8B"/><stop offset=".5" stop-color="#D4A12E"/><stop offset="1" stop-color="#8F6414"/></linearGradient>
@@ -502,10 +513,10 @@ nav.bt{grid-template-columns:repeat(5,1fr)}
 <div class="tb" id="tb" role="tablist"></div>
 <div class="gr" id="gr"></div>
 </div></div>
-<div class="vw" id="v-trade" hidden><div class="pad" id="trroot"></div></div><div class="vw" id="v-inv" hidden></div><div class="vw" id="v-mine" hidden><div class="pad" id="mnroot"></div></div><div class="vw" id="v-my" hidden></div>
+<div class="vw" id="v-trade" hidden><div class="pad" id="trroot"></div></div><div class="vw" id="v-inv" hidden></div><div class="vw" id="v-mine" hidden><div class="pad" id="mnroot"></div></div><div class="vw" id="v-chg" hidden><div class="pad" id="chgroot"></div></div><div class="vw" id="v-my" hidden></div>
 <footer class="ft"><button class="lang ftl" id="lg" onclick="setLang()" aria-label="Language / 언어">KO</button><nav class="fl"><a href="#">고객센터</a><a href="#">확률 공개</a><a href="#">이용약관</a><a href="#"><b>개인정보처리방침</b></a><a href="#">책임 있는 이용</a></nav><p>무작위 결과가 제공되며 컬렉터블의 가치는 변동될 수 있습니다. 감당할 수 있는 범위 내에서 이용해 주세요. 만 19세 이상 이용 가능합니다.</p><p>화면에 표시된 수치와 상품은 예시이며, 실제 자금이 사용되지 않습니다.</p><p class="cp">© 2026 CRYPTO GACHA</p></footer>
 
-<nav class="bt" aria-label="하단 메뉴"><button aria-current="page" onclick="view('home')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 4l8.5 6.5V19a1 1 0 0 1-1 1H15v-5.5H9V20H4.5a1 1 0 0 1-1-1z"/></svg><span>홈</span></button><button onclick="view('trade')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M7 15v6M17 3v5M17 17v4"/><rect x="5" y="6" width="4" height="9" rx="1"/><rect x="15" y="8" width="4" height="9" rx="1"/></svg><span>트레이드</span></button><button onclick="view('mine')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 9.5 4 20"/><path d="M5 7.5C9 3.5 15.5 3 20.5 6.5 17 5.8 13.5 6.3 11 8.3"/><path d="M16.5 3.5c3.5 4 4 10.5 1 15.5.7-3.5.2-7-1.8-9.5"/></svg><span>채굴장</span></button><button onclick="view('inv')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM3 4.5h18V8H3z"/><path d="M10 12h4"/></svg><span>보관함</span></button><button onclick="view('my')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20c.8-3.8 3.8-6 7.5-6s6.7 2.2 7.5 6"/></svg><span>마이</span></button></nav>
+<nav class="bt" aria-label="하단 메뉴"><button aria-current="page" onclick="view('home')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 4l8.5 6.5V19a1 1 0 0 1-1 1H15v-5.5H9V20H4.5a1 1 0 0 1-1-1z"/></svg><span>홈</span></button><button onclick="view('trade')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3M7 15v6M17 3v5M17 17v4"/><rect x="5" y="6" width="4" height="9" rx="1"/><rect x="15" y="8" width="4" height="9" rx="1"/></svg><span>트레이드</span></button><button onclick="view('mine')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 9.5 4 20"/><path d="M5 7.5C9 3.5 15.5 3 20.5 6.5 17 5.8 13.5 6.3 11 8.3"/><path d="M16.5 3.5c3.5 4 4 10.5 1 15.5.7-3.5.2-7-1.8-9.5"/></svg><span>채굴장</span></button><button onclick="view('inv')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zM3 4.5h18V8H3z"/><path d="M10 12h4"/></svg><span>보관함</span></button><button onclick="view('chg')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M12 13v4M10 15h4"/></svg><span>충전</span></button><button onclick="view('my')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20c.8-3.8 3.8-6 7.5-6s6.7 2.2 7.5 6"/></svg><span>마이</span></button></nav>
 <div class="mo" id="mo" hidden><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mt"><div class="mh"><h2 id="mt"></h2><button class="x" id="mx" aria-label="닫기">✕</button></div><div id="mb"></div><button class="cl" id="mc">닫기</button></div></div>
 <div id="toast" role="status"></div>
 </div>
@@ -677,7 +688,6 @@ function mnMiceN(){return (mine.mice|0)+(mine.m1|0)+(mine.m2|0)}
 function mnMS(ms){ms=Math.max(0,Math.ceil(ms/1000));var m=Math.floor(ms/60),s=ms%60;return m+'분 '+('0'+s).slice(-2)+'초'}
 function mnShopList(){var now=Date.now(),left=Math.max(0,(+mine.bo||0)-now),mc=mnMiceN(),lv=mine.lvl|0,L=[],ct=mine.cart|0,nx=MNCART[ct+1];
  L.push({g:'아이템'});
- L.push({id:'boost',ic:'⚡',name:'경험치 부스트 3000%',desc:'30분 동안 얻는 경험치가 '+MNC.boostX+'배. 구매하면 남은 시간에 30분이 더해집니다.',st:left>0?'적용 중 · 남은 '+mnMS(left):'미적용',price:MNC.boostPrice,max:false});
  L.push({id:'shield',ic:'🛡️',name:'룰렛 꽝 방어권',desc:'룰렛에서 꽝(폭탄)이 나오면 1장을 써서 배팅금을 돌려받습니다.',st:'보유 '+(mine.sh|0)+'장',price:MNC.shieldPrice,max:false});
  L.push({id:'lvl',ic:'⛏️',name:'채굴량 +0.2배',desc:'채굴 보상 배율이 0.2씩 오릅니다(생쥐·거북이·박쥐 모두). 구매 횟수 제한 없음.',st:'구매 '+lv+'회 · 현재 채굴량 ×'+mnMul().toFixed(1),price:MNC.lvlPrice,max:false});
  L.push({id:'accel',ic:'⏩',name:'채굴장 가속권 (영구)',desc:'채굴·이동 속도가 영구히 +'+MNC.accStep+'배 빨라집니다. 구매 횟수 제한 없음.',st:'구매 '+(mine.acc|0)+'회 · 현재 속도 ×'+mnSpd().toFixed(1),price:MNC.accP,max:false});
@@ -746,7 +756,7 @@ window.rv_mine=function(){var el=$('mnroot');el.innerHTML='';var tk=++MNtok;if(M
 var TRp=null;window.TRm=null;
 function trLoad(){if(!TRp)TRp=import('./trade.js').then(function(m){window.TRm=m.getTrade({rate:KRW,getBal:function(){return +bal||0},setBal:function(v){bal=+v||0;try{bwUpd()}catch(e){}},getState:function(){return window.trd},setState:function(x){window.trd=x},toast:toast});return window.TRm}).catch(function(e){TRp=null;toast('트레이딩 모듈을 불러오지 못했습니다');console.error('[trade]',e);return null});return TRp}
 window.trBg=function(){var t=window.trd;if(window.TRm){window.TRm.reload();return}if(t&&((t.pos&&Object.keys(t.pos).length)||(t.ord&&t.ord.length)))trLoad().then(function(x){x&&x.ensure()})};
-function view(v){var cvw0=cvw;cvw=v;if(v!='mine'&&MNm){MNm.stop();MNm=null}if(cvw0==='trade'&&v!=='trade'&&window.TRm)TRm.unmount();if(v==='trade')trLoad().then(function(t){if(t&&cvw==='trade')t.mount($('trroot'))});var a=['home','trade','mine','inv','my'],b=document.querySelectorAll('nav.bt button');a.forEach(function(k,i){$('v-'+k).hidden=k!=v;if(k==v)b[i].setAttribute('aria-current','page');else b[i].removeAttribute('aria-current')});window.scrollTo(0,0);if(window['rv_'+v])window['rv_'+v]()}
+function view(v){var cvw0=cvw;cvw=v;if(v!='mine'&&MNm){MNm.stop();MNm=null}if(cvw0==='trade'&&v!=='trade'&&window.TRm)TRm.unmount();if(v==='trade')trLoad().then(function(t){if(t&&cvw==='trade')t.mount($('trroot'))});var a=['home','trade','mine','inv','chg','my'],b=document.querySelectorAll('nav.bt button');a.forEach(function(k,i){$('v-'+k).hidden=k!=v;if(k==v)b[i].setAttribute('aria-current','page');else b[i].removeAttribute('aria-current')});window.scrollTo(0,0);if(window['rv_'+v])window['rv_'+v]()}
 function theme(){var e=document.documentElement,d=e.dataset.theme?e.dataset.theme=='dark':matchMedia('(prefers-color-scheme:dark)').matches;e.dataset.theme=d?'light':'dark'}
 /* temporary stubs, replaced in later stages */
 ['inv','my'].forEach(function(k){window['rv_'+k]=function(){$('v-'+k).innerHTML='<div class="pad"><div class="em">이 화면은 4단계에서 구현됩니다.</div></div>'}});
@@ -2290,4 +2300,17 @@ document.addEventListener('keydown',function(){SFX.unlock()});
  new MutationObserver(chk).observe(document.body||document.documentElement,{childList:true})})();
 
 </script>
-</body></html>
+<script>
+var CHG_U=10000;
+function chgR(){var r=document.getElementById('chgroot');if(!r)return;var u=(window.used=window.used||{});var n=+u.chgN||0;
+r.innerHTML='<div class="chg"><div class="chgc"><div class="chgl">보유 원화</div><div class="chgv" id="chgbal">'+Math.round(+bal||0).toLocaleString('ko-KR')+'원</div></div>'
++'<button class="chgb" onclick="chgDo()">+10,000원 충전하기</button>'
++'<div class="chgc"><div class="chgs"><div><span class="chgl">충전 횟수</span><b id="chgn">'+n.toLocaleString('ko-KR')+'회</b></div><div><span class="chgl">누적 충전</span><b id="chgt">'+(n*CHG_U).toLocaleString('ko-KR')+'원</b></div></div>'
++'<div class="chgn">누를 때마다 가상 원화 10,000원이 바로 지급됩니다.<br>실제 결제가 아니며 현금 가치가 없는 게임 머니입니다.</div></div></div>'}
+function chgDo(){var now=Date.now();if(chgDo.t&&now-chgDo.t<150)return;chgDo.t=now;bal=Math.round((+bal||0)+CHG_U);
+try{var u=(window.used=window.used||{});u.chgN=(+u.chgN||0)+1}catch(e){}
+if(typeof bwUpd==='function')bwUpd();var e=document.getElementById('chgbal');if(e)e.textContent=Math.round(bal).toLocaleString('ko-KR')+'원';
+var n=+((window.used||{}).chgN)||0,a=document.getElementById('chgn'),b=document.getElementById('chgt');if(a)a.textContent=n.toLocaleString('ko-KR')+'회';if(b)b.textContent=(n*CHG_U).toLocaleString('ko-KR')+'원';
+toast('10,000원 충전 완료')}
+window.rv_chg=chgR;
+</script></body></html>
