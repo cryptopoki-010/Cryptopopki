@@ -171,16 +171,29 @@ export function adjMargin(S, w, marks, sym, amt) {
   hist(S, { s: sym, mk: 'fut', act: amt > 0 ? 'm+' : 'm-', q: 0, px: mkOf(marks, p), amt: Math.abs(amt) });
   return { ok: true };
 }
+/**
+ * Leverage change (Binance rules):
+ *  - -2027: position + open orders notional must fit the bracket cap of the new leverage
+ *  - -4161: isolated mode with an open position → leverage can only be RAISED (margin stays, so LP is unchanged)
+ *  - -2028: cross mode lowering leverage needs extra initial margin from the available balance
+ *  - open (non reduce-only) orders are re-margined at the new leverage
+ */
 export function setLev(S, w, marks, sym, lev) {
   lev = Math.max(1, Math.min(maxLevSym(sym), Math.round(lev)));
-  const p = S.pos[sym];
-  if (p) {
-    const N = p.q * mkOf(marks, p); if (N > capForLev(sym, lev)) return fail('현재 포지션 크기에서는 최대 ' + maxLevFor(sym, N) + '배까지 가능합니다');
-    const need = p.q * p.ep / lev;
-    if (p.m < need) { const d = need - p.m; if (avail(S, w.bal, marks) < d) return fail('레버리지를 낮추려면 증거금 ' + d.toFixed(2) + ' USDT 가 더 필요합니다'); w.bal = r8(w.bal - d); p.m = r8(need); }
-    else if (p.mode === 'cross' && p.m > need) { w.bal = r8(w.bal + p.m - need); p.m = r8(need); }
-    p.lev = lev;
-  }
+  const p = S.pos[sym], ords = S.ord.filter(o => o.s === sym && o.mk === 'fut' && !o.ro);
+  const N = (p ? p.q * mkOf(marks, p) : 0) + ords.reduce((a, o) => a + (p && o.side !== p.side ? 0 : o.q * o.px), 0);
+  if (N > capForLev(sym, lev)) return fail(lev + '배에서 허용되는 최대 포지션을 넘습니다 (현재 크기에서는 최대 ' + maxLevFor(sym, N) + '배)');
+  const cur = p ? p.lev : (S.lev[sym] || 20);
+  if (p && p.mode === 'iso' && lev < cur) return fail('격리 모드에서 포지션이 있으면 레버리지를 낮출 수 없습니다 (증거금 추가로 청산가를 조정하세요)');
+  let dPos = 0, dOrd = 0;
+  if (p && p.mode === 'cross') dPos = p.q * p.ep / lev - p.m;
+  const newRes = ords.map(o => (p && o.side !== p.side) ? o.res : o.q * o.px / lev + o.q * o.px * FEE.futM);
+  ords.forEach((o, i) => { dOrd += newRes[i] - o.res; });
+  const need = dPos + dOrd;
+  if (need > 0 && avail(S, w.bal, marks) + 1e-9 < need) return fail('레버리지를 낮추려면 증거금 ' + need.toFixed(2) + ' USDT 가 더 필요합니다');
+  w.bal = r8(w.bal - need);
+  if (p) { if (p.mode === 'cross') p.m = r8(p.m + dPos); p.lev = lev; }
+  ords.forEach((o, i) => { o.res = r8(newRes[i]); o.lev = lev; });
   S.lev[sym] = lev; return { ok: true, lev };
 }
 export function setMode(S, sym, mode) { if (S.pos[sym] || S.ord.some(o => o.s === sym && o.mk === 'fut')) return fail('포지션·미체결 주문이 있으면 마진 모드를 바꿀 수 없습니다'); S.mode[sym] = mode === 'cross' ? 'cross' : 'iso'; return { ok: true }; }
@@ -250,7 +263,7 @@ function fillOrder(S, w, marks, o) {
     if (o.side > 0) return spotBuy(S, w, o.s, o.q, o.px, FEE.spot);
     const fee = o.q * o.px * FEE.spot; w.bal = r8(w.bal + o.q * o.px - fee); hist(S, { s: o.s, mk: 'spot', act: 'sell', side: -1, q: o.q, px: o.px, fee, pnl: o.q * o.px - fee - (o.cbasis || 0) }); return { ok: true };
   }
-  return openFut(S, w, marks, { s: o.s, side: o.side, q: o.q, px: o.px, lev: o.lev, mode: o.mode, fee: FEE.futM, reduceOnly: !!o.ro, kind: 'limit' });
+  return openFut(S, w, marks, { s: o.s, side: o.side, q: o.q, px: o.px, lev: S.lev[o.s] || o.lev, mode: o.mode, fee: FEE.futM, reduceOnly: !!o.ro, kind: 'limit' });
 }
 
 /* ---------------- price tick ----------------
