@@ -4,8 +4,8 @@ import { Chart } from './trade-chart.js';
 import { Feed, SYMS } from './trade-feed.js';
 
 const IVS = [['1m', '1분'], ['5m', '5분'], ['15m', '15분'], ['30m', '30분'], ['1h', '1시간'], ['4h', '4시간'], ['1d', '1일'], ['1w', '1주']];
-const LEVS = [1, 2, 3, 5, 10, 20, 25, 50, 75, 100, 125];
-const ACT = { open: '진입', add: '추가 진입', close: '시장가 종료', limit: '지정가 체결', tp: 'TP 체결', sl: 'SL 체결', liq: '강제 청산', buy: '매수', sell: '매도', 'm+': '증거금 추가', 'm-': '증거금 회수' };
+const LEVS = [1, 2, 3, 5, 10, 20, 25, 50, 75, 100, 125, 150];
+const ACT = { open: '진입', add: '추가 진입', close: '시장가 종료', limit: '지정가 체결', tp: 'TP 체결', sl: 'SL 체결', liq: '강제 청산', buy: '매수', sell: '매도', 'm+': '증거금 추가', 'm-': '증거금 회수', fund: '펀딩비' };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = v => { const x = parseFloat(String(v == null ? '' : v).replace(/,/g, '')); return isFinite(x) ? x : 0; };
 const dec = p => p >= 100 ? 2 : p >= 10 ? 3 : p >= 1 ? 4 : p >= .1 ? 5 : 6;
@@ -24,15 +24,18 @@ class Trade {
   constructor(br) {
     this.br = br; this.S = E.norm(br.getState()); br.setState(this.S);
     this.U = Object.assign({ mk: 'fut', sym: 'BTC', iv: '15m', ot: 'mkt', unit: 'coin', side: 1, tpsl: false, tab: 'pos', conf: true, kr: false, ma: true, vol: true }, this.loadU());
-    this.feed = new Feed({ px: () => this.onPx(), bar: (b, iv) => this.onBar(b, iv), status: m => this.onStatus(m) });
+    this.feed = new Feed({ px: () => this.onPx(), bar: (b, iv) => this.onBar(b, iv), status: m => this.onStatus(m), funding: (s, r, t, m) => this.onFunding(s, r, t, m) });
     this.started = false; this.root = null; this.chart = null; this.lastUi = 0; this.uiQ = false;
   }
   reload() { this.S = E.norm(this.br.getState()); this.br.setState(this.S); if (this.R) { this.renderAll(); this.chartLines(); } if (this.active()) this.ensure(); }
   loadU() { try { return JSON.parse(localStorage.getItem('cg_tr_ui') || '{}'); } catch (e) { return {}; } }
   saveU() { try { localStorage.setItem('cg_tr_ui', JSON.stringify(this.U)); } catch (e) { } }
   active() { return Object.keys(this.S.pos).length > 0 || this.S.ord.length > 0; }
-  pairs() { return this.feed.prices(); }
-  P(sym) { return this.feed.px[sym || this.U.sym] || 0; }
+  pairs() { return this.feed.marks(); }            // futures MARK prices (PnL, liquidation)
+  lastF() { return this.feed.fprices(); }          // futures LAST prices (fills, TP/SL)
+  P(sym) { return this.feed.last(sym || this.U.sym, this.U.mk) || 0; }
+  Pf(sym) { return this.feed.last(sym || this.U.sym, 'fut') || 0; }
+  Pm(sym) { return (this.feed.marks()[(sym || this.U.sym) + 'USDT']) || this.Pf(sym); }
   w() { return { bal: +this.br.getBal() || 0 }; }
   commit(w) { if (w) this.br.setBal(Math.round(w.bal * 1e6) / 1e6); this.br.setState(this.S); }
   async ensure() {
@@ -48,29 +51,41 @@ class Trade {
     const since = this.S.last || Date.now(); if (Date.now() - since < 60e3) return;
     const w = this.w(); let evs = [];
     for (const pair of syms) {
-      const sym = pair.replace(/USDT$/, ''), gap = Date.now() - since;
+      const sym = pair.replace(/USDT$/, ''), gap = Date.now() - since, futs = !!this.S.pos[pair] || this.S.ord.some(o => o.s === pair && o.mk === 'fut');
       try {
         const iv = gap < 16 * 36e5 ? '1m' : '1h';
-        const bars = await this.feed.klinesSince(sym, iv, since);
-        for (const c of bars) { if (!this.S.pos[pair] && !this.S.ord.some(o => o.s === pair)) break; evs = evs.concat(E.replayCandle(this.S, w, pair, c, this.pairs())); }
+        const bars = await this.feed.klinesSince(sym, iv, since, futs ? 'fut' : 'spot');
+        const fund = futs ? await this.feed.fundingSince(sym, since).catch(() => []) : [];
+        let fi = 0;
+        for (const c of bars) {
+          while (fi < fund.length && fund[fi].t <= c.t) { const f = fund[fi++]; const r = E.applyFunding(this.S, w, pair, f.r, f.mark || c.o, f.t); if (r) evs.push({ type: 'fund', r }); }
+          if (!this.S.pos[pair] && !this.S.ord.some(o => o.s === pair)) break;
+          evs = evs.concat(E.replayCandle(this.S, w, pair, c, this.pairs()));
+        }
+        while (fi < fund.length) { const f = fund[fi++]; const r = E.applyFunding(this.S, w, pair, f.r, f.mark || this.Pm(sym), f.t); if (r) evs.push({ type: 'fund', r }); }
       } catch (e) { console.warn('[trade] replay', e); }
     }
     this.commit(w);
-    if (evs.length) { this.br.toast('자리를 비운 동안 ' + evs.length + '건이 체결되었습니다 (내역 확인)'); evs.filter(e => e.type === 'liq').forEach(e => this.liqSheet(e)); }
+    const n = evs.filter(e => e.type !== 'fund').length, nf = evs.length - n;
+    if (evs.length) { this.br.toast('자리를 비운 동안 체결 ' + n + '건' + (nf ? ' · 펀딩 ' + nf + '회' : '') + '이 처리되었습니다 (내역 확인)'); evs.filter(e => e.type === 'liq').forEach(e => this.liqSheet(e)); }
   }
   /* -------- price / bar events -------- */
   onPx() {
     if (this.hold) return this.queueUi();
     const prices = this.pairs(), w = this.w();
-    const ev = E.tick(this.S, w, prices);
+    const ev = E.tick(this.S, w, this.lastF(), { mark: prices, spot: this.feed.prices() });
     if (ev.length) {
       ev.forEach(e => {
-        if (e.type === 'fill' && e.o.tpsl) E.setTpSl(this.S, e.o.s, e.o.tpsl.tp, e.o.tpsl.sl, prices);
+        if (e.type === 'fill' && e.o.tpsl) E.setTpSl(this.S, e.o.s, e.o.tpsl.tp, e.o.tpsl.sl, this.lastF());
         this.note(e);
       });
       this.commit(w);
     }
     this.queueUi();
+  }
+  onFunding(pair, rate, t, mark) {
+    if (!this.S.pos[pair]) return; const w = this.w(), r = E.applyFunding(this.S, w, pair, rate, mark, t); if (!r) return;
+    this.commit(w); this.br.toast('펀딩비 ' + pair + ' ' + (r.amt > 0 ? '지불 ' : '수령 ') + fU(Math.abs(r.amt)) + ' USDT (' + (rate * 100).toFixed(4) + '%)'); this.queueUi();
   }
   onBar(b, iv) { if (this.chart && iv === this.U.iv) this.chart.update(b); }
   onStatus() { if (this.root) this.renderBadge(); }
@@ -99,7 +114,7 @@ class Trade {
       '<div class="trw" id="twal"></div>' +
       '<div class="tro" id="tord"></div>' +
       '<div class="trtabs" id="ttabs"></div><div class="trlist" id="tlist"></div>' +
-      '<p class="trnote">모든 거래는 가상 USDT로 이루어지는 모의 투자입니다. 시세는 Binance 공개 데이터이며, 선물은 현재가를 기준가(마크 가격)로 사용하고 펀딩비는 반영하지 않습니다. 청산가는 Binance 공식 수식과 구간별 유지증거금률(근사)로 계산합니다.</p>' +
+      '<p class="trnote">모든 거래는 가상 USDT로 이루어지는 모의 투자입니다. 시세는 Binance 공개 데이터입니다. 선물은 USDⓈ-M 무기한 계약의 체결가로 주문·TP/SL이 체결되고, 청산은 마크 가격 기준이며, 펀딩비는 Binance 실제 펀딩 시각·요율로 정산됩니다. 청산가는 Binance 공식 공식과 구간별 유지증거금표로 계산합니다.</p>' +
       '<div class="trsh" id="tsh" hidden><div class="trshb" role="dialog" aria-modal="true"><div class="trshh"><b id="tsht"></b><button data-a="shx" aria-label="닫기">✕</button></div><div id="tshc"></div></div></div>';
     r.addEventListener('click', e => this.onClick(e));
     r.addEventListener('input', e => this.onInput(e));
@@ -114,15 +129,15 @@ class Trade {
     if (this.chart) { this.chart.destroy(); this.chart = null; }
     if (this.themeObs) this.themeObs.disconnect(); if (this.mq && this.mq.removeEventListener) this.mq.removeEventListener('change', this.mqf);
     if (this.root) this.root.innerHTML = ''; this.root = null; this.R = null;
-    if (!this.active()) { this.feed.stop(); this.feed = new Feed({ px: () => this.onPx(), bar: (b, iv) => this.onBar(b, iv), status: m => this.onStatus(m) }); this.started = false; }
+    if (!this.active()) { this.feed.stop(); this.feed = new Feed({ px: () => this.onPx(), bar: (b, iv) => this.onBar(b, iv), status: m => this.onStatus(m), funding: (s, r, t, m) => this.onFunding(s, r, t, m) }); this.started = false; }
   }
   async loadChart() {
-    if (!this.chart) return; const { sym, iv } = this.U; this.feed.setChart(sym, iv);
+    if (!this.chart) return; const { sym, iv, mk } = this.U; this.feed.setChart(sym, iv, mk);
     this.chart.setData([], iv, dec(this.P(sym) || 1), sym);
-    try { const d = await this.feed.klines(sym, iv); if (!this.chart || this.U.sym !== sym || this.U.iv !== iv) return; this.chart.setData(d, iv, dec(d.length ? d[d.length - 1].c : 1), sym); this.chartLines(); }
+    try { const d = await this.feed.klines(sym, iv, 0, mk); if (!this.chart || this.U.sym !== sym || this.U.iv !== iv || this.U.mk !== mk) return; this.chart.setData(d, iv, dec(d.length ? d[d.length - 1].c : 1), sym); this.chartLines(); }
     catch (e) { this.chart.o.empty = '차트를 불러오지 못했습니다'; this.chart.dirty = true; }
   }
-  async more(t) { const { sym, iv } = this.U; try { const d = await this.feed.klines(sym, iv, t); if (this.chart && this.U.sym === sym && this.U.iv === iv) this.chart.prepend(d); } catch (e) { if (this.chart) this.chart.more = 'end'; } }
+  async more(t) { const { sym, iv, mk } = this.U; try { const d = await this.feed.klines(sym, iv, t, mk); if (this.chart && this.U.sym === sym && this.U.iv === iv) this.chart.prepend(d); } catch (e) { if (this.chart) this.chart.more = 'end'; } }
   chartLines() {
     if (!this.chart) return; const pair = this.U.sym + 'USDT', p = this.S.pos[pair], L = [];
     if (this.U.mk === 'fut' && p) {
@@ -137,20 +152,24 @@ class Trade {
   renderAll() { this.renderHead(); this.renderBadge(); this.renderTabsTop(); this.renderWallet(); this.renderOrder(); this.renderList(); }
   $(id) { return this.R && this.R.querySelector('#' + id); }
   renderBadge() {
-    const b = this.$('tbadge'), d = this.$('tdemo'); if (!b) return; const m = this.feed.mode;
-    b.textContent = m === 'live' ? 'LIVE' : m === 'poll' ? 'REST' : m === 'demo' ? 'DEMO' : '…'; b.className = 'trbadge ' + m;
-    d.hidden = m !== 'demo'; d.textContent = 'Binance 시세 서버에 연결할 수 없어 데모 시세(무작위)를 표시하고 있습니다. 실제 가격과 다릅니다.';
+    const b = this.$('tbadge'), d = this.$('tdemo'); if (!b) return; const m = this.feed.mode, fm = this.feed.fmode, fut = this.U.mk === 'fut';
+    const k = fut ? (m === 'demo' ? 'demo' : fm === 'spot' ? 'spot' : fm) : m;
+    b.textContent = k === 'live' ? 'LIVE' : k === 'poll' ? 'REST' : k === 'demo' ? 'DEMO' : k === 'spot' ? '현물시세' : '…'; b.className = 'trbadge ' + (k === 'spot' ? 'poll' : k);
+    const msg = m === 'demo' ? 'Binance 시세 서버에 연결할 수 없어 데모 시세(무작위)를 표시하고 있습니다. 실제 가격과 다릅니다.' : fut && fm === 'spot' ? 'Binance 선물 서버(fapi)에 연결할 수 없어 현물 가격을 선물 가격·마크 가격 대신 쓰고 있습니다. 펀딩비도 적용되지 않습니다.' : '';
+    d.hidden = !msg; d.textContent = msg;
   }
   renderTabsTop() {
     this.R.querySelectorAll('[data-a=mk]').forEach(b => b.setAttribute('aria-selected', b.dataset.v === this.U.mk));
     this.R.querySelectorAll('[data-a=iv]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === this.U.iv));
   }
   renderHead() {
-    const s = this.U.sym, p = this.P(s), t = this.feed.t24[s] || {};
+    const s = this.U.sym, p = this.P(s), t = this.feed.stats(s, this.U.mk) || {};
     this.$('tsym').innerHTML = s + '/USDT' + (this.U.mk === 'fut' ? ' <small>무기한</small>' : '');
     const px = this.$('tpx'); px.textContent = p ? fN(p, dec(p)) : '-'; const up = (t.p || 0) >= 0; px.className = up ? 'up' : 'dn';
     const ch = this.$('tch'); ch.textContent = t.p != null ? pct(t.p) : ''; ch.className = up ? 'up' : 'dn';
-    this.$('t24').innerHTML = '<span>24h 고가 <b>' + (t.h ? fN(t.h, dec(t.h)) : '-') + '</b></span><span>24h 저가 <b>' + (t.l ? fN(t.l, dec(t.l)) : '-') + '</b></span><span>24h 거래대금 <b>' + (t.q ? (t.q >= 1e9 ? (t.q / 1e9).toFixed(2) + 'B' : (t.q / 1e6).toFixed(2) + 'M') : '-') + '</b></span>';
+    const fr = this.feed.fr[s], mk = this.Pm(s), fut = this.U.mk === 'fut' && this.feed.futReal();
+    let cd = ''; if (fut && fr && fr.T) { const l = Math.max(0, fr.T - Date.now()), z = n => (n < 10 ? '0' : '') + n; cd = z(Math.floor(l / 36e5)) + ':' + z(Math.floor(l % 36e5 / 6e4)) + ':' + z(Math.floor(l % 6e4 / 1e3)); }
+    this.$('t24').innerHTML = (fut ? '<span>마크 <b>' + fN(mk, dec(mk)) + '</b></span><span>펀딩 <b class="' + ((fr && fr.r) >= 0 ? 'up' : 'dn') + '">' + (fr ? (fr.r * 100).toFixed(4) + '%' : '-') + '</b> <b>' + cd + '</b></span>' : '') + '<span>24h 고가 <b>' + (t.h ? fN(t.h, dec(t.h)) : '-') + '</b></span><span>24h 저가 <b>' + (t.l ? fN(t.l, dec(t.l)) : '-') + '</b></span><span>24h 거래대금 <b>' + (t.q ? (t.q >= 1e9 ? (t.q / 1e9).toFixed(2) + 'B' : (t.q / 1e6).toFixed(2) + 'M') : '-') + '</b></span>';
   }
   /* -------- wallet strip -------- */
   acct() {
@@ -164,7 +183,7 @@ class Trade {
   renderWallet() {
     const a = this.acct(), el = this.$('twal'); if (!el) return;
     el.innerHTML = this.U.mk === 'fut'
-      ? '<div><small>사용 가능</small><b>' + fU(a.bal) + '</b></div><div><small>미실현 손익</small><b class="' + (a.up >= 0 ? 'up' : 'dn') + '">' + sgn(a.up) + '</b></div><div><small>사용 중 증거금</small><b>' + fU(a.mIso + a.mCross) + '</b></div><div><small>교차 마진율</small><b class="' + (a.mr > .8 ? 'dn' : '') + '">' + (a.mr ? (a.mr * 100).toFixed(2) + '%' : '-') + '</b></div>'
+      ? '<div><small>사용 가능</small><b>' + fU(E.avail(this.S, a.bal, this.pairs())) + '</b></div><div><small>미실현 손익</small><b class="' + (a.up >= 0 ? 'up' : 'dn') + '">' + sgn(a.up) + '</b></div><div><small>사용 중 증거금</small><b>' + fU(a.mIso + a.mCross) + '</b></div><div><small>교차 마진율</small><b class="' + (a.mr > .8 ? 'dn' : '') + '">' + (a.mr ? (a.mr * 100).toFixed(2) + '%' : '-') + '</b></div>'
       : '<div><small>사용 가능 USDT</small><b>' + fU(a.bal) + '</b></div><div><small>현물 평가액</small><b>' + fU(a.spotV) + '</b></div><div><small>주문 대기 금액</small><b>' + fU(a.res) + '</b></div><div><small>총 평가 자산</small><b>' + fU(a.total) + '</b></div>';
   }
   /* -------- order panel -------- */
@@ -204,7 +223,7 @@ class Trade {
     return floorTo(q, qdec(px) + (this.U.mk === 'spot' ? 2 : 0));
   }
   maxQ(side) {
-    const px = this.orderPx(), pair = this.U.sym + 'USDT', bal = this.w().bal; if (!(px > 0)) return 0;
+    const px = this.orderPx(), pair = this.U.sym + 'USDT', bal = this.U.mk === 'spot' ? this.w().bal : E.avail(this.S, this.w().bal, this.pairs()); if (!(px > 0)) return 0;
     if (this.U.mk === 'spot') { if (side < 0) return (this.S.spot[pair] || { q: 0 }).q; return floorTo(bal / px, qdec(px) + 2); }
     const lev = this.curLev(), rate = this.U.ot === 'lmt' ? E.FEE.futM : E.FEE.futT, p = this.S.pos[pair];
     let q = bal / (px * (1 / lev + rate)); const cap = E.capForLev(pair, lev) / px - (p && p.side === side ? p.q : 0);
@@ -261,9 +280,9 @@ class Trade {
     const dist = L > 0 ? (L - p.ep) / p.ep * 100 : null, distMk = L > 0 ? (L - mk) / mk * 100 : null;
     return '<div class="trpos"><div class="trph"><b>' + p.s + '</b><span class="tag ' + (p.side > 0 ? 'up' : 'dn') + '">' + (p.side > 0 ? '롱' : '숏') + ' ' + p.lev + 'x</span><span class="tag">' + (p.mode === 'cross' ? '교차' : '격리') + '</span><button class="trlink" data-a="fx" data-v="' + p.s + '">청산가 계산식</button></div>'
       + '<div class="trpnl"><div><small>미실현 손익 (USDT)</small><b class="' + (u >= 0 ? 'up' : 'dn') + '">' + sgn(u) + '</b></div><div><small>ROE</small><b class="' + (u >= 0 ? 'up' : 'dn') + '">' + pct(r) + '</b></div></div>'
-      + '<div class="kv g3"><span>수량 (' + s + ')<b>' + fN(p.q, qdec(mk)) + '</b><i>≈ ' + fU(p.q * mk) + ' USDT</i></span><span>평단가<b>' + fN(p.ep, d) + '</b></span><span>현재가<b>' + fN(mk, d) + '</b></span>'
-      + '<span>청산가<b class="liq">' + (L > 0 ? fN(L, d) : '없음') + '</b>' + (L > 0 ? '<i>평단 대비 ' + pct(dist) + ' · 현재가 대비 ' + pct(distMk) + '</i>' : '') + '</span><span>증거금<b>' + fU(p.m) + '</b><i>' + (p.mode === 'cross' ? '교차 · 지갑 공유' : '격리') + '</i></span><span>마진율<b class="' + (mr > .8 ? 'dn' : '') + '">' + (isFinite(mr) ? (mr * 100).toFixed(2) + '%' : '-') + '</b></span></div>'
-      + '<div class="trtp">' + (p.tp ? '<span class="up">TP ' + fN(p.tp.px, d) + ' · ' + Math.round(p.tp.r * 100) + '%</span>' : '<span>TP 없음</span>') + (p.sl ? '<span class="dn">SL ' + fN(p.sl.px, d) + ' · ' + Math.round(p.sl.r * 100) + '%</span>' : '<span>SL 없음</span>') + (p.rp ? '<span>실현 ' + sgn(p.rp) + '</span>' : '') + '</div>'
+      + '<div class="kv g3"><span>수량 (' + s + ')<b>' + fN(p.q, qdec(mk)) + '</b><i>≈ ' + fU(p.q * mk) + ' USDT</i></span><span>평단가<b>' + fN(p.ep, d) + '</b></span><span>마크 가격<b>' + fN(mk, d) + '</b></span>'
+      + '<span>청산가<b class="liq">' + (L > 0 ? fN(L, d) : '없음') + '</b>' + (L > 0 ? '<i>평단 대비 ' + pct(dist) + ' · 마크 대비 ' + pct(distMk) + '</i>' : '') + '</span><span>증거금<b>' + fU(p.m) + '</b><i>' + (p.mode === 'cross' ? '교차 · 지갑 공유' : '격리') + '</i></span><span>마진율<b class="' + (mr > .8 ? 'dn' : '') + '">' + (isFinite(mr) ? (mr * 100).toFixed(2) + '%' : '-') + '</b></span></div>'
+      + '<div class="trtp">' + (p.tp ? '<span class="up">TP ' + fN(p.tp.px, d) + ' · ' + Math.round(p.tp.r * 100) + '%</span>' : '<span>TP 없음</span>') + (p.sl ? '<span class="dn">SL ' + fN(p.sl.px, d) + ' · ' + Math.round(p.sl.r * 100) + '%</span>' : '<span>SL 없음</span>') + (p.rp ? '<span>실현 ' + sgn(p.rp) + '</span>' : '') + (p.fund ? '<span>펀딩 ' + sgn(p.fund) + '</span>' : '') + '</div>'
       + '<div class="trqc"><span>시장가 종료</span>' + [25, 50, 75, 100].map(v => '<button data-a="qc" data-s="' + p.s + '" data-v="' + v + '">' + v + '%</button>').join('') + '</div>'
       + '<div class="tracts"><button data-a="pclose" data-v="' + p.s + '">분할 종료</button><button data-a="ptpsl" data-v="' + p.s + '">TP/SL</button><button data-a="padd" data-v="' + p.s + '">추가 진입</button>' + (p.mode === 'iso' ? '<button data-a="pmar" data-v="' + p.s + '">증거금</button>' : '') + '<button data-a="plev" data-v="' + p.s + '">레버리지</button></div></div>';
   }
@@ -278,7 +297,7 @@ class Trade {
   onClick(e) {
     const b = e.target.closest('[data-a]'); if (!b || !this.R.contains(b)) return; const a = b.dataset.a, v = b.dataset.v, U = this.U;
     switch (a) {
-      case 'mk': U.mk = v; this.saveU(); this.renderTabsTop(); this.renderHead(); this.renderWallet(); this.renderOrder(); this.chartLines(); break;
+      case 'mk': U.mk = v; this.saveU(); this.renderTabsTop(); this.renderBadge(); this.renderHead(); this.renderWallet(); this.renderOrder(); this.loadChart(); break;
       case 'iv': U.iv = v; this.saveU(); this.renderTabsTop(); this.loadChart(); break;
       case 'sym': this.symSheet(); break;
       case 'cset': this.chartSheet(); break;
@@ -336,8 +355,8 @@ class Trade {
         else r = side > 0 ? E.spotBuy(this.S, w, pair, q, cur) : E.spotSell(this.S, w, pair, q, cur);
       } else {
         const lev = this.curLev(), mode = this.curMode();
-        if (isLmt && !marketable) { r = E.placeLimit(this.S, w, { s: pair, mk: 'fut', side, q, px, lev, mode }); if (r.ok && tpsl) r.ord.tpsl = tpsl; }
-        else { r = E.openFut(this.S, w, prices, { s: pair, side, q, px: cur, lev, mode }); if (r.ok && tpsl && this.S.pos[pair] && this.S.pos[pair].side === side) { const t = E.setTpSl(this.S, pair, tpsl.tp, tpsl.sl, prices); if (!t.ok) this.br.toast('TP/SL 미설정: ' + t.err); } }
+        if (isLmt && !marketable) { r = E.placeLimit(this.S, w, { s: pair, mk: 'fut', side, q, px, lev, mode }, prices); if (r.ok && tpsl) r.ord.tpsl = tpsl; }
+        else { r = E.openFut(this.S, w, prices, { s: pair, side, q, px: cur, lev, mode }); if (r.ok && tpsl && this.S.pos[pair] && this.S.pos[pair].side === side) { const t = E.setTpSl(this.S, pair, tpsl.tp, tpsl.sl, this.lastF()); if (!t.ok) this.br.toast('TP/SL 미설정: ' + t.err); } }
       }
       if (!r.ok) return this.br.toast(r.err);
       this.commit(w);
@@ -366,7 +385,7 @@ class Trade {
   }
   closeSheetUI() { const s = this.$('tsh'); if (s) s.hidden = true; this.sheetAct = null; this.onSheetInput = null; }
   symSheet() {
-    const row = s => { const t = this.feed.t24[s] || {}, p = this.feed.px[s]; return '<button class="trsr" data-a="pick" data-v="' + s + '"><b>' + s + '<small>/USDT</small></b><span>' + (p ? fN(p, dec(p)) : '-') + '</span><span class="' + ((t.p || 0) >= 0 ? 'up' : 'dn') + '">' + (t.p != null ? pct(t.p) : '') + '</span></button>'; };
+    const row = s => { const t = this.feed.stats(s, this.U.mk) || {}, p = this.feed.last(s, this.U.mk); return '<button class="trsr" data-a="pick" data-v="' + s + '"><b>' + s + '<small>/USDT</small></b><span>' + (p ? fN(p, dec(p)) : '-') + '</span><span class="' + ((t.p || 0) >= 0 ? 'up' : 'dn') + '">' + (t.p != null ? pct(t.p) : '') + '</span></button>'; };
     this.sheet('종목 선택', '<div class="trsl">' + SYMS.map(row).join('') + '</div>', (a, v) => { if (a === 'pick') { this.U.sym = v; this.saveU(); this.closeSheetUI(); this.renderAll(); this.loadChart(); } });
   }
   chartSheet() {
@@ -384,12 +403,12 @@ class Trade {
       + '<p class="trhint"><b>격리</b>: 포지션마다 넣은 증거금만 위험에 노출됩니다. 청산되면 그 증거금만 잃습니다.<br><b>교차</b>: 사용 가능한 잔액 전체(이 사이트에서는 게임 잔액 포함)가 모든 교차 포지션의 증거금이 됩니다. 청산가는 멀어지지만, 청산되면 잔액 전체를 잃습니다.</p>', (a, v) => { if (a === 'setmode') { const r = E.setMode(this.S, pair, v); if (!r.ok) return this.br.toast(r.err); this.commit(); this.closeSheetUI(); this.renderOrder(); } });
   }
   levSheet() {
-    const pair = this.U.sym + 'USDT', p = this.S.pos[pair], cur = this.curLev();
-    const body = '<div class="trlev"><button data-a="ld" data-v="-1">−</button><b id="lvv">' + cur + 'x</b><button data-a="ld" data-v="1">+</button></div><input type="range" id="lvr" min="1" max="125" value="' + cur + '" class="trrange"><div class="trpct sm">' + LEVS.map(v => '<button data-a="lp" data-v="' + v + '">' + v + 'x</button>').join('') + '</div><div class="trinfo" id="lvi"></div><button class="trgo" data-a="lvok">확인</button>';
+    const pair = this.U.sym + 'USDT', p = this.S.pos[pair], cur = this.curLev(), MX = E.maxLevSym(pair);
+    const body = '<div class="trlev"><button data-a="ld" data-v="-1">−</button><b id="lvv">' + cur + 'x</b><button data-a="ld" data-v="1">+</button></div><input type="range" id="lvr" min="1" max="' + MX + '" value="' + cur + '" class="trrange"><div class="trpct sm">' + LEVS.filter(v => v <= MX).concat(LEVS.indexOf(MX) < 0 ? [MX] : []).map(v => '<button data-a="lp" data-v="' + v + '">' + v + 'x</button>').join('') + '</div><div class="trinfo" id="lvi"></div><button class="trgo" data-a="lvok">확인</button>';
     const info = () => { const v = +this.R.querySelector('#lvr').value; this.R.querySelector('#lvv').textContent = v + 'x'; const px = this.P(); let h = '<div><span>' + v + '배 최대 포지션</span><b>' + fN(E.capForLev(pair, v), 0) + ' USDT</b></div><div><span>1% 움직일 때 ROE</span><b>' + v + '%</b></div>'; if (p) { const need = p.q * p.ep / v; h += '<div><span>필요 증거금</span><b>' + fU(need) + ' (현재 ' + fU(p.m) + ')</b></div>'; const np = Object.assign({}, p, { lev: v, m: Math.max(p.m, need) }); if (p.mode === 'cross') np.m = need; const tmp = Object.assign({}, this.S, { pos: Object.assign({}, this.S.pos, { [pair]: np }) }); const L = E.liqPrice(np, tmp, this.w().bal - Math.max(0, need - p.m), this.pairs()).lp; h += '<div><span>변경 후 청산가</span><b class="liq">' + (L > 0 ? fN(L, dec(px)) : '없음') + '</b></div>'; } if (v >= 50) h += '<p class="trwarn">고배율은 작은 변동에도 청산될 수 있습니다.</p>'; this.R.querySelector('#lvi').innerHTML = h; };
     this.sheet(pair + ' 레버리지', body, (a, v) => {
       const r = this.R.querySelector('#lvr');
-      if (a === 'ld') { r.value = Math.max(1, Math.min(125, +r.value + +v)); info(); }
+      if (a === 'ld') { r.value = Math.max(1, Math.min(MX, +r.value + +v)); info(); }
       if (a === 'lp') { r.value = v; info(); }
       if (a === 'lvok') { const w = this.w(), x = E.setLev(this.S, w, this.pairs(), pair, +r.value); if (!x.ok) return this.br.toast(x.err); this.commit(w); this.closeSheetUI(); this.renderAll(); this.chartLines(); this.br.toast('레버리지 ' + x.lev + 'x 로 설정했습니다'); }
     }, e => { if (e.target.id === 'lvr') info(); });
@@ -402,15 +421,15 @@ class Trade {
       + '<label class="trin"><span>수량</span><input id="cqty" inputmode="decimal" value="' + floorTo(p.q * (preset || 100) / 100, qd) + '"><em>' + s + '</em></label>'
       + '<div class="trpct">' + [10, 25, 50, 75, 100].map(v => '<button data-a="cp" data-v="' + v + '">' + v + '%</button>').join('') + '</div><div class="trinfo" id="cinf"></div><button class="trgo ' + (p.side > 0 ? 'short' : 'long') + '" data-a="cok">포지션 종료</button>';
     let ct = 'mkt';
-    const info = () => { const q = Math.min(p.q, num(this.R.querySelector('#cqty').value)), px = ct === 'lmt' ? num(this.R.querySelector('#cprice').value) || this.P(s) : this.P(s), pnl = p.side * q * (px - p.ep), fee = q * px * (ct === 'lmt' ? E.FEE.futM : E.FEE.futT); this.R.querySelector('#cinf').innerHTML = '<div><span>종료 비율</span><b>' + (q / p.q * 100).toFixed(1) + '%</b></div><div><span>예상 실현 손익</span><b class="' + (pnl - fee >= 0 ? 'up' : 'dn') + '">' + sgn(pnl - fee) + ' USDT</b></div><div><span>돌려받는 증거금</span><b>' + fU(p.m * q / p.q) + '</b></div><div><span>남는 수량</span><b>' + fN(Math.max(0, p.q - q), qd) + ' ' + s + '</b></div>'; };
+    const info = () => { const q = Math.min(p.q, num(this.R.querySelector('#cqty').value)), px = ct === 'lmt' ? num(this.R.querySelector('#cprice').value) || this.Pf(s) : this.Pf(s), pnl = p.side * q * (px - p.ep), fee = q * px * (ct === 'lmt' ? E.FEE.futM : E.FEE.futT); this.R.querySelector('#cinf').innerHTML = '<div><span>종료 비율</span><b>' + (q / p.q * 100).toFixed(1) + '%</b></div><div><span>예상 실현 손익</span><b class="' + (pnl - fee >= 0 ? 'up' : 'dn') + '">' + sgn(pnl - fee) + ' USDT</b></div><div><span>돌려받는 증거금</span><b>' + fU(p.m * q / p.q) + '</b></div><div><span>남는 수량</span><b>' + fN(Math.max(0, p.q - q), qd) + ' ' + s + '</b></div>'; };
     this.sheet(pair + ' 분할 종료', body, (a, v, b) => {
-      if (a === 'ct') { ct = v; this.R.querySelectorAll('[data-a=ct]').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === v)); const i = this.R.querySelector('#cprice'); i.disabled = v !== 'lmt'; i.placeholder = v === 'lmt' ? '종료 가격' : '시장가'; this.R.querySelector('#cpx').classList.toggle('off', v !== 'lmt'); if (v === 'lmt') i.value = String(+this.P(s).toFixed(d)); info(); }
+      if (a === 'ct') { ct = v; this.R.querySelectorAll('[data-a=ct]').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === v)); const i = this.R.querySelector('#cprice'); i.disabled = v !== 'lmt'; i.placeholder = v === 'lmt' ? '종료 가격' : '시장가'; this.R.querySelector('#cpx').classList.toggle('off', v !== 'lmt'); if (v === 'lmt') i.value = String(+this.Pf(s).toFixed(d)); info(); }
       if (a === 'cp') { this.R.querySelector('#cqty').value = floorTo(p.q * v / 100, qd) || p.q; if (+v === 100) this.R.querySelector('#cqty').value = p.q; info(); }
       if (a === 'cok') {
         let q = num(this.R.querySelector('#cqty').value); if (!(q > 0)) return this.br.toast('수량을 입력해 주세요'); q = Math.min(q, p.q);
         const w = this.w(); let r;
-        if (ct === 'lmt') { const px = num(this.R.querySelector('#cprice').value); if (!(px > 0)) return this.br.toast('가격을 입력해 주세요'); const cur = this.P(s); if (p.side > 0 ? px <= cur : px >= cur) r = E.closeFut(this.S, w, pair, q, cur, E.FEE.futT, 'close'); else r = E.placeLimit(this.S, w, { s: pair, mk: 'fut', side: -p.side, q, px, ro: true }); }
-        else r = E.closeFut(this.S, w, pair, q, this.P(s), E.FEE.futT, 'close');
+        if (ct === 'lmt') { const px = num(this.R.querySelector('#cprice').value); if (!(px > 0)) return this.br.toast('가격을 입력해 주세요'); const cur = this.Pf(s); if (p.side > 0 ? px <= cur : px >= cur) r = E.closeFut(this.S, w, pair, q, cur, E.FEE.futT, 'close'); else r = E.placeLimit(this.S, w, { s: pair, mk: 'fut', side: -p.side, q, px, ro: true }); }
+        else r = E.closeFut(this.S, w, pair, q, this.Pf(s), E.FEE.futT, 'close');
         if (!r.ok) return this.br.toast(r.err); this.commit(w); this.closeSheetUI(); this.renderAll(); this.chartLines();
         this.br.toast(r.ord ? '지정가 종료 주문을 등록했습니다' : '포지션 ' + fN(q, qd) + ' ' + s + ' 종료 · 손익 ' + sgn(r.pnl - r.fee) + ' USDT');
       }
@@ -419,7 +438,7 @@ class Trade {
   }
   tpslSheet(pair) {
     const p = this.S.pos[pair]; if (!p) return; const d = dec(p.ep), s = pair.replace(/USDT$/, '');
-    const body = '<p class="trhint">' + (p.side > 0 ? '롱' : '숏') + ' ' + p.lev + 'x · 평단 ' + fN(p.ep, d) + ' · 현재가 ' + fN(this.P(s), d) + '</p>'
+    const body = '<p class="trhint">' + (p.side > 0 ? '롱' : '숏') + ' ' + p.lev + 'x · 평단 ' + fN(p.ep, d) + ' · 현재가 ' + fN(this.Pf(s), d) + '</p>'
       + '<label class="trin"><span>TP</span><input id="ttp" inputmode="decimal" value="' + (p.tp ? p.tp.px : '') + '" placeholder="익절 가격"><em>USDT</em></label><div class="trpct sm">' + [10, 25, 50, 100, 200].map(v => '<button data-a="tr" data-k="tp" data-v="' + v + '">+' + v + '%</button>').join('') + '</div>'
       + '<label class="trin"><span>TP 비율</span><input id="ttr" type="range" min="10" max="100" step="5" value="' + (p.tp ? Math.round(p.tp.r * 100) : 100) + '" class="trrange"><em id="ttrv"></em></label>'
       + '<label class="trin"><span>SL</span><input id="tsl" inputmode="decimal" value="' + (p.sl ? p.sl.px : '') + '" placeholder="손절 가격"><em>USDT</em></label><div class="trpct sm">' + [5, 10, 25, 50, 75].map(v => '<button data-a="tr" data-k="sl" data-v="' + v + '">−' + v + '%</button>').join('') + '</div>'
@@ -435,7 +454,7 @@ class Trade {
     this.sheet(pair + ' TP / SL', body, (a, v, b) => {
       if (a === 'tr') { const mv = v / 100 / p.lev, k = b.dataset.k; const px = k === 'tp' ? p.ep * (1 + p.side * mv) : p.ep * (1 - p.side * mv); this.R.querySelector(k === 'tp' ? '#ttp' : '#tsl').value = String(+px.toFixed(d)); info(); }
       if (a === 'tclr') { p.tp = null; p.sl = null; this.commit(); this.closeSheetUI(); this.renderList(); this.chartLines(); this.br.toast('TP/SL을 해제했습니다'); }
-      if (a === 'tok') { const tp = num(this.R.querySelector('#ttp').value), sl = num(this.R.querySelector('#tsl').value); const r = E.setTpSl(this.S, pair, tp > 0 ? { px: tp, r: +this.R.querySelector('#ttr').value / 100 } : null, sl > 0 ? { px: sl, r: +this.R.querySelector('#tsr').value / 100 } : null, this.pairs()); if (!r.ok) return this.br.toast(r.err); this.commit(); this.closeSheetUI(); this.renderList(); this.chartLines(); this.br.toast('TP/SL을 저장했습니다'); }
+      if (a === 'tok') { const tp = num(this.R.querySelector('#ttp').value), sl = num(this.R.querySelector('#tsl').value); const r = E.setTpSl(this.S, pair, tp > 0 ? { px: tp, r: +this.R.querySelector('#ttr').value / 100 } : null, sl > 0 ? { px: sl, r: +this.R.querySelector('#tsr').value / 100 } : null, this.lastF()); if (!r.ok) return this.br.toast(r.err); this.commit(); this.closeSheetUI(); this.renderList(); this.chartLines(); this.br.toast('TP/SL을 저장했습니다'); }
     }, () => info());
     info();
   }
@@ -449,7 +468,7 @@ class Trade {
       + '<div class="trpct">' + [25, 50, 100, 200].map(v => '<button data-a="ap" data-v="' + v + '">현재의 ' + v + '%</button>').join('') + '</div>'
       + '<div class="trinfo" id="ainf"></div><button class="trgo ' + (p.side > 0 ? 'long' : 'short') + '" data-a="aok">추가 진입</button>';
     const qOf = () => { const v = num(this.R.querySelector('#aqty').value), px = pxOf(); return floorTo(unit === 'coin' ? v : unit === 'usdt' ? v / px : v * p.lev / px, qd); };
-    const pxOf = () => ot === 'lmt' ? (num(this.R.querySelector('#aprice').value) || this.P(s)) : this.P(s);
+    const pxOf = () => ot === 'lmt' ? (num(this.R.querySelector('#aprice').value) || this.Pf(s)) : this.Pf(s);
     const info = () => {
       const q = qOf(), px = pxOf(); if (!(q > 0)) { this.R.querySelector('#ainf').innerHTML = '<div><span>현재 청산가</span><b class="liq">' + fN(E.liqPrice(p, this.S, this.w().bal, this.pairs()).lp, d) + '</b></div>'; return; }
       const pv = E.previewOpen(this.S, this.w().bal, Object.assign(this.pairs(), { [pair]: px }), { s: pair, side: p.side, q, px, fee: ot === 'lmt' ? E.FEE.futM : E.FEE.futT });
@@ -457,12 +476,12 @@ class Trade {
       this.R.querySelector('#ainf').innerHTML = '<div><span>평단가</span><b>' + fN(p.ep, d) + ' → ' + fN(pv.pos.ep, d) + '</b></div><div><span>수량</span><b>' + fN(p.q, qd) + ' → ' + fN(pv.pos.q, qd) + ' ' + s + '</b></div><div><span>청산가</span><b class="liq">' + (L0 > 0 ? fN(L0, d) : '없음') + ' → ' + (pv.liq > 0 ? fN(pv.liq, d) : '없음') + '</b></div><div><span>새 평단 대비 청산 거리</span><b>' + (pv.liq > 0 ? pct((pv.liq - pv.pos.ep) / pv.pos.ep * 100) : '-') + '</b></div><div><span>추가 증거금 + 수수료</span><b>' + fU(pv.margin) + ' + ' + fU(pv.fee) + '</b></div><div><span>주문금액</span><b>' + fU(q * px) + ' USDT</b></div>';
     };
     this.sheet(pair + ' 추가 진입 (물타기 · 불타기)', body, (a, v) => {
-      if (a === 'at') { ot = v; this.R.querySelectorAll('[data-a=at]').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === v)); const i = this.R.querySelector('#aprice'); i.disabled = v !== 'lmt'; this.R.querySelector('#apx').classList.toggle('off', v !== 'lmt'); if (v === 'lmt') i.value = String(+this.P(s).toFixed(d)); info(); }
+      if (a === 'at') { ot = v; this.R.querySelectorAll('[data-a=at]').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === v)); const i = this.R.querySelector('#aprice'); i.disabled = v !== 'lmt'; this.R.querySelector('#apx').classList.toggle('off', v !== 'lmt'); if (v === 'lmt') i.value = String(+this.Pf(s).toFixed(d)); info(); }
       if (a === 'au') { unit = v; this.R.querySelectorAll('[data-a=au]').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === v)); this.R.querySelector('#aqty').value = ''; info(); }
       if (a === 'ap') { const q = p.q * v / 100, px = pxOf(); this.R.querySelector('#aqty').value = unit === 'coin' ? String(floorTo(q, qd)) : (unit === 'usdt' ? q * px : q * px / p.lev).toFixed(2); info(); }
       if (a === 'aok') {
-        const q = qOf(), px = pxOf(); if (!(q > 0)) return this.br.toast('수량을 입력해 주세요'); const w = this.w(); let r; const cur = this.P(s);
-        if (ot === 'lmt' && (p.side > 0 ? px < cur : px > cur)) r = E.placeLimit(this.S, w, { s: pair, mk: 'fut', side: p.side, q, px, lev: p.lev, mode: p.mode });
+        const q = qOf(), px = pxOf(); if (!(q > 0)) return this.br.toast('수량을 입력해 주세요'); const w = this.w(); let r; const cur = this.Pf(s);
+        if (ot === 'lmt' && (p.side > 0 ? px < cur : px > cur)) r = E.placeLimit(this.S, w, { s: pair, mk: 'fut', side: p.side, q, px, lev: p.lev, mode: p.mode }, this.pairs());
         else r = E.openFut(this.S, w, this.pairs(), { s: pair, side: p.side, q, px: cur });
         if (!r.ok) return this.br.toast(r.err); this.commit(w); this.closeSheetUI(); this.renderAll(); this.chartLines();
         this.br.toast(r.ord ? '추가 진입 지정가 주문을 등록했습니다' : '추가 진입 체결 · 새 평단 ' + fN(this.S.pos[pair].ep, d));
@@ -473,7 +492,7 @@ class Trade {
   marginSheet(pair) {
     const p = this.S.pos[pair]; if (!p) return; const d = dec(p.ep), s = pair.replace(/USDT$/, ''); let mode = 1;
     const body = '<div class="trseg sm"><button data-a="mm" data-v="1" aria-pressed="true">추가</button><button data-a="mm" data-v="-1" aria-pressed="false">회수</button></div><label class="trin"><span>금액</span><input id="mamt" inputmode="decimal" placeholder="0"><em>USDT</em></label><div class="trinfo" id="minf"></div><button class="trgo" data-a="mok">확인</button>';
-    const info = () => { const amt = num(this.R.querySelector('#mamt').value) * mode, np = Object.assign({}, p, { m: Math.max(0, p.m + amt) }), L0 = E.liqPrice(p, this.S, 0, {}).lp, L1 = E.liqPrice(np, this.S, 0, {}).lp; this.R.querySelector('#minf').innerHTML = '<div><span>현재 증거금</span><b>' + fU(p.m) + '</b></div><div><span>' + (mode > 0 ? '추가 가능' : '최대 회수 가능') + '</span><b>' + fU(mode > 0 ? this.w().bal : E.maxRemovable(p, this.P(s))) + '</b></div><div><span>청산가</span><b class="liq">' + (L0 > 0 ? fN(L0, d) : '없음') + ' → ' + (L1 > 0 ? fN(L1, d) : '없음') + '</b></div>'; };
+    const info = () => { const amt = num(this.R.querySelector('#mamt').value) * mode, np = Object.assign({}, p, { m: Math.max(0, p.m + amt) }), L0 = E.liqPrice(p, this.S, 0, {}).lp, L1 = E.liqPrice(np, this.S, 0, {}).lp; this.R.querySelector('#minf').innerHTML = '<div><span>현재 증거금</span><b>' + fU(p.m) + '</b></div><div><span>' + (mode > 0 ? '추가 가능' : '최대 회수 가능') + '</span><b>' + fU(mode > 0 ? this.w().bal : E.maxRemovable(p, this.Pm(s))) + '</b></div><div><span>청산가</span><b class="liq">' + (L0 > 0 ? fN(L0, d) : '없음') + ' → ' + (L1 > 0 ? fN(L1, d) : '없음') + '</b></div>'; };
     this.sheet(pair + ' 증거금 조정 (격리)', body, (a, v) => {
       if (a === 'mm') { mode = +v; this.R.querySelectorAll('[data-a=mm]').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === v)); info(); }
       if (a === 'mok') { const amt = num(this.R.querySelector('#mamt').value); if (!(amt > 0)) return this.br.toast('금액을 입력해 주세요'); const w = this.w(), r = E.adjMargin(this.S, w, this.pairs(), pair, amt * mode); if (!r.ok) return this.br.toast(r.err); this.commit(w); this.closeSheetUI(); this.renderAll(); this.chartLines(); this.br.toast('증거금을 ' + (mode > 0 ? '추가' : '회수') + '했습니다'); }
@@ -486,7 +505,7 @@ class Trade {
       + '<div class="trinfo"><div><span>WB ' + (p.mode === 'cross' ? '(교차 지갑 잔액)' : '(격리 증거금)') + '</span><b>' + fU(x.WB) + '</b></div><div><span>TMM1 (다른 교차 포지션 유지증거금)</span><b>' + fU(x.TMM1) + '</b></div><div><span>UPNL1 (다른 교차 포지션 미실현 손익)</span><b>' + sgn(x.UPNL1) + '</b></div><div><span>cum (유지증거금 공제액)</span><b>' + fU(x.cum) + '</b></div><div><span>Side</span><b>' + (x.side > 0 ? '+1 (롱)' : '−1 (숏)') + '</b></div><div><span>Q (수량)</span><b>' + x.Q + '</b></div><div><span>EP (평단가)</span><b>' + fN(x.EP, d) + '</b></div><div><span>MMR (유지증거금률)</span><b>' + (x.mmr * 100).toFixed(2) + '%</b></div></div>'
       + '<p>= (' + fU(x.WB) + ' − ' + fU(x.TMM1) + ' + ' + fU(x.UPNL1) + ' + ' + fU(x.cum) + ' − (' + x.side + ' × ' + x.Q + ' × ' + fN(x.EP, d) + ')) ÷ (' + x.Q + ' × ' + x.mmr + ' − (' + x.side + ' × ' + x.Q + '))</p>'
       + '<p class="trbig">청산가 <b class="liq">' + (r.lp > 0 ? fN(r.lp, d) : '없음') + '</b>' + (r.lp > 0 ? ' · 평단 대비 ' + pct((r.lp - p.ep) / p.ep * 100) : '') + '</p>'
-      + '<p class="trhint">청산 조건: ' + (p.mode === 'cross' ? '교차 지갑 잔액 + 교차 포지션 미실현 손익 ≤ 교차 포지션 유지증거금 합계' : '격리 증거금 + 미실현 손익 ≤ 유지증거금') + '. 유지증거금 = 포지션 금액 × MMR − cum. 포지션 금액 구간(' + fN(br.lo, 0) + ' ~ ' + (isFinite(br.hi) ? fN(br.hi, 0) : '∞') + ' USDT)에 따라 MMR ' + (br.mmr * 100).toFixed(2) + '%, 최대 ' + br.maxLev + '배가 적용됩니다. 구간 표는 Binance 공개 표를 근사한 값입니다.</p></div>';
+      + '<p class="trhint">청산 조건: ' + (p.mode === 'cross' ? '교차 지갑 잔액 + 교차 포지션 미실현 손익 ≤ 교차 포지션 유지증거금 합계' : '격리 증거금 + 미실현 손익 ≤ 유지증거금') + '. 유지증거금 = 포지션 금액 × MMR − cum. 포지션 금액 구간(' + fN(br.lo, 0) + ' ~ ' + (isFinite(br.hi) ? fN(br.hi, 0) : '∞') + ' USDT)에 따라 MMR ' + (br.mmr * 100).toFixed(2) + '%, 최대 ' + br.maxLev + '배가 적용됩니다. ' + (E.bracketOfficial(pair) ? '구간표는 Binance 공개 데이터(' + E.BRACKET_DATE + ' 기준) 값입니다.' : '이 종목의 구간표는 공식 값을 확인하지 못해 비슷한 종목의 표를 쓰고 있습니다(근사).') + ' 실제 청산 판정은 마크 가격 기준입니다.</p></div>';
     this.sheet(pair + ' 청산가 계산', body);
   }
   liqSheet(e) {
