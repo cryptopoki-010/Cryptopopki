@@ -89,6 +89,21 @@ export const UP = [
 ];
 export const upCost = (i, lv, k) => { const u = UP[i]; return Math.ceil(u.c0 * Math.pow(u.g, lv) * (Math.pow(u.g, k) - 1) / (u.g - 1)) };
 export function upQuote(s, i, n) { const u = UP[i], lv = (s.up || [])[i] | 0; let k = 0; const room = Math.max(0, u.cap - lv); n = Math.min(n, room); let best = 0, cost = 0; for (k = 1; k <= n; k++) { const c = upCost(i, lv, k); if (c > s.meat + 1e-9) break; best = k; cost = c } return { k: best, cost, lv, room } }
+// ── 해금 조건 ──
+// 장비: 처치 수 OR 버틴 시간 중 하나만 채우면 열림. 쉘터: 캐릭터 강화 총 레벨.
+export const GK = [0, 150, 500, 1500, 4000, 9000, 18000, 35000, 70000, 120000];
+export const GT = [0, 600, 1800, 3600, 7200, 12600, 21600, 32400, 50400, 64800];
+export const GL_W = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+export const GL_AR = [1, 3, 5, 7, 8];
+export const GL_AL = [1, 3, 5, 7, 8];
+export const GL_FN = [0, 2, 4, 6, 8];
+export const GL_TP = [1, 3, 5, 7];
+export const GL_TU = [2, 4, 6, 8];
+export const GU_HL = [0, 10, 40, 100, 200];
+export const GU_EX = [0, 250, 300, 350, 400, 450, 500, 600, 700];
+export const upSum = s => (s.up || []).reduce((a, v) => a + (v | 0), 0);
+export const eqGate = (s, L) => (s.kills >= GK[L] || s.age >= GT[L]);
+export const shGate = (s, need) => upSum(s) >= need;
 const SEGS = (() => {
   const a = []; const T = 8;
   for (let i = 0; i < 5; i++) a.push({ x: CX - R + i * 40, y: CY - R - T / 2, w: 40, h: T });
@@ -620,39 +635,44 @@ export function openShelter(ctx) {
     $('tb').innerHTML = T.map(t => '<button data-t="' + t[0] + '"' + (tab === t[0] ? ' class="on"' : '') + '>' + t[1] + '</button>').join('');
     $('tb').onclick = e => { const b = e.target.closest('button[data-t]'); if (!b) return; tab = b.dataset.t; tabs(); list() };
   }
+  const tmx = t => t < 3600 ? Math.round(t / 60) + '분' : (t % 3600 ? Math.floor(t / 3600) + '시간 ' + Math.round(t % 3600 / 60) + '분' : t / 3600 + '시간');
+  const gq = L => { const ok = eqGate(S, L); return { lock: !ok, lockTx: '🔒 ☠' + fmtN(Math.min(S.kills, GK[L])) + '/' + fmtN(GK[L]) + ' · ' + tmx(GT[L]) } };
+  const gu = need => { const ok = shGate(S, need); return { lock: !ok, lockTx: '🔒 강화 Lv ' + fmtN(upSum(S)) + '/' + fmtN(need) } };
   const row = (ic, nm, ds, pr, o) => { o = o || {}; const tx = o.eq ? '장착 중' : o.own ? (o.low ? '하위 단계' : '보유 중') : F(pr) + ' 🥩'; return '<div class="it' + (o.eq ? ' eq' : '') + '"><div class="ic">' + ic + '</div><div class="bdy"><b>' + nm + '</b><p>' + ds + '</p></div><button ' + (o.own || o.eq ? 'class="own" disabled' : 'data-p="' + pr + '" data-lock="' + (o.lock ? 1 : 0) + '" data-a="' + o.a + '"' + (o.i !== undefined ? ' data-i="' + o.i + '"' : '') + (o.j !== undefined ? ' data-j="' + o.j + '"' : '') + (S.meat < pr || o.lock ? ' disabled' : '')) + '>' + (o.lock && !o.own && !o.eq ? (o.lockTx || '잠김') : tx) + '</button></div>' };
   function list() {
     const L = $('ls'); let h = '';
     if (tab === 'chr') {
       const hs = heroStats(S);
+      h += '<div class="nt">🔒 장비는 <b>좀비 처치 수</b>를 채우거나 <b>시간이 흐르면</b>(둘 중 하나) 단계별로 열립니다. 현재 ☠ ' + fmtN(S.kills) + '마리 · ' + tmx(S.age) + '</div>';
       h += '<h4>⚔️ 무기 (현재 공격력 ' + hs.dmg + ' · 초당 ' + Math.round(hs.dmg / hs.iv) + ')</h4>';
-      WEAPONS.forEach((w, i) => { if (!i) return; h += row(w.ic, w.n, '공격 ' + w.d + ' · ' + (1 / w.iv).toFixed(1) + '회/초 · 초당 ' + Math.round(w.d / w.iv) + ' · 사거리 ' + w.r + (w.g ? ' (원거리)' : ' (근접)'), w.p, { a: 'wp', i, eq: S.wp === i, own: S.wp > i, low: 1 }) });
+      WEAPONS.forEach((w, i) => { if (!i) return; h += row(w.ic, w.n, '공격 ' + w.d + ' · ' + (1 / w.iv).toFixed(1) + '회/초 · 초당 ' + Math.round(w.d / w.iv) + ' · 사거리 ' + w.r + (w.g ? ' (원거리)' : ' (근접)'), w.p, Object.assign({ a: 'wp', i, eq: S.wp === i, own: S.wp > i, low: 1 }, gq(GL_W[i]))) });
       SLOTS.forEach((s, si) => {
         h += '<h4>' + s.ic + ' ' + s.n + (S.ar[si] ? ' · 착용: ' + s.names[S.ar[si] - 1] : ' · 없음') + '</h4>';
-        for (let t = 0; t < 5; t++) { const it = armorItem(si, t); h += row(s.ic, it.n, '체력 +' + it.hp + (it.df ? ' · 방어 ' + it.df + '%' : '') + (it.sp ? ' · 공격속도 +' + Math.round(it.sp * 100) + '%' : '') + (it.ms ? ' · 이동속도 +' + Math.round(it.ms * 100) + '%' : ''), it.p, { a: 'ar', i: si, j: t, eq: S.ar[si] === t + 1, own: S.ar[si] > t + 1, low: 1 }) }
+        for (let t = 0; t < 5; t++) { const it = armorItem(si, t); h += row(s.ic, it.n, '체력 +' + it.hp + (it.df ? ' · 방어 ' + it.df + '%' : '') + (it.sp ? ' · 공격속도 +' + Math.round(it.sp * 100) + '%' : '') + (it.ms ? ' · 이동속도 +' + Math.round(it.ms * 100) + '%' : ''), it.p, Object.assign({ a: 'ar', i: si, j: t, eq: S.ar[si] === t + 1, own: S.ar[si] > t + 1, low: 1 }, gq(GL_AR[t]))) }
       });
       h += '<h4>🐕 동료 (구매하면 함께 싸웁니다)</h4>';
-      ALLY.forEach((a, i) => { h += row(a.ic, a.n, '초당 공격 ' + a.dps + ' · 체력 ' + a.hp + ' · 사거리 ' + a.r + (a.g ? ' (원거리)' : ' (근접)') + ' · 쓰러지면 8초 뒤 복귀', a.p, { a: 'al', i, own: !!S.al[i] }) });
+      ALLY.forEach((a, i) => { h += row(a.ic, a.n, '초당 공격 ' + a.dps + ' · 체력 ' + a.hp + ' · 사거리 ' + a.r + (a.g ? ' (원거리)' : ' (근접)') + ' · 쓰러지면 8초 뒤 복귀', a.p, Object.assign({ a: 'al', i, own: !!S.al[i] }, gq(GL_AL[i]))) });
     } else if (tab === 'up') {
       h += '<h4>💪 캐릭터 강화 · 구매 수량</h4><div class="sq">' + [1, 10, 100].map(n => '<button data-uq="' + n + '"' + (upQ === n ? ' style="background:#3a5a2a;border-color:#8ac060;color:#fff"' : '') + '>x' + n + '</button>').join('') + '</div><p class="nt">고기로 능력치 레벨을 올립니다. 레벨이 오를수록 비용이 늘어나고, 수량을 고르면 살 수 있는 만큼 한 번에 구매해요.</p>';
       UP.forEach((u, i) => { const q = upQuote(S, i, upQ), lv = S.up[i] | 0, nx = upCost(i, lv, 1); h += '<div class="it"><div class="ic">' + u.ic + '</div><div class="bdy"><b>' + u.n + ' Lv.' + fmtN(lv) + '</b><p>' + u.d + (lv >= u.cap ? ' · 최대 레벨' : ' · 다음 레벨 ' + F(nx) + ' 🥩') + '</p></div><button ' + (q.room <= 0 ? 'class="own" disabled>최대' : 'data-p="' + (q.k ? q.cost : nx) + '" data-lock="0" data-a="up" data-i="' + i + '"' + (S.meat < nx ? ' disabled' : '') + '>' + (q.k ? 'x' + q.k + ' · ' + F(q.cost) + ' 🥩' : F(nx) + ' 🥩')) + '</button></div>' });
       const hs = heroStats(S); h += '<h4>현재 능력치</h4><div class="st"><div>공격력<b>' + hs.dmg.toFixed(1) + '</b></div><div>공격 속도<b>' + (1 / hs.iv).toFixed(2) + '회/초</b></div><div>최대 체력<b>' + fmtN(hs.hpMax) + '</b></div><div>이동 속도<b>' + Math.round(hs.sp) + '</b></div></div>';
     } else if (tab === 'shp') {
+      h += '<div class="nt">🔒 쉘터 증축·진화는 💪 강화 탭의 <b>능력치 총 레벨</b>이 일정 수준 이상이어야 열립니다. 현재 총 Lv ' + fmtN(upSum(S)) + '</div>';
       h += '<h4>🏠 집 (현재 ' + HOUSE[S.hl].n + ' · 체력 ' + fmtN(S.hp) + ' / ' + fmtN(maxHp(S)) + ')</h4>';
-      HOUSE.forEach((x, i) => { if (!i) return; h += row('🏠', x.n, '쉘터 최대 체력 +' + fmtN(x.hp) + ' (총 ' + fmtN(10000 + HOUSE.slice(0, i + 1).reduce((a, q) => a + q.hp, 0)) + ')', x.p, { a: 'hl', i, own: S.hl >= i, lock: S.hl < i - 1, lockTx: '이전 단계 필요' }) });
+      HOUSE.forEach((x, i) => { if (!i) return; h += row('🏠', x.n, '쉘터 최대 체력 +' + fmtN(x.hp) + ' (총 ' + fmtN(10000 + HOUSE.slice(0, i + 1).reduce((a, q) => a + q.hp, 0)) + ')', x.p, Object.assign({ a: 'hl', i, own: S.hl >= i }, S.hl < i - 1 ? { lock: true, lockTx: '이전 단계 필요' } : gu(GU_HL[i]))) });
       h += '<h4>🏭 쉘터 진화 (현재 ' + EXN[S.ex | 0] + ')</h4>';
       if (S.hl < 4) h += '<div class="nt">🔒 강철 벙커까지 증축하면 진화 단계가 열립니다.</div>';
       const EXD = ['', '체력 +300,000 · 강철 벙커 1성', '체력 +500,000 · 2성', '체력 +800,000 · 3성', '⚡ 쉘터가 직접 전기를 쏩니다 · 체력 +1,000,000', '⚡ 전기 강화: 피해·대상·사거리 증가 · 체력 +1,500,000', '⚡ 전기 강화 2성 · 체력 +2,500,000', '⚡ 전기 강화 3성 · 체력 +4,000,000', '🤖 메카봇 5기 소환 (건·미사일·화염·레일건·수리) · 체력 +6,000,000'];
-      for (let i = 1; i <= 8; i++) { const z = i >= 5 && i <= 7 ? zapStat({ ex: i }) : i === 4 ? zapStat({ ex: 4 }) : null; h += row(i === 8 ? '🤖' : i >= 4 ? '⚡' : '⭐', EXN[i], EXD[i] + (z ? ' · 전기 ' + z.dmg + ' × ' + z.n + '명 / ' + z.iv + '초' : ''), EXP[i], { a: 'ex', i, eq: (S.ex | 0) === i, own: (S.ex | 0) > i, low: 1, lock: S.hl < 4 || (S.ex | 0) < i - 1, lockTx: S.hl < 4 ? '강철 벙커 필요' : '이전 단계 필요' }) }
+      for (let i = 1; i <= 8; i++) { const z = i >= 5 && i <= 7 ? zapStat({ ex: i }) : i === 4 ? zapStat({ ex: 4 }) : null; h += row(i === 8 ? '🤖' : i >= 4 ? '⚡' : '⭐', EXN[i], EXD[i] + (z ? ' · 전기 ' + z.dmg + ' × ' + z.n + '명 / ' + z.iv + '초' : ''), EXP[i], { a: 'ex', i, eq: (S.ex | 0) === i, own: (S.ex | 0) > i, low: 1, lock: S.hl < 4 || (S.ex | 0) < i - 1 || !shGate(S, GU_EX[i]), lockTx: S.hl < 4 ? '강철 벙커 필요' : (S.ex | 0) < i - 1 ? '이전 단계 필요' : gu(GU_EX[i]).lockTx }) }
       const miss = maxHp(S) - S.hp; h += row('🧰', '쉘터 수리', '모자란 체력 ' + fmtN(miss) + ' 전부 복구 (체력 1당 0.2 고기)', Math.max(1, Math.ceil(miss * .2)), { a: 'hrep', lock: miss < 1, lockTx: '수리 불필요' });
       h += '<h4>🧱 울타리 (' + (S.fn ? FENCE[S.fn - 1].n : '없음') + ')</h4>';
-      FENCE.forEach((f, i) => { h += row('🧱', f.n, '구간당 체력 ' + fmtN(f.hp) + ' · 사방을 둘러싸는 15구간 (남쪽 문은 열려 있음)', f.p, { a: 'fn', i, eq: S.fn === i + 1, own: S.fn > i + 1, low: 1 }) });
+      FENCE.forEach((f, i) => { h += row('🧱', f.n, '구간당 체력 ' + fmtN(f.hp) + ' · 사방을 둘러싸는 15구간 (남쪽 문은 열려 있음)', f.p, Object.assign({ a: 'fn', i, eq: S.fn === i + 1, own: S.fn > i + 1, low: 1 }, gq(GL_FN[i]))) });
       const fm = S.fn ? SEGS.reduce((a, _, k) => a + (fenceHp(S) - S.fh[k]) / fenceHp(S), 0) : 0; h += row('🔨', '울타리 수리', '부서지거나 상한 구간 복구 (구간당 ' + (S.fn ? F(FENCE[S.fn - 1].p * .04) : '-') + ' 고기)', S.fn ? Math.max(1, Math.ceil(fm * FENCE[S.fn - 1].p * .04)) : 0, { a: 'frep', lock: !S.fn || fm < .01, lockTx: !S.fn ? '울타리 없음' : '수리 불필요' });
       h += '<h4>🪤 함정 (' + S.tp.filter(t => t.t).length + ' / 8칸)</h4>';
-      TRAP.forEach((t, i) => { h += row(t.ic, t.n, t.d + ' · 개당', t.p, { a: 'tp', i, lock: S.tp.every(x => x.t), lockTx: '칸 가득' }) });
+      TRAP.forEach((t, i) => { h += row(t.ic, t.n, t.d + ' · 개당', t.p, (S.tp.every(x => x.t) ? { a: 'tp', i, lock: true, lockTx: '칸 가득' } : Object.assign({ a: 'tp', i }, gq(GL_TP[i])))) });
       const tr = S.tp.reduce((a, t) => a + (t.t ? (1 - t.d / TRAP[t.t - 1].dur) * TRAP[t.t - 1].p * .2 : 0), 0); h += row('🔧', '함정 재장전', '모든 함정 내구도 복구', Math.max(1, Math.ceil(tr)), { a: 'trep', lock: tr < 1, lockTx: '필요 없음' });
       h += '<h4>🔫 반자동 포탑 (' + S.tu.filter(Boolean).length + ' / 4칸 · 울타리 모서리)</h4>';
-      TURRET.forEach((t, i) => { h += row(t.ic, t.n, '공격 ' + t.dmg + ' · ' + (1 / t.iv).toFixed(1) + '회/초 · 초당 ' + Math.round(t.dmg / t.iv) + ' · 사거리 ' + t.rg + (t.aoe ? ' · 범위 폭발' : ''), t.p, { a: 'tu', i, lock: S.tu.every(Boolean), lockTx: '칸 가득' }) });
+      TURRET.forEach((t, i) => { h += row(t.ic, t.n, '공격 ' + t.dmg + ' · ' + (1 / t.iv).toFixed(1) + '회/초 · 초당 ' + Math.round(t.dmg / t.iv) + ' · 사거리 ' + t.rg + (t.aoe ? ' · 범위 폭발' : ''), t.p, (S.tu.every(Boolean) ? { a: 'tu', i, lock: true, lockTx: '칸 가득' } : Object.assign({ a: 'tu', i }, gq(GL_TU[i])))) });
     } else if (tab === 'swp') {
       const bal = ctx.getBal(), lk = (S.hl | 0) < SWAP_HL;
       h += '<div class="nt" style="font-size:13px">달러를 고기로 바꿉니다.<br><b>' + F(1000 * SWAP) + ' USDT = 고기 1,000</b> (고기 1개 = ' + F(SWAP) + ' USDT) · 고기는 상점에서만 쓸 수 있고 달러로 되돌릴 수 없어요.</div>' + (lk ? '<div class="nt" style="font-size:13px;background:#3a2a16;border:1px solid #c08a3a;border-radius:12px;padding:10px 12px;color:#ffe2b0">🔒 <b>콘크리트 요새</b>까지 증축하면 스왑이 열립니다. (현재 ' + HOUSE[S.hl].n + ')</div>' : '') + '<div class="it"><div class="ic">💵</div><div class="bdy"><b>보유 달러 <span id="balx">' + F(bal) + '</span> USDT</b><p>교환 가능 최대 고기 ' + F(Math.floor(bal / SWAP)) + '</p></div></div><div class="sq">' + [1000, 1e4, 1e5, 1e6].map(n => '<button data-sw="' + n + '" data-n="' + n + '"' + (lk ? ' disabled data-lock="1"' : '') + '>+' + F(n) + '<small style="display:block;font-weight:600;font-size:10px;opacity:.8">−' + F(n * SWAP) + '</small></button>').join('') + '<button data-sw="max" data-n="1"' + (lk ? ' disabled data-lock="1"' : '') + '>최대</button></div><p class="nt">1회 누를 때마다 바로 교환됩니다. 비용 = 고기 수 × ' + F(SWAP) + ' USDT</p>';
@@ -668,6 +688,8 @@ export function openShelter(ctx) {
   }
   function buy(b) {
     const a = b.dataset.a, i = +b.dataset.i, j = +b.dataset.j; let p = +b.dataset.p; if (a === 'up') { const q = upQuote(S, i, upQ); if (!q.k) { toast('고기가 부족합니다'); return } p = q.cost; S.up[i] = q.lv + q.k; S.meat -= p; if (i === 1) sim.hero.hp = heroStats(S).hpMax; save(); sfx('rl_win', 1); toast(UP[i].n + ' +' + q.k + ' → Lv.' + S.up[i] + ' (−' + F(p) + ' 고기)'); list(); return }
+    { const g = a === 'wp' ? !eqGate(S, GL_W[i]) : a === 'ar' ? !eqGate(S, GL_AR[j]) : a === 'al' ? !eqGate(S, GL_AL[i]) : a === 'fn' ? !eqGate(S, GL_FN[i]) : a === 'tp' ? !eqGate(S, GL_TP[i]) : a === 'tu' ? !eqGate(S, GL_TU[i]) : false; if (g) { toast('아직 해금되지 않았습니다 (처치 수 또는 시간 필요)'); list(); return }
+      if ((a === 'hl' && !shGate(S, GU_HL[i])) || (a === 'ex' && !shGate(S, GU_EX[i]))) { toast('캐릭터 강화 총 레벨이 부족합니다'); list(); return } }
     if (S.meat < p - 1e-9) { toast('고기가 부족합니다'); return }
     let ok = true, msg = '';
     if (a === 'wp') { S.wp = i; msg = WEAPONS[i].n + ' 장착' }
