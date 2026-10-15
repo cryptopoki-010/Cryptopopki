@@ -87,7 +87,7 @@ const BASE_HP = t => Math.round(700 * Math.pow(2.25, t - 1));
 const BASE_ARMOR = t => .04 * (t - 1);
 const INCOME = t => .6 * Math.pow(2.45, t - 1);
 const TPOW = t => Math.pow(TCOST[t] / 100, .86);
-const UPG_KRW = 1e10, UPG_P = .5, GEM_KRW = 1e10, GEM_GOLD = 100, SPD_COST = { 2: 1e23, 3: 1e25 }, GEM_DROP = .1;
+const UPG_KRW = 1e10, UPG_P = .5, GEM_KRW = 1e10, GEM_GOLD = 20000, SPD_COST = { 2: 1e23, 3: 1e25 }, GEM_DROP = .1;
 const enemyTier = st => Math.min(7, 1 + Math.floor((st - 1) / 5));
 const stageMul = st => st <= 35 ? 1 + .08 * ((st - 1) % 5) : 1.32 + .06 * (st - 35);
 
@@ -1345,7 +1345,7 @@ export function openWar(br) {
   }
   function swapSheet() {
     const bal = +br.getBal() || 0, maxN = Math.max(0, Math.min(ST.gem, Math.floor(bal / GEM_KRW)));
-    const html = '<h4>💎 젬 스왑</h4><p>적을 처치할 때 10% 확률로 떨어지는 젬과 원화를 함께 써서 골드로 바꿉니다.<br><b style="color:#ffd65a">1 젬 + ' + fmtW(GEM_KRW) + '원 = ' + GEM_GOLD + ' 골드</b></p>'
+    const html = '<h4>💎 젬 스왑</h4><p>적을 처치할 때 10% 확률로 떨어지는 젬과 원화를 함께 써서 골드로 바꿉니다.<br><b style="color:#ffd65a">1 젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드</b></p>'
       + '<div class="wkv"><span>보유 젬</span><b>' + ST.gem.toLocaleString('ko-KR') + ' 개</b><span>보유 원화</span><b>' + fmtW(bal) + '원</b><span>보유 골드</span><b>' + fK(ST.g) + '</b></div>'
       + '<div class="wnum"><button data-s="m1">1</button><input id="wsn" inputmode="numeric" value="' + (maxN ? 1 : 0) + '"><button data-s="m10">10</button><button data-s="mx">MAX</button></div><div class="wkv" id="wsq"></div>'
       + '<div class="row"><button data-s="x">닫기</button><button class="go" data-s="go" id="wsgo">스왑</button></div>';
@@ -1372,7 +1372,7 @@ export function openWar(br) {
     });
   }
   function helpSheet() {
-    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = 100골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 7성. 성공하면 병사와 포탑이 진화합니다.</li><li>적 기지를 부수면 다음 스테이지, 내 기지가 무너지면 이전 스테이지로 후퇴합니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다.</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
+    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 7성. 성공하면 병사와 포탑이 진화합니다.</li><li>적 기지를 부수면 다음 스테이지, 내 기지가 무너지면 이전 스테이지로 후퇴합니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다.</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
   }
   function resultSheet() {
     const win = B.over === 'win';
