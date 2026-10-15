@@ -477,6 +477,7 @@ nav.bt{grid-template-columns:repeat(6,1fr)}
 .chgv{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .chgb{width:100%;height:64px;border:0;border-radius:16px;background:var(--acc,#3b5bff);color:#fff;font-size:18px;font-weight:800;cursor:pointer;transition:transform .08s}
 .chgb:active{transform:scale(.97)}
+.chgb:disabled{background:var(--soft);color:var(--mut,#888);cursor:not-allowed;font-size:15px}
 .chgs{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
 .chgs div{background:var(--soft);border-radius:12px;padding:10px}
 .chgs b{display:block;font-size:16px;font-variant-numeric:tabular-nums}
@@ -2301,16 +2302,27 @@ document.addEventListener('keydown',function(){SFX.unlock()});
 
 </script>
 <script>
-var CHG_U=10000;
-function chgR(){var r=document.getElementById('chgroot');if(!r)return;var u=(window.used=window.used||{});var n=+u.chgN||0;
-r.innerHTML='<div class="chg"><div class="chgc"><div class="chgl">보유 원화</div><div class="chgv" id="chgbal">'+Math.round(+bal||0).toLocaleString('ko-KR')+'원</div></div>'
-+'<button class="chgb" onclick="chgDo()">+10,000원 충전하기</button>'
-+'<div class="chgc"><div class="chgs"><div><span class="chgl">충전 횟수</span><b id="chgn">'+n.toLocaleString('ko-KR')+'회</b></div><div><span class="chgl">누적 충전</span><b id="chgt">'+(n*CHG_U).toLocaleString('ko-KR')+'원</b></div></div>'
-+'<div class="chgn">누를 때마다 가상 원화 10,000원이 바로 지급됩니다.<br>실제 결제가 아니며 현금 가치가 없는 게임 머니입니다.</div></div></div>'}
-function chgDo(){var now=Date.now();if(chgDo.t&&now-chgDo.t<150)return;chgDo.t=now;bal=Math.round((+bal||0)+CHG_U);
-try{var u=(window.used=window.used||{});u.chgN=(+u.chgN||0)+1}catch(e){}
-if(typeof bwUpd==='function')bwUpd();var e=document.getElementById('chgbal');if(e)e.textContent=Math.round(bal).toLocaleString('ko-KR')+'원';
-var n=+((window.used||{}).chgN)||0,a=document.getElementById('chgn'),b=document.getElementById('chgt');if(a)a.textContent=n.toLocaleString('ko-KR')+'회';if(b)b.textContent=(n*CHG_U).toLocaleString('ko-KR')+'원';
-toast('10,000원 충전 완료')}
+var CHG_U=10000,CHG_MAX=500,CHG_WIN=3600000;
+function chgU(){return (window.used=window.used||{})}
+function chgSt(){var u=chgU(),now=Date.now(),w=+u.chgW||0;if(!w||now-w>=CHG_WIN||w>now+60000){return{c:0,left:CHG_MAX,reset:0}}var c=+u.chgC||0;return{c:c,left:Math.max(0,CHG_MAX-c),reset:w+CHG_WIN-now}}
+function chgMS(ms){var t=Math.ceil(ms/1000),m=Math.floor(t/60),x=t%60;return m+'분 '+(x<10?'0':'')+x+'초'}
+function chgR(){var r=document.getElementById('chgroot');if(!r)return;
+r.innerHTML='<div class="chg"><div class="chgc"><div class="chgl">보유 원화</div><div class="chgv" id="chgbal"></div></div>'
++'<button class="chgb" id="chgbtn" onclick="chgDo()">+10,000원 충전하기</button>'
++'<div class="chgc"><div class="chgs"><div><span class="chgl">이번 1시간 남은 횟수</span><b id="chgl"></b></div><div><span class="chgl">초기화까지</span><b id="chgr"></b></div><div><span class="chgl">총 충전 횟수</span><b id="chgn"></b></div><div><span class="chgl">누적 충전</span><b id="chgt"></b></div></div>'
++'<div class="chgn">누를 때마다 가상 원화 10,000원이 지급됩니다. 1시간에 최대 '+CHG_MAX+'번(500만 원)까지 충전할 수 있고, 첫 충전 시점부터 1시간이 지나면 다시 채워집니다.<br>실제 결제가 아니며 현금 가치가 없는 게임 머니입니다.</div></div></div>';chgUpd()}
+function chgUpd(){var e=document.getElementById('chgbal');if(!e)return;var st=chgSt(),n=+chgU().chgN||0;
+e.textContent=Math.round(+bal||0).toLocaleString('ko-KR')+'원';
+document.getElementById('chgl').textContent=st.left+' / '+CHG_MAX+'회';
+document.getElementById('chgr').textContent=st.reset>0?chgMS(st.reset):'-';
+document.getElementById('chgn').textContent=n.toLocaleString('ko-KR')+'회';
+document.getElementById('chgt').textContent=(n*CHG_U).toLocaleString('ko-KR')+'원';
+var bt=document.getElementById('chgbtn');bt.disabled=st.left<=0;bt.textContent=st.left>0?'+10,000원 충전하기':'충전 한도 도달 · '+chgMS(st.reset)+' 후 가능'}
+function chgDo(){var now=Date.now();if(chgDo.t&&now-chgDo.t<150)return;chgDo.t=now;var u=chgU(),st=chgSt();
+if(st.left<=0){toast('1시간 충전 한도('+CHG_MAX+'회)에 도달했어요. '+chgMS(st.reset)+' 후 다시 충전할 수 있어요');chgUpd();return}
+if(st.c===0){u.chgW=now;u.chgC=0}u.chgC=(+u.chgC||0)+1;u.chgN=(+u.chgN||0)+1;
+bal=Math.round((+bal||0)+CHG_U);if(typeof bwUpd==='function')bwUpd();chgUpd();
+toast('10,000원 충전 완료 · 남은 '+(CHG_MAX-u.chgC)+'회')}
+setInterval(function(){if(typeof cvw!=='undefined'&&cvw==='chg')chgUpd()},1000);
 window.rv_chg=chgR;
 </script></body></html>
