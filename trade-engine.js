@@ -60,8 +60,8 @@ const mkOf = (marks, p) => (marks && marks[p.s] > 0 ? marks[p.s] : p.ep);
 export const upnl = (p, mk) => p.side * p.q * (mk - p.ep);
 export const initMargin = (p, px) => p.q * (px == null ? p.ep : px) / p.lev;
 export function mmOf(p, mk) { const N = p.q * mk, b = bracket(p.s, N); return Math.max(0, N * b.mmr - b.cum); }
-/** Binance ROI% = UPNL / (Q × mark × IMR) */
-export const roe = (p, mk) => upnl(p, mk) / initMargin(p, mk) * 100;
+/** ROE% = UPNL / 진입 시드(Q × 평단 / 레버리지)  →  가격 변동률 × 레버리지 */
+export const roe = (p, mk) => upnl(p, mk) / initMargin(p) * 100;
 
 /** cross wallet balance = free USDT + margin booked to cross positions (margin is not spent in cross mode) */
 export function crossWB(S, bal) { let w = bal; for (const k in S.pos) { const p = S.pos[k]; if (p.mode === 'cross') w += p.m; } return w; }

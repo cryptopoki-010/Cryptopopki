@@ -234,8 +234,9 @@ class Trade {
     const lev = this.curLev(), mode = this.curMode();
     const ot = '<div class="trseg sm"><button data-a="ot" data-v="mkt" aria-pressed="' + (U.ot === 'mkt') + '">시장가</button><button data-a="ot" data-v="lmt" aria-pressed="' + (U.ot === 'lmt') + '">지정가</button></div>';
     const price = '<label class="trin' + (U.ot === 'lmt' ? '' : ' off') + '"><span>가격</span><input id="oprice" inputmode="decimal" autocomplete="off" placeholder="' + (U.ot === 'lmt' ? '지정가' : '시장가로 즉시 체결') + '"' + (U.ot === 'lmt' ? '' : ' disabled') + '><em>USDT</em>' + (U.ot === 'lmt' ? '<button data-a="last">현재가</button>' : '') + '</label>';
-    const units = U.mk === 'fut' ? [['coin', s], ['usdt', '주문금액'], ['mar', '증거금']] : [['coin', s], ['usdt', 'USDT']];
-    if (!units.some(u => u[0] === U.unit)) U.unit = 'coin';
+    const units = U.mk === 'fut' ? [['mar', '시드(증거금)'], ['usdt', '주문금액'], ['coin', s]] : [['coin', s], ['usdt', 'USDT']];
+    if (U.mk === 'fut' && !U.seedv) { U.seedv = 1; U.unit = 'mar'; this.saveU(); }
+    if (!units.some(u => u[0] === U.unit)) U.unit = U.mk === 'fut' ? 'mar' : 'coin';
     const size = '<label class="trin"><span>' + (U.mk === 'spot' ? '수량' : '수량') + '</span><input id="oqty" inputmode="decimal" autocomplete="off" placeholder="0"><div class="trunit">' + units.map(u => '<button data-a="unit" data-v="' + u[0] + '" aria-pressed="' + (U.unit === u[0]) + '">' + u[1] + '</button>').join('') + '</div></label>';
     const pcts = '<div class="trpct">' + [10, 25, 50, 75, 100].map(v => '<button data-a="pct" data-v="' + v + '">' + v + '%</button>').join('') + '</div>';
     if (U.mk === 'fut') {
@@ -321,7 +322,8 @@ class Trade {
     const mk = prices[p.s] || p.ep, u = E.upnl(p, mk), r = E.roe(p, mk), L = E.liqPrice(p, this.S, bal, prices).lp, mr = E.marginRatio(p, this.S, bal, prices), d = dec(p.ep), s = p.s.replace(/USDT$/, '');
     const dist = L > 0 ? (L - p.ep) / p.ep * 100 : null, distMk = L > 0 ? (L - mk) / mk * 100 : null;
     return '<div class="trpos"><div class="trph"><b>' + p.s + '</b><span class="tag ' + (p.side > 0 ? 'up' : 'dn') + '">' + (p.side > 0 ? '롱' : '숏') + ' ' + p.lev + 'x</span><span class="tag">' + (p.mode === 'cross' ? '교차' : '격리') + '</span><button class="trlink" data-a="fx" data-v="' + p.s + '">청산가 계산식</button></div>'
-      + '<div class="trpnl"><div><small>미실현 손익 (USDT)</small><b class="' + (u >= 0 ? 'up' : 'dn') + '">' + sgn(u) + '</b></div><div><small>ROE</small><b class="' + (u >= 0 ? 'up' : 'dn') + '">' + pct(r) + '</b></div></div>'
+      + '<div class="trpnl"><div><small>미실현 손익 (USDT)</small><b class="' + (u >= 0 ? 'up' : 'dn') + '">' + sgn(u) + '</b></div><div><small>ROE (시드 대비)</small><b class="' + (u >= 0 ? 'up' : 'dn') + '">' + pct(r) + '</b></div></div>'
+      + '<div class="trseed">진입 시드 <b>' + fU(E.initMargin(p)) + ' USDT</b> · 가격 ' + pct((mk - p.ep) / p.ep * 100) + ' · ' + (p.side > 0 ? '롱' : '숏') + ' ' + p.lev + '배 → ' + pct(r) + '</div>'
       + '<div class="kv g3"><span>수량 (' + s + ')<b>' + fN(p.q, qdec(mk)) + '</b><i>≈ ' + fU(p.q * mk) + ' USDT</i></span><span>평단가<b>' + fN(p.ep, d) + '</b></span><span>마크 가격<b>' + fN(mk, d) + '</b></span>'
       + '<span>청산가<b class="liq">' + (L > 0 ? fN(L, d) : '없음') + '</b>' + (L > 0 ? '<i>평단 대비 ' + pct(dist) + ' · 마크 대비 ' + pct(distMk) + '</i>' : '') + '</span><span>증거금<b>' + fU(p.m) + '</b><i>' + (p.mode === 'cross' ? '교차 · 지갑 공유' : '격리') + '</i></span><span>마진율<b class="' + (mr > .8 ? 'dn' : '') + '">' + (isFinite(mr) ? (mr * 100).toFixed(2) + '%' : '-') + '</b></span></div>'
       + '<div class="trtp">' + (p.tp ? '<span class="up">TP ' + fN(p.tp.px, d) + ' · ' + Math.round(p.tp.r * 100) + '%</span>' : '<span>TP 없음</span>') + (p.sl ? '<span class="dn">SL ' + fN(p.sl.px, d) + ' · ' + Math.round(p.sl.r * 100) + '%</span>' : '<span>SL 없음</span>') + (p.rp ? '<span>실현 ' + sgn(p.rp) + '</span>' : '') + (p.fund ? '<span>펀딩 ' + sgn(p.fund) + '</span>' : '') + '</div>'
@@ -624,6 +626,7 @@ const CSS = `
 .trin input[type=range]{text-align:left}
 .trin em{flex:none;font-style:normal;font-size:12px;color:var(--mute);padding-right:6px}
 .trin>button{flex:none;height:30px;padding:0 9px;border:0;border-radius:7px;background:var(--soft);font-size:12px;font-weight:600}
+.trseed{font-size:11.5px;color:var(--mute);margin:-2px 0 8px}.trseed b{color:var(--ink)}
 .trunit{flex:none;display:flex;background:var(--soft);border-radius:7px;padding:2px}
 .trunit button{border:0;background:none;height:28px;padding:0 7px;border-radius:6px;font-size:11.5px;font-weight:600;color:var(--mute)}
 .trunit button[aria-pressed=true]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
