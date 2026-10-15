@@ -146,17 +146,17 @@ function buildTextures(){
 
 // ===== 층 데이터 + 레벨 생성 (사무실 모듈: 방 + 복도 + 문 + 가구) =====
 const FLOORS=[
-  {id:0,name:'프롤로그',sub:'멈춰 선 엘리베이터',size:33,rooms:4,monsters:[],coins:3,bats:0,items:0,key:null,lamps:.9,walls:[0],shop:false,tint:[1,1,1],
+  {id:0,wh:1.5,name:'프롤로그',sub:'멈춰 선 엘리베이터',size:33,rooms:4,monsters:[],coins:3,bats:0,items:0,key:null,lamps:.9,walls:[0],shop:false,tint:[1,1,1],
    obj:'엘리베이터를 빠져나가 비상구를 찾으세요'},
-  {id:1,name:'1층',sub:'버려진 오피스',size:58,rooms:15,monsters:['after'],coins:18,bats:4,items:3,key:null,lamps:.65,walls:[0,1],shop:true,tint:[1,1,1],
+  {id:1,wh:1.5,name:'1층',sub:'버려진 오피스',size:58,rooms:15,monsters:['after'],coins:18,bats:4,items:3,key:null,lamps:.65,walls:[0,1],shop:true,tint:[1,1,1],
    obj:'비상구를 찾으세요 (초록 표지)'},
-  {id:2,name:'2층',sub:'뒤틀린 오피스',size:66,rooms:18,monsters:['after','patient'],coins:20,bats:4,items:3,key:{n:'열쇠',ic:'🔑',t:'key'},lamps:.5,walls:[0,1,2],shop:true,tint:[1,1,.95],
+  {id:2,wh:1.6,name:'2층',sub:'뒤틀린 오피스',size:66,rooms:18,monsters:['after','patient'],coins:20,bats:4,items:3,key:{n:'열쇠',ic:'🔑',t:'key'},lamps:.5,walls:[0,1,2],shop:true,tint:[1,1,.95],
    obj:'열쇠를 찾아 비상구를 여세요'},
-  {id:3,name:'3층',sub:'침수 병원',size:74,rooms:21,monsters:['after','patient','faceless'],coins:22,bats:5,items:4,key:{n:'퓨즈',ic:'🔌',t:'fuse'},lamps:.45,walls:[3,1,3],shop:true,tint:[.8,1,1.1],
+  {id:3,wh:1.7,name:'3층',sub:'침수 병원',size:74,rooms:21,monsters:['after','patient','faceless'],coins:22,bats:5,items:4,key:{n:'퓨즈',ic:'🔌',t:'fuse'},lamps:.45,walls:[3,1,3],shop:true,tint:[.8,1,1.1],
    obj:'차단기 퓨즈를 찾아 비상구 전원을 복구하세요',rmax:10},
-  {id:4,name:'4층',sub:'뒤틀린 복도',size:82,rooms:24,monsters:['patient','faceless','after','patient'],coins:24,bats:5,items:4,key:{n:'카드키',ic:'💳',t:'card'},lamps:.4,walls:[2,1,0],shop:true,tint:[.9,1.05,.85],
+  {id:4,wh:1.8,name:'4층',sub:'뒤틀린 복도',size:82,rooms:24,monsters:['patient','faceless','after','patient'],coins:24,bats:5,items:4,key:{n:'카드키',ic:'💳',t:'card'},lamps:.4,walls:[2,1,0],shop:true,tint:[.9,1.05,.85],
    obj:'카드키를 찾아 비상구를 여세요 (뒤를 조심)',rmax:10},
-  {id:5,name:'5층',sub:'붉은 나락',size:90,rooms:27,monsters:['void','faceless','patient','after'],coins:26,bats:6,items:5,key:{n:'마스터 키',ic:'🗝️',t:'key'},lamps:.35,walls:[4,1,4],shop:true,tint:[1.25,.75,.75],
+  {id:5,wh:2.0,name:'5층',sub:'붉은 나락',size:90,rooms:27,monsters:['void','faceless','patient','after'],coins:26,bats:6,items:5,key:{n:'마스터 키',ic:'🗝️',t:'key'},lamps:.35,walls:[4,1,4],shop:true,tint:[1.25,.75,.75],
    obj:'마스터 키를 찾아 탈출하세요 — 키를 줍는 순간 무언가 깨어난다',rmax:11,final:true},
 ];
 // 스프라이트 정의: 텍스처, 월드 폭/높이(타일), 지면에서 띄움
@@ -355,7 +355,7 @@ function loadFloor(i,retry){
 const MT={
   after:{name:'걸어 다니는 잔상',sp:[1.35,2.95],sight:7,fov:105,hear:1.0,tex:'after',w:.62,h:1.0,lost:4.5},
   faceless:{name:'얼굴 없는 추격자',sp:[1.5,3.3],sight:8.5,fov:120,hear:.7,tex:'faceless',w:.5,h:1.0,lost:5,silent:true,look:true},
-  void:{name:'공허',sp:[2.1,3.45],sight:11,fov:360,hear:1.5,tex:'void',w:.85,h:1.15,lost:10,beep:true},
+  void:{name:'공허',sp:[.55,.95],sight:11,fov:360,hear:1.5,tex:'void',w:.85,h:1.15,lost:10,beep:true},
   patient:{name:'기어오는 환자',sp:[1.15,3.75],sight:9,fov:160,hear:.8,tex:'patient',w:.95,h:.55,lost:5.5},
 };
 // ---- 괴물 AI ----
@@ -640,42 +640,31 @@ function render(){
   const flareR=9;
   const TW=TEX.wall,TF=TEX.floor,TC=TEX.ceil,TL=TEX.lamp;
   const fk=G.fk;
-  // ---- 바닥/천장 ----
-  const yMax=Math.max(H-1,2*hz);
-  for(let y=hz+1;y<=yMax;y++){
-    const p=y-hz,rd=.5*VK/p;if(rd>22)continue;
-    let fxw=px+rd*(dx-plx),fyw=py+rd*(dy-ply);const sx=rd*2*plx/W,sy=rd*2*ply/W;
-    const yc=2*hz-y,doF=y<H,doC=yc>=0&&yc<H;if(!doF&&!doC)continue;
-    const by2f=((y-hz)*iRY)**2;
-    const fogK=Math.max(0,1-rd/20);
-    for(let x=0;x<W;x++,fxw+=sx,fyw+=sy){
-      const cxl=Math.floor(fxw),cyl=Math.floor(fyw);
-      if(cxl<0||cyl<0||cxl>=N||cyl>=N)continue;
-      const ci=cyl*N+cxl,u=((fxw-cxl)*TS)&63,v=((fyw-cyl)*TS)&63,ti=(v*TS+u)*4;
-      lightAt(fxw,fyw);
-      let lr=AMB0+LC[0],lg=AMB1+LC[1],lb=AMB2+LC[2];
-      const dE=rd*RL[x];
-      if(fStr>0){const f=1-BX2[x]-by2f;if(f>0){const t=1-dE/fRange;if(t>0){const b=f*t*t*1.5*fStr;lr+=b;lg+=b*.96;lb+=b*.82}}}
-      if(flr>0){const t=1-dE/flareR;if(t>0){const b=t*t*1.4*flr;lr+=b;lg+=b*.75;lb+=b*.5}}
-      if(doF){
-        const T=TF[L.corr[ci]?1:0].d,o=(y*W+x)*4;
-        BUF[o]=T[ti]*lr*fogK;BUF[o+1]=T[ti+1]*lg*fogK;BUF[o+2]=T[ti+2]*lb*fogK;
-      }
-      if(doC){
-        const o=(yc*W+x)*4,lc=L.lampCell[ci];
-        if(lc>=0&&u>14&&u<50&&v>14&&v<50){
-          const k=lc===0?.18:lc===2?Math.min(1.2,fk):1,T=TL.d;
-          BUF[o]=T[ti]*k*(lc===0?.5:1);BUF[o+1]=T[ti+1]*k*(lc===0?.5:1);BUF[o+2]=T[ti+2]*k*(lc===0?.5:1);
-        }else{
-          const T=TC.d,by2c=((yc-hz)*iRY)**2;let cr=lr,cg=lg,cb=lb;
-          if(fStr>0){const f=1-BX2[x]-by2c;if(f>0){const t=1-dE/fRange;if(t>0){const b=f*t*t*1.5*fStr;const bf=b*.6-b;cr+=bf;cg+=bf*.96;cb+=bf*.82}}}
-          BUF[o]=T[ti]*cr*fogK*.85;BUF[o+1]=T[ti+1]*cg*fogK*.85;BUF[o+2]=T[ti+2]*cb*fogK*.85;
-        }
+  // ---- 바닥/천장 (층고 WH) ----
+  const EYE=.5,WH=L.cfg.wh||1.6,CH=WH-EYE;
+  for(let pass=0;pass<2;pass++){
+    const isF=pass===0,hgt=isF?EYE:CH;
+    for(let y=isF?hz+1:hz-1;isF?y<H:y>=0;isF?y++:y--){
+      if(y<0||y>=H)continue;
+      const p=isF?y-hz:hz-y,rd=hgt*VK/p;if(rd>24)continue;
+      let fxw=px+rd*(dx-plx),fyw=py+rd*(dy-ply);const sx=rd*2*plx/W,sy=rd*2*ply/W;
+      const by2=((y-hz)*iRY)**2,fogK=Math.max(0,1-rd/20),rowO=y*W*4;
+      for(let x=0;x<W;x++,fxw+=sx,fyw+=sy){
+        const cxl=Math.floor(fxw),cyl=Math.floor(fyw);
+        if(cxl<0||cyl<0||cxl>=N||cyl>=N)continue;
+        const ci=cyl*N+cxl,u=((fxw-cxl)*TS)&63,v=((fyw-cyl)*TS)&63,ti=(v*TS+u)*4,o=rowO+x*4;
+        const dE=rd*RL[x];
+        if(!isF){const lc=L.lampCell[ci];
+          if(lc>=0&&u>14&&u<50&&v>14&&v<50){const k=(lc===0?.09:lc===2?Math.min(1.2,fk):1),T=TL.d;BUF[o]=T[ti]*k;BUF[o+1]=T[ti+1]*k;BUF[o+2]=T[ti+2]*k;continue}}
+        lightAt(fxw,fyw);
+        let lr=AMB0+LC[0],lg=AMB1+LC[1],lb=AMB2+LC[2];
+        if(fStr>0){const f=1-BX2[x]-by2;if(f>0){const t=1-dE/fRange;if(t>0){const b=f*t*t*1.5*fStr*(isF?1:.6);lr+=b;lg+=b*.96;lb+=b*.82}}}
+        if(flr>0){const t=1-dE/flareR;if(t>0){const b=t*t*1.4*flr;lr+=b;lg+=b*.75;lb+=b*.5}}
+        const T=isF?TF[L.corr[ci]?1:0].d:TC.d,k=fogK*(isF?1:.85);
+        BUF[o]=T[ti]*lr*k;BUF[o+1]=T[ti+1]*lg*k;BUF[o+2]=T[ti+2]*lb*k;
       }
     }
   }
-  // 수평선 위 천장 쪽에서 floor row가 없는 윗부분(pitch가 아래일 때) 보정: 위쪽 남은 줄은 어둡게
-  for(let y=0;y<Math.min(H,Math.max(0,2*hz-yMax));y++){const o=y*W*4;for(let x=0;x<W*4;x+=4){BUF[o+x]=4;BUF[o+x+1]=4;BUF[o+x+2]=6}}
   // 수평선 한 줄
   if(hz>=0&&hz<H){const o=hz*W*4;for(let x=0;x<W*4;x+=4){BUF[o+x]=6;BUF[o+x+1]=6;BUF[o+x+2]=8}}
   // ---- 벽 ----
@@ -700,7 +689,7 @@ function render(){
     perp=side===0?sdx-ddx:sdy-ddy;if(perp<.05)perp=.05;
     wx=side===0?py+perp*rdy:px+perp*rdx;wx-=Math.floor(wx);
     ZB[x]=perp;
-    const lh=VK/perp,top=hz-lh*.5,y0=Math.max(0,Math.ceil(top)),y1=Math.min(H-1,Math.floor(hz+lh*.5));
+    const lh=VK/perp,top=hz-CH*lh,y0=Math.max(0,Math.ceil(top)),y1=Math.min(H-1,Math.floor(hz+EYE*lh)),lhW=lh*WH;
     let tx=Math.floor((wx-(doorOff>0?doorOff:0))*TS);
     if(tid===1||tid===4){tx=Math.floor(wx*TS)}
     if(tx<0)tx=0;if(tx>63)tx=63;
@@ -716,7 +705,7 @@ function render(){
     let colF=0;if(flr>0){const t=1-dE/flareR;if(t>0)colF=t*t*1.4*flr}
     const bx2=BX2[x],em=tid===4;
     for(let y=y0;y<=y1;y++){
-      let ty=Math.floor((y-top)*TS/lh);if(ty<0)ty=0;else if(ty>63)ty=63;
+      let ty=Math.floor((y-top)*TS/lhW);if(ty<0)ty=0;else if(ty>63)ty=63;
       const ti=(ty*TS+tx)*4;let lr=lr0,lg=lg0,lb=lb0;
       if(colB>0){const f=1-bx2-((y-hz)*iRY)**2;if(f>0){const b=f*colB;lr+=b*sd;lg+=b*.96*sd;lb+=b*.82*sd}}
       if(colF>0){lr+=colF*sd;lg+=colF*.75*sd;lb+=colF*.5*sd}
@@ -755,7 +744,7 @@ function render(){
         let u=ax===0?(hyw-(cyw-hy))/(2*hy):(hxw-(cxw-hx))/(2*hx);
         if((ax===0&&rdx>0)||(ax===1&&rdy<0))u=1-u;
         const tu=Math.min(tw-1,Math.max(0,Math.floor(u*tw)));
-        const lh=VK/t0,yb=hz+lh*.5,yt=hz+lh*(.5-bh),hgt=yb-yt;
+        const lh=VK/t0,yb=hz+lh*EYE,yt=hz+lh*(EYE-bh),hgt=yb-yt;
         lightAt(hxw-(ax===0?Math.sign(rdx):0)*.25,hyw-(ax===1?Math.sign(rdy):0)*.25);
         const sdb=ax?.75:1;
         let lr=(AMB0+LC[0])*sdb,lg=(AMB1+LC[1])*sdb,lb=(AMB2+LC[2])*sdb;
