@@ -738,7 +738,8 @@ export function openRR(br) {
         await Promise.race([net.createRoom(doc), new Promise((_, rj) => setTimeout(() => rj({ code: 'timeout' }), 10000))]); roomId = id; isHost = true; enterRoom(); } catch (e) { console.error(e); const c = (e && e.code) || (e && e.message) || 'error', rm = $('rm'); if (!rm) return;
         if (c === 'permission-denied' || c === 'timeout') { rm.innerHTML = (c === 'timeout' ? '서버 연결이 지연되어 방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' : '방을 만들 수 없습니다: Firebase 규칙에 rooms 권한이 없습니다.') + '<br><small>(오류 코드: ' + c + ' · 연결 방식: ' + (window.__fsmode || '기본(이전 index.html)') + (c === 'timeout' ? ' — 연결 방식이 기본이면 index.html을 새로 배포하고 새로고침해 주세요' : ' — Firebase 규칙에 아래 블록을 추가하고 게시해 주세요') + ')</small><br><button class="rrbtn" id="rcp" style="margin-top:6px;padding:6px 10px;font-size:12px">규칙 블록 복사</button>'; const cb = $('rcp'); if (cb) cb.onclick = () => { try { navigator.clipboard.writeText(RULES_TX); cb.textContent = '복사됨 ✓' } catch (x) { cb.textContent = '복사 실패' } } }
         else rm.textContent = '방을 만들지 못했습니다 (' + c + ') — 네트워크를 확인해 주세요';
-        const rc = $('rc'); if (rc) rc.disabled = false; }
+        const rc = $('rc'); if (rc) rc.disabled = false;
+        if (c === 'timeout' && net.diag) net.diag().then(o => { const m = $('rm'); if (m) { const d = document.createElement('div'); d.style.cssText = 'font-size:11px;margin-top:6px;word-break:break-all;color:#ffd9a0'; d.textContent = '진단: ' + JSON.stringify(o); m.appendChild(d); } }).catch(() => { }); }
     };
   }
   function drawJoin(pane) {
