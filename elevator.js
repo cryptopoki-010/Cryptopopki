@@ -1,7 +1,7 @@
 /* 엘리베이터 런 (Elevator Run) — 1인칭 공포 탈출. 의존성 없는 캔버스 레이캐스터.
    index.html 에서 import('./elevator.js').then(m=>m.openElevator({toast,onClose})) */
 const CSS = "#elv{position:fixed;inset:0;z-index:9500;background:#030406;color:#cfd8d0;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;font-family:'Noto Sans KR',system-ui,sans-serif;overflow:hidden;--ink:#cfd8d0;--dim:#8a968e;--red:#d83a3a;--yel:#e8c040;--grn:#16e07a;--panel:#0d1216e6;--line:#2a3a3a}\n#elv *{box-sizing:border-box}\n#elv canvas{position:absolute;inset:0;width:100%;height:100%;display:block;background:#000;image-rendering:auto}\n#elv [hidden]{display:none!important}\n#elv #vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 45%,#000b 100%)}\n#elv #hurt{position:absolute;inset:0;pointer-events:none;opacity:0;background:radial-gradient(ellipse at center,transparent 25%,#c00a 100%)}\n#elv #flash{position:absolute;inset:0;pointer-events:none;opacity:0;background:#fff}\n#elv .warn{position:absolute;top:0;bottom:0;width:22%;pointer-events:none;opacity:0}\n#elv #wL{left:0;background:linear-gradient(90deg,#e22c,transparent)}\n#elv #wR{right:0;background:linear-gradient(-90deg,#e22c,transparent)}\n#elv #hidev{position:absolute;inset:0;pointer-events:none;display:none}\n#elv #hidev.on{display:block}\n#elv #hidev i{position:absolute;left:0;right:0;background:#000}\n#elv #hidev i:first-child{top:0;height:38%}#elv #hidev i:last-child{bottom:0;height:38%}\n#elv #hud{position:absolute;inset:0;pointer-events:none}\n#elv #hud button{pointer-events:auto}\n#elv #top{position:absolute;left:max(12px,env(safe-area-inset-left,0px));top:max(10px,env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:4px;text-shadow:0 1px 3px #000}\n#elv #obj{font-size:13px;font-weight:700;color:var(--yel);max-width:46vw}\n#elv #res{display:flex;gap:10px;font-size:14px;font-weight:700}\n#elv #bPause{position:absolute;right:max(12px,env(safe-area-inset-right,0px));top:max(10px,env(safe-area-inset-top,0px));width:44px;height:44px;border-radius:12px;background:#0009;border:1px solid var(--line);color:var(--ink);font-size:18px}\n#elv #comp{position:absolute;right:max(64px,calc(env(safe-area-inset-right,0px) + 58px));top:max(10px,env(safe-area-inset-top,0px));height:44px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:12px;background:#0009;border:1px solid var(--line);font-size:12px}\n#elv #comp b{display:inline-block;font-size:22px;color:var(--grn);transition:transform .08s}\n#elv #msg{position:absolute;left:50%;top:22%;transform:translateX(-50%);max-width:80%;text-align:center;font-size:15px;font-weight:700;text-shadow:0 2px 6px #000;opacity:0;transition:opacity .25s;pointer-events:none}\n#elv #prompt{position:absolute;left:50%;top:58%;transform:translateX(-50%);padding:6px 14px;border-radius:99px;background:#000a;border:1px solid var(--yel);color:var(--yel);font-size:14px;font-weight:700;pointer-events:none;white-space:nowrap}\n#elv #cross{position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:#fff6}\n#elv #bars{position:absolute;left:50%;bottom:max(12px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;width:min(34vw,200px)}\n#elv .bar{position:relative;height:12px;border-radius:6px;background:#000a;border:1px solid var(--line);overflow:hidden}\n#elv .bar i{position:absolute;inset:0;transform-origin:left;background:linear-gradient(90deg,#2a9d6a,#6ae0a0);transform:scaleX(1)}\n#elv .bt i{background:linear-gradient(90deg,#c8a020,#f0d060)}\n#elv .bar span{position:absolute;inset:0;text-align:center;font-size:9px;line-height:12px;color:#fffc;letter-spacing:.06em}\n#elv #slots{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(max(12px,env(safe-area-inset-bottom,0px)) + 66px);display:flex;gap:6px}\n#elv #slots button{width:48px;height:48px;border-radius:12px;background:#000c;border:1px solid var(--line);color:var(--ink);font-size:22px;padding:0;position:relative}\n#elv #slots button small{position:absolute;left:3px;top:1px;font-size:9px;color:var(--dim)}\n#elv #slots button.em{opacity:.35}\n#elv #ctl{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:max(12px,env(safe-area-inset-bottom,0px));display:flex;gap:8px;align-items:flex-end}\n#elv .rb{height:54px;min-width:54px;padding:0 12px;border-radius:14px;background:#000c;border:1px solid var(--line);color:var(--ink);font:700 13px 'Noto Sans KR',system-ui,sans-serif}\n#elv .rb.on{background:#2a5a3a;border-color:var(--grn)}\n#elv .rb.act{min-width:74px;height:64px;border-color:var(--yel);color:var(--yel)}\n#elv .rb.act.dis{opacity:.35;border-color:var(--line);color:var(--dim)}\n#elv #joy{position:absolute;left:max(24px,env(safe-area-inset-left,0px));bottom:max(24px,env(safe-area-inset-bottom,0px));width:120px;height:120px;border-radius:50%;border:2px solid #ffffff30;background:#ffffff0a;opacity:.55}\n#elv #knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px;border-radius:50%;background:#ffffff40;border:1px solid #fff6}\n#elv .ov{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-start;gap:14px;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));text-align:center;overflow:auto;background:#030406e8}\n#elv .ov.on{display:flex}\n#elv #qte{background:#0000;justify-content:flex-end;padding-bottom:max(18px,env(safe-area-inset-bottom,0px))}\n#elv #fade{background:#000;transition:opacity .5s}\n#elv h1,#elv h2{margin:0;font-weight:800;letter-spacing:.05em;text-wrap:balance}\n#elv h1{font-size:clamp(34px,10vw,58px);color:#e8f0e8;text-shadow:0 0 22px #16e07a55}\n#elv h1.red{color:var(--red);text-shadow:0 0 22px #d83a3a88}\n#elv h2{font-size:clamp(22px,6vw,30px)}\n#elv small{letter-spacing:.2em;color:var(--dim);font-size:11px}\n#elv p{margin:0;color:var(--dim);line-height:1.55;max-width:32em;font-size:14px}\n#elv .foot{font-size:12px;opacity:.7}\n#elv button{font:700 16px 'Noto Sans KR',system-ui,sans-serif;color:var(--ink);background:#141c20;border:1px solid var(--line);border-radius:12px;padding:0 22px;min-height:48px;min-width:48px;cursor:pointer;touch-action:manipulation}\n#elv button:active{background:#1e2c32}\n#elv button.pri{background:linear-gradient(#2a8a5a,#17503a);border-color:#4ad090;color:#fff;min-width:170px}\n#elv button.big{height:84px;width:min(86vw,360px);font-size:26px}\n#elv .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;max-width:360px;width:100%;text-align:left}\n#elv .card.q{text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;background:#000b}\n#elv .tip b{font-size:13px;color:var(--yel)}#elv .tip p{font-size:12px;margin:4px 0 8px}\n#elv .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}\n#elv .col{display:flex;flex-direction:column;gap:8px;width:min(92vw,360px)}\n#elv .col button{width:100%}\n#elv .stat{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;border-bottom:1px solid #ffffff10}#elv .stat b{color:var(--yel)}\n#elv .tog{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;font-size:14px}\n#elv .tog button{min-height:40px;padding:0 14px;font-size:14px;min-width:90px}\n#elv .qbar,#elv .qtime{width:min(86vw,360px);height:20px;border-radius:10px;background:#111;border:1px solid var(--line);overflow:hidden;position:relative}\n#elv .qtime{height:8px}\n#elv .qbar i,#elv .qtime i{position:absolute;inset:0;transform-origin:left;transform:scaleX(0)}\n#elv .qbar i{background:linear-gradient(90deg,#c8a020,#fff080)}\n#elv .qtime i{background:#d83a3a}\n#elv .tl{display:flex;flex-direction:column;gap:8px;align-items:center}\n#elv .xb{position:absolute;left:max(12px,env(safe-area-inset-left,0px));top:max(12px,env(safe-area-inset-top,0px))}\n#elv .fc{display:flex;flex-direction:column;gap:8px;align-items:center}\n#elv .shi{display:flex;align-items:center;gap:10px;text-align:left;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;width:100%}\n#elv .shi .t{flex:1;min-width:0}#elv .shi .t b{display:block;font-size:14px}#elv .shi .t span{font-size:11px;color:var(--dim)}\n#elv .shi button{min-height:40px;min-width:70px;padding:0 10px;font-size:14px}\n#elv .shi.no button{opacity:.4}\n#elv .ov::before{content:'';margin-top:auto}#elv .ov::after{content:'';margin-bottom:auto}\n#elv #qte{justify-content:flex-end}#elv #qte::before{margin-top:auto}\n@media (max-height:480px){#elv .ov{gap:8px}#elv h1{font-size:34px}#elv .tip p{margin:2px 0 4px}}\n@media (max-aspect-ratio:1/1){#elv #bars{bottom:calc(max(12px,env(safe-area-inset-bottom,0px)) + 80px);width:min(60vw,240px)}#elv #obj{max-width:60vw}#elv #slots{bottom:calc(max(12px,env(safe-area-inset-bottom,0px)) + 76px);right:max(12px,env(safe-area-inset-right,0px))}#elv #joy{bottom:max(24px,env(safe-area-inset-bottom,0px))}}\n";
-const BODY = "<canvas id=\"cv\"></canvas>\n<div id=\"vig\"></div><div id=\"hurt\"></div><div id=\"flash\"></div>\n<div id=\"wL\" class=\"warn\"></div><div id=\"wR\" class=\"warn\"></div>\n<div id=\"hidev\"><i></i><i></i></div>\n<div id=\"hud\" hidden>\n  <div id=\"top\">\n    <div id=\"obj\"></div>\n    <div id=\"res\"><span id=\"gold\">🪙 0</span><span id=\"keyi\" hidden>🔑</span></div>\n  </div>\n  <button id=\"bPause\" aria-label=\"일시정지\">II</button>\n  <div id=\"comp\" hidden><b id=\"compA\">➤</b><small id=\"compD\"></small></div>\n  <div id=\"msg\"></div>\n  <div id=\"prompt\" hidden></div>\n  <div id=\"cross\"></div>\n  <div id=\"bars\"><div class=\"bar\"><i id=\"stB\"></i><span>스태미나</span></div><div class=\"bar bt\"><i id=\"btB\"></i><span id=\"btT\">배터리</span></div></div>\n  <div id=\"slots\"></div>\n  <div id=\"ctl\">\n    <button id=\"bRun\" class=\"rb\">달리기</button>\n    <button id=\"bFl\" class=\"rb\">손전등</button>\n    <button id=\"bAct\" class=\"rb act\">상호작용</button>\n  </div>\n  <div id=\"joy\"><div id=\"knob\"></div></div>\n</div>\n<div id=\"qte\" class=\"ov\"><div class=\"card q\"><h2 id=\"qT\">문을 연다!</h2><div class=\"qbar\"><i id=\"qF\"></i></div><div class=\"qtime\"><i id=\"qTm\"></i></div><button id=\"bTap\" class=\"pri big\">연타!</button><button id=\"bQx\">물러나기</button><p>화면 아래 버튼을 빠르게 연타하세요 (키보드: 스페이스)</p></div></div>\n<div id=\"title\" class=\"ov on\">\n  <button class=\"xb\" id=\"bExit1\" aria-label=\"나가기\">←</button>\n  <div class=\"tl\"><small>FIRST-PERSON HORROR ESCAPE</small><h1>엘리베이터 런</h1><p>정전된 엘리베이터에서 눈을 떴다. 손전등 하나로 어두운 사무실 층을 지나 비상구를 찾아라.</p></div>\n  <div class=\"row\"><button class=\"pri\" id=\"bStart\">게임 시작</button><button id=\"bSet1\">설정</button></div>\n  <div class=\"card tip\"><b>🎧 이어폰을 권장합니다</b><p>괴물의 발소리 방향과 거리가 중요한 단서입니다. 소리를 끄면 화면 가장자리에 위험 표시가 나타납니다.</p><b>조작</b><p>왼쪽 화면: 이동 스틱 · 오른쪽 화면: 드래그로 시선<br>PC: WASD 이동 · 마우스 시선 · Shift 달리기 · F 손전등 · E 상호작용 · 1~4 아이템 · Esc 일시정지</p></div>\n  <p class=\"foot\">체험판 · 프롤로그 + 1~2층</p>\n</div>\n<div id=\"settings\" class=\"ov\">\n  <h2>설정</h2>\n  <div class=\"card\">\n    <div class=\"tog\"><span>소리</span><button id=\"sSound\"></button></div>\n    <div class=\"tog\"><span>시점 감도</span><div class=\"row\"><button id=\"sSensM\">−</button><b id=\"sSensV\"></b><button id=\"sSensP\">+</button></div></div>\n    <div class=\"tog\"><span>화질 (성능)</span><button id=\"sQual\"></button></div>\n    <div class=\"tog\"><span>QTE 난이도</span><button id=\"sQte\"></button></div>\n    <div class=\"tog\"><span>진동</span><button id=\"sHap\"></button></div>\n  </div>\n  <button class=\"pri\" id=\"bSetBack\">돌아가기</button>\n</div>\n<div id=\"pause\" class=\"ov\"><h2>일시정지</h2><div class=\"col\"><button class=\"pri\" id=\"bResume\">계속하기</button><button id=\"bSet2\">설정</button><button id=\"bRestart\">이 층 다시 시작</button><button id=\"bExit2\">사이트로 나가기</button></div></div>\n<div id=\"fade\" class=\"ov\"><div class=\"fc\"><small id=\"fSub\"></small><h1 id=\"fTitle\"></h1><p id=\"fObj\"></p></div></div>\n<div id=\"shop\" class=\"ov\"><h2>비상 상점</h2><p>다음 층으로 가기 전에 준비하세요.</p><div class=\"card\"><div class=\"stat\"><span>보유 코인</span><b id=\"shGold\"></b></div><div class=\"stat\"><span>가방</span><b id=\"shBag\"></b></div></div><div id=\"shList\" class=\"col\"></div><button class=\"pri\" id=\"bGo\">다음 층으로</button></div>\n<div id=\"over\" class=\"ov\"><h1 class=\"red\">잡혔습니다</h1><p id=\"ovT\"></p><div class=\"row\"><button class=\"pri\" id=\"bRetry\">다시 시도</button><button id=\"bExit3\">나가기</button></div></div>\n<div id=\"end\" class=\"ov\"><h2>체험판 클리어</h2><p>비상구 너머로 새어 들어오는 건 아침 햇살이 아니었다. 계단은 아직 한참 아래로 이어진다…</p><div class=\"card\" id=\"endStats\"></div><div class=\"row\"><button class=\"pri\" id=\"bAgain\">처음부터 다시</button><button id=\"bExit4\">나가기</button></div><p class=\"foot\">3층 이후(침수 병원 · 뒤틀린 복도 · 붉은 나락)는 개발 예정입니다.</p></div>\n";
+const BODY = "<canvas id=\"cv\"></canvas>\n<div id=\"vig\"></div><div id=\"hurt\"></div><div id=\"flash\"></div>\n<div id=\"wL\" class=\"warn\"></div><div id=\"wR\" class=\"warn\"></div>\n<div id=\"hidev\"><i></i><i></i></div>\n<div id=\"hud\" hidden>\n  <div id=\"top\">\n    <div id=\"obj\"></div>\n    <div id=\"res\"><span id=\"gold\">🪙 0</span><span id=\"keyi\" hidden>🔑</span></div>\n  </div>\n  <button id=\"bPause\" aria-label=\"일시정지\">II</button>\n  <div id=\"comp\" hidden><b id=\"compA\">➤</b><small id=\"compD\"></small></div>\n  <div id=\"msg\"></div>\n  <div id=\"prompt\" hidden></div>\n  <div id=\"cross\"></div>\n  <div id=\"bars\"><div class=\"bar\"><i id=\"stB\"></i><span>스태미나</span></div><div class=\"bar bt\"><i id=\"btB\"></i><span id=\"btT\">배터리</span></div></div>\n  <div id=\"slots\"></div>\n  <div id=\"ctl\">\n    <button id=\"bRun\" class=\"rb\">달리기</button>\n    <button id=\"bFl\" class=\"rb\">손전등</button>\n    <button id=\"bAct\" class=\"rb act\">상호작용</button>\n  </div>\n  <div id=\"joy\"><div id=\"knob\"></div></div>\n</div>\n<div id=\"qte\" class=\"ov\"><div class=\"card q\"><h2 id=\"qT\">문을 연다!</h2><div class=\"qbar\"><i id=\"qF\"></i></div><div class=\"qtime\"><i id=\"qTm\"></i></div><button id=\"bTap\" class=\"pri big\">연타!</button><button id=\"bQx\">물러나기</button><p>화면 아래 버튼을 빠르게 연타하세요 (키보드: 스페이스)</p></div></div>\n<div id=\"title\" class=\"ov on\">\n  <button class=\"xb\" id=\"bExit1\" aria-label=\"나가기\">←</button>\n  <div class=\"tl\"><small>FIRST-PERSON HORROR ESCAPE</small><h1>엘리베이터 런</h1><p>정전된 엘리베이터에서 눈을 떴다. 손전등 하나로 어두운 사무실 층을 지나 비상구를 찾아라.</p></div>\n  <div class=\"row\"><button class=\"pri\" id=\"bStart\">게임 시작</button><button id=\"bSet1\">설정</button></div>\n  <div class=\"card tip\"><b>🎧 이어폰을 권장합니다</b><p>괴물의 발소리 방향과 거리가 중요한 단서입니다. 소리를 끄면 화면 가장자리에 위험 표시가 나타납니다.</p><b>조작</b><p>왼쪽 화면: 이동 스틱 · 오른쪽 화면: 드래그로 시선<br>PC: WASD 이동 · 마우스 시선 · Shift 달리기 · F 손전등 · E 상호작용 · 1~4 아이템 · Esc 일시정지</p></div>\n  <p class=\"foot\">프롤로그 + 1~5층</p>\n</div>\n<div id=\"settings\" class=\"ov\">\n  <h2>설정</h2>\n  <div class=\"card\">\n    <div class=\"tog\"><span>소리</span><button id=\"sSound\"></button></div>\n    <div class=\"tog\"><span>시점 감도</span><div class=\"row\"><button id=\"sSensM\">−</button><b id=\"sSensV\"></b><button id=\"sSensP\">+</button></div></div>\n    <div class=\"tog\"><span>화질 (성능)</span><button id=\"sQual\"></button></div>\n    <div class=\"tog\"><span>QTE 난이도</span><button id=\"sQte\"></button></div>\n    <div class=\"tog\"><span>진동</span><button id=\"sHap\"></button></div>\n  </div>\n  <button class=\"pri\" id=\"bSetBack\">돌아가기</button>\n</div>\n<div id=\"pause\" class=\"ov\"><h2>일시정지</h2><div class=\"col\"><button class=\"pri\" id=\"bResume\">계속하기</button><button id=\"bSet2\">설정</button><button id=\"bRestart\">이 층 다시 시작</button><button id=\"bExit2\">사이트로 나가기</button></div></div>\n<div id=\"fade\" class=\"ov\"><div class=\"fc\"><small id=\"fSub\"></small><h1 id=\"fTitle\"></h1><p id=\"fObj\"></p></div></div>\n<div id=\"shop\" class=\"ov\"><h2>비상 상점</h2><p>다음 층으로 가기 전에 준비하세요.</p><div class=\"card\"><div class=\"stat\"><span>보유 코인</span><b id=\"shGold\"></b></div><div class=\"stat\"><span>가방</span><b id=\"shBag\"></b></div></div><div id=\"shList\" class=\"col\"></div><button class=\"pri\" id=\"bGo\">다음 층으로</button></div>\n<div id=\"over\" class=\"ov\"><h1 class=\"red\">잡혔습니다</h1><p id=\"ovT\"></p><div class=\"row\"><button class=\"pri\" id=\"bRetry\">다시 시도</button><button id=\"bExit3\">나가기</button></div></div>\n<div id=\"end\" class=\"ov\"><h2>5층 돌파</h2><p>마지막 문 너머로 아침 햇살이 쏟아진다. 손에는 낯선 환자 팔찌가 채워져 있다. 그날 엘리베이터에서 무슨 일이 있었던 걸까…</p><div class=\"card\" id=\"endStats\"></div><div class=\"row\"><button class=\"pri\" id=\"bAgain\">처음부터 다시</button><button id=\"bExit4\">나가기</button></div><p class=\"foot\">엘리베이터 런 · 전 5층 클리어</p></div>\n";
 export function openElevator(ctx) {
   ctx = ctx || {};
   if (document.getElementById('elv')) return null;
@@ -76,6 +76,10 @@ function buildTextures(){
       const n=(hn(x,y,1)-.5)*16,st=Math.sin(x*.21+3)*Math.sin(y*.13+x*.05)>.72?-30:0;return[b[0]+n+st,b[1]+n+st,b[2]+n+st]}),
     pxTex(TS,TS,(x,y)=>{const n=(hn(x>>1,y>>1,2)-.5)*26,cr=(Math.abs(Math.sin(x*.4+y*.13))<.04&&y>10&&y<50)?-40:0,b=y>57?[48,50,48]:[98,104,100];return[b[0]+n+cr,b[1]+n+cr,b[2]+n+cr]}),
     pxTex(TS,TS,(x,y)=>{let b=[108,128,118];if(y<6)b=[70,86,80];else if(y>54)b=[44,54,50];else if(x%32===0||(y>26&&y<30))b=[84,102,94];const n=(hn(x,y,3)-.5)*14;return[b[0]+n,b[1]+n,b[2]+n]}),
+    // 3: 병원 타일 (흰 청록색 + 물때)
+    pxTex(TS,TS,(x,y)=>{let b=[168,190,188];if(x%16===0||y%16===0)b=[96,116,114];else if(y>50)b=[84,112,108];const n=(hn(x,y,9)-.5)*14,st=(y>40&&Math.sin(x*.3)*.5+.5>hn(x>>2,3,4)+.2)?-34:0;return[b[0]+n+st,b[1]+n+st,b[2]+n+st]}),
+    // 4: 붉은 콘크리트
+    pxTex(TS,TS,(x,y)=>{const n=(hn(x>>1,y>>1,11)-.5)*30,dr=(hn(x>>2,0,12)>.7&&y<20+hn(x>>2,1,13)*40)?-36:0,b=[118,52,48];return[b[0]+n+dr,b[1]+n*.5+dr*.5,b[2]+n*.5+dr*.5]}),
   ];
   TEX.door=cTex(TS,TS,(g,w,h)=>{g.fillStyle='#4a3524';g.fillRect(0,0,w,h);for(let y=0;y<h;y++){g.fillStyle='rgba(0,0,0,'+(hn(0,y,4)*.15)+')';g.fillRect(0,y,w,1)}
     g.fillStyle='#2c1f15';g.fillRect(0,0,w,3);g.fillRect(0,0,3,h);g.fillRect(w-3,0,3,h);g.fillStyle='#5a4230';g.fillRect(8,8,48,22);g.fillRect(8,36,48,24);
@@ -121,21 +125,44 @@ function buildTextures(){
     g.fillStyle='#d8d4cc';g.beginPath();g.ellipse(80,34,11,10,0,0,TAU);g.fill();g.fillStyle='#1a1414';g.beginPath();g.ellipse(82,28,12,8,0,Math.PI,TAU);g.fill();g.fillRect(70,28,5,24);
     g.fillStyle='#050508';g.fillRect(80,32,3,4);g.fillRect(86,32,3,4);g.fillStyle='#8a1a1a';g.fillRect(80,40,8,2);
     g.strokeStyle='#d8d4cc';g.lineWidth=4;g.beginPath();g.moveTo(66,40);g.lineTo(88,50);g.moveTo(30,40);g.lineTo(12,52);g.moveTo(52,42);g.lineTo(60,54);g.stroke()});
+  TEX.s.key=TEX.s.key;
+  TEX.s.fuse=spr(20,16,g=>{g.fillStyle='#2a2a2a';g.fillRect(2,2,16,12);g.fillStyle='#e8c040';g.fillRect(4,4,12,8);g.fillStyle='#1a1a1a';g.beginPath();g.moveTo(11,4);g.lineTo(7,9);g.lineTo(10,9);g.lineTo(8,12);g.lineTo(13,7);g.lineTo(10,7);g.fill()});
+  TEX.s.card=spr(20,14,g=>{g.fillStyle='#e8e8ee';g.fillRect(1,2,18,10);g.fillStyle='#d03030';g.fillRect(1,4,18,3);g.fillStyle='#2a2a30';g.fillRect(3,9,8,1);g.fillRect(3,10,5,1)});
+  // 괴물: 얼굴 없는 추격자 (검은 정장, 빈 얼굴)
+  TEX.s.faceless=spr(56,128,g=>{
+    g.fillStyle='#0b0b0f';g.beginPath();g.moveTo(14,34);g.lineTo(42,34);g.lineTo(46,84);g.lineTo(10,84);g.fill();g.fillRect(8,36,5,60);g.fillRect(43,36,5,60);g.fillRect(17,84,8,42);g.fillRect(31,84,8,42);
+    g.fillStyle='#d8d4cc';g.beginPath();g.ellipse(28,18,10,14,0,0,TAU);g.fill();
+    g.fillStyle='#b8b4ac';g.beginPath();g.ellipse(28,24,6,6,0,0,Math.PI);g.fill();
+    g.fillStyle='#e8e8e8';g.fillRect(26,34,4,24);g.fillStyle='#8a1a1a';g.fillRect(26,40,4,16)});
+  // 괴물: 공허 (최종 추격자)
+  TEX.s.void=spr(80,144,g=>{
+    const gr=g.createRadialGradient(40,72,6,40,72,64);gr.addColorStop(0,'#000');gr.addColorStop(.7,'#06020a');gr.addColorStop(1,'rgba(6,2,10,0)');
+    g.fillStyle=gr;g.fillRect(0,0,80,144);
+    g.fillStyle='#050207';g.beginPath();g.ellipse(40,24,15,20,0,0,TAU);g.fill();g.fillRect(24,40,32,70);
+    for(let i=0;i<7;i++){g.fillRect(8+i*10,60+((i*37)%30),6,60-((i*23)%30))}
+    g.fillStyle='#ff2a2a';g.beginPath();g.ellipse(33,22,3,5,0,0,TAU);g.ellipse(47,22,3,5,0,0,TAU);g.fill();
+    g.fillStyle='#ff6a6a';g.fillRect(32,20,2,2);g.fillRect(46,20,2,2)});
 }
 
 // ===== 층 데이터 + 레벨 생성 (사무실 모듈: 방 + 복도 + 문 + 가구) =====
 const FLOORS=[
-  {id:0,name:'프롤로그',sub:'멈춰 선 엘리베이터',size:27,rooms:3,monsters:[],coins:2,bats:0,items:0,key:false,lamps:.9,walls:[0],shop:false,
+  {id:0,name:'프롤로그',sub:'멈춰 선 엘리베이터',size:33,rooms:4,monsters:[],coins:3,bats:0,items:0,key:null,lamps:.9,walls:[0],shop:false,tint:[1,1,1],
    obj:'엘리베이터를 빠져나가 비상구를 찾으세요'},
-  {id:1,name:'1층',sub:'버려진 오피스',size:41,rooms:9,monsters:['after'],coins:12,bats:3,items:2,key:false,lamps:.65,walls:[0,1],shop:true,
+  {id:1,name:'1층',sub:'버려진 오피스',size:58,rooms:15,monsters:['after'],coins:18,bats:4,items:3,key:null,lamps:.65,walls:[0,1],shop:true,tint:[1,1,1],
    obj:'비상구를 찾으세요 (초록 표지)'},
-  {id:2,name:'2층',sub:'뒤틀린 오피스',size:45,rooms:11,monsters:['after','patient'],coins:14,bats:3,items:2,key:true,lamps:.5,walls:[0,1,2],shop:true,
+  {id:2,name:'2층',sub:'뒤틀린 오피스',size:66,rooms:18,monsters:['after','patient'],coins:20,bats:4,items:3,key:{n:'열쇠',ic:'🔑',t:'key'},lamps:.5,walls:[0,1,2],shop:true,tint:[1,1,.95],
    obj:'열쇠를 찾아 비상구를 여세요'},
+  {id:3,name:'3층',sub:'침수 병원',size:74,rooms:21,monsters:['after','patient','faceless'],coins:22,bats:5,items:4,key:{n:'퓨즈',ic:'🔌',t:'fuse'},lamps:.45,walls:[3,1,3],shop:true,tint:[.8,1,1.1],
+   obj:'차단기 퓨즈를 찾아 비상구 전원을 복구하세요',rmax:10},
+  {id:4,name:'4층',sub:'뒤틀린 복도',size:82,rooms:24,monsters:['patient','faceless','after','patient'],coins:24,bats:5,items:4,key:{n:'카드키',ic:'💳',t:'card'},lamps:.4,walls:[2,1,0],shop:true,tint:[.9,1.05,.85],
+   obj:'카드키를 찾아 비상구를 여세요 (뒤를 조심)',rmax:10},
+  {id:5,name:'5층',sub:'붉은 나락',size:90,rooms:27,monsters:['void','faceless','patient','after'],coins:26,bats:6,items:5,key:{n:'마스터 키',ic:'🗝️',t:'key'},lamps:.35,walls:[4,1,4],shop:true,tint:[1.25,.75,.75],
+   obj:'마스터 키를 찾아 탈출하세요 — 키를 줍는 순간 무언가 깨어난다',rmax:11,final:true},
 ];
 // 스프라이트 정의: 텍스처, 월드 폭/높이(타일), 지면에서 띄움
 const SPD={desk:{t:'desk',w:.95,h:.6,v:0},locker:{t:'locker',w:.5,h:1,v:0},plant:{t:'plant',w:.38,h:.56,v:0},chair:{t:'chair',w:.42,h:.52,v:0},
   coin:{t:'coin',w:.2,h:.2,v:.08},bat:{t:'bat',w:.2,h:.26,v:.08},flare:{t:'flare',w:.18,h:.3,v:.08},drink:{t:'drink',w:.17,h:.28,v:.08},decoy:{t:'decoy',w:.22,h:.22,v:.08},
-  compass:{t:'compass',w:.22,h:.22,v:.08},key:{t:'key',w:.28,h:.2,v:.1},torch:{t:'torch',w:.32,h:.18,v:.08},light:{t:'light',w:.8,h:.8,v:.2}};
+  compass:{t:'compass',w:.22,h:.22,v:.08},key:{t:'key',w:.28,h:.2,v:.1},fuse:{t:'fuse',w:.26,h:.22,v:.1},card:{t:'card',w:.28,h:.2,v:.1},torch:{t:'torch',w:.32,h:.18,v:.08},light:{t:'light',w:.8,h:.8,v:.2}};
 const ITEMDEF={
   flare:{n:'조명탄',ic:'🔥',price:12,desc:'15초간 시야 확보 · 시야 안의 추격자 5초 기절'},
   drink:{n:'에너지 드링크',ic:'🥤',price:8,desc:'20초간 스태미나 소모 없음 · 이동속도 +40%'},
@@ -148,8 +175,8 @@ function genLevel(cfg,seed){
   const N=cfg.size,g=new Uint8Array(N*N).fill(1),wv=new Uint8Array(N*N),rooms=[],corr=new Uint8Array(N*N);
   const I=(x,y)=>y*N+x,inb=(x,y)=>x>0&&y>0&&x<N-1&&y<N-1;
   const fits=(x,y,w,h)=>{if(x<2||y<2||x+w>N-2||y+h>N-2)return false;for(let yy=y-3;yy<=y+h+2;yy++)for(let xx=x-3;xx<=x+w+2;xx++)if(inb(xx,yy)&&g[I(xx,yy)]===0)return false;return true};
-  for(let k=0;k<400&&rooms.length<cfg.rooms;k++){
-    const el=rooms.length===0,w=el?5:RI(5,9),h=el?5:RI(5,8),x=RI(2,N-w-3),y=RI(2,N-h-3);
+  const rmx=cfg.rmax||9;for(let k=0;k<3000&&rooms.length<cfg.rooms;k++){
+    const el=rooms.length===0,w=el?5:RI(5,rmx),h=el?5:RI(5,Math.max(8,rmx-1)),x=RI(2,N-w-3),y=RI(2,N-h-3);
     if(!fits(x,y,w,h))continue;
     const r={x,y,w,h,cx:x+(w>>1),cy:y+(h>>1),kind:el?'elev':'room',wall:PK(cfg.walls)};rooms.push(r);
     for(let yy=y;yy<y+h;yy++)for(let xx=x;xx<x+w;xx++){g[I(xx,yy)]=0;wv[I(xx,yy)]=r.wall}
@@ -199,12 +226,12 @@ function genLevel(cfg,seed){
   rooms.forEach(r=>{
     if(r.kind==='elev'){return}
     const nd=cfg.id===0?0:RI(1,3);
-    for(let i=0;i<nd;i++){const c=randIn(r,1);if(c){occ.add(I(c.x,c.y));addSpr('desk',c.x+.5,c.y+.5,{r:.42});if(rd()<.7){const cc=[[1,0],[-1,0],[0,1],[0,-1]].map(d=>({x:c.x+d[0],y:c.y+d[1]})).find(p=>cellFree(p.x,p.y)&&!doorNear(p.x,p.y));if(cc){occ.add(I(cc.x,cc.y));addSpr('chair',cc.x+.5,cc.y+.5,{r:.2})}}}}
+    for(let i=0;i<nd;i++){const c=randIn(r,1);if(c){occ.add(I(c.x,c.y));{const o=rd()<.5;addSpr('desk',c.x+.5,c.y+.5,{r:.42,box:o?[.46,.26,.6]:[.26,.46,.6]})};if(rd()<.7){const cc=[[1,0],[-1,0],[0,1],[0,-1]].map(d=>({x:c.x+d[0],y:c.y+d[1]})).find(p=>cellFree(p.x,p.y)&&!doorNear(p.x,p.y));if(cc){occ.add(I(cc.x,cc.y));addSpr('chair',cc.x+.5,cc.y+.5,{r:.2,box:[.17,.17,.52]})}}}}
     const nl=cfg.id===0?(r.kind==='exit'?0:0):RI(1,2);
     for(let i=0;i<nl;i++){ // 사물함: 벽에 붙은 칸 (숨기 지점)
       for(let k=0;k<20;k++){const side=RI(0,3),t=side<2?RI(r.x,r.x+r.w-1):RI(r.y,r.y+r.h-1);const x=side===0?t:side===1?t:(side===2?r.x:r.x+r.w-1),y=side===0?r.y:side===1?r.y+r.h-1:t;
-        if(cellFree(x,y)&&!doorNear(x,y)){occ.add(I(x,y));const fx=side===0?0:side===1?0:0;addSpr('locker',x+.5,(side===0?y+.28:side===1?y+.72:y+.5),{r:.3,hide:true,face:side});break}}}
-    if(rd()<.5){const c=randIn(r,0);if(c){occ.add(I(c.x,c.y));addSpr('plant',c.x+.5,c.y+.5,{r:.15})}}
+        if(cellFree(x,y)&&!doorNear(x,y)){occ.add(I(x,y));const fx=side===0?0:side===1?0:0;addSpr('locker',x+.5,(side===0?y+.28:side===1?y+.72:y+.5),{r:.3,hide:true,face:side,box:side<2?[.24,.2,1]:[.2,.24,1]});break}}}
+    if(rd()<.5){const c=randIn(r,0);if(c){occ.add(I(c.x,c.y));addSpr('plant',c.x+.5,c.y+.5,{r:.15,box:[.15,.15,.56]})}}
   });
   // 조명 (램프)
   const lamps=[];
@@ -237,7 +264,7 @@ function genLevel(cfg,seed){
   for(let i=0;i<cfg.bats;i++)addPick('bat',takeSpot(far));
   const itemPool=['flare','drink','decoy','compass'];
   for(let i=0;i<cfg.items;i++)addPick(PK(itemPool),takeSpot(far));
-  if(cfg.key){const s=takeSpot(s=>s.r===keyRoom);addPick('key',s||takeSpot(far),{big:true})}
+  if(cfg.key){const s=takeSpot(s=>s.r===keyRoom);addPick(cfg.key.t,s||takeSpot(far),{big:true,pick:'key'})}
   if(cfg.id===0){addSpr('torch',sr.cx+.5+1,sr.cy+.5+1,{pick:'torch'})}
   // 괴물 스폰 / 순찰 지점
   L.wp=rooms.filter(r=>r.kind!=='elev').map(r=>({x:r.cx+.5,y:r.cy+.5}));
@@ -319,14 +346,16 @@ function loadFloor(i,retry){
   for(const d of L.doors.values())if(d.type===3){P.a=Math.atan2(d.y+.5-P.y,d.x+.5-P.x)}
   P.fl=P.hasTorch;MON=[];DEC=null;QT=null;G.floorT=0;G.t=0;
   cfg.monsters.forEach((ty,k)=>{
-    const sp=L.mspawn[k%L.mspawn.length],M=MT[ty];
-    MON.push({type:ty,M,x:sp.x,y:sp.y,face:0,st:'patrol',path:null,pi:0,wait:6+k*3,tx:sp.x,ty:sp.y,rp:0,stun:0,windup:0,seen:false,lost:0,lastX:sp.x,lastY:sp.y,doorT:-1,stepT:0,d:99,search:0,knows:false,attn:0,catchT:0,sfT:0});
+    const sp=L.mspawn[(k*3+((G.seed>>3)%L.mspawn.length))%L.mspawn.length],M=MT[ty];
+    MON.push({type:ty,M,x:sp.x,y:sp.y,face:0,st:'patrol',path:null,pi:0,wait:6+k*3,tx:sp.x,ty:sp.y,rp:0,stun:0,windup:0,seen:false,lost:0,lastX:sp.x,lastY:sp.y,doorT:-1,stepT:0,d:99,search:0,knows:false,attn:0,catchT:0,sfT:0,mul:1,dorm:ty==='void',bT:0,pingT:8});
   });
   FX.flash=0;FX.hurt=0;FX.caught=0;
   buildLM();
 }
 const MT={
   after:{name:'걸어 다니는 잔상',sp:[1.35,2.95],sight:7,fov:105,hear:1.0,tex:'after',w:.62,h:1.0,lost:4.5},
+  faceless:{name:'얼굴 없는 추격자',sp:[1.5,3.3],sight:8.5,fov:120,hear:.7,tex:'faceless',w:.5,h:1.0,lost:5,silent:true,look:true},
+  void:{name:'공허',sp:[2.1,3.45],sight:11,fov:360,hear:1.5,tex:'void',w:.85,h:1.15,lost:10,beep:true},
   patient:{name:'기어오는 환자',sp:[1.15,3.75],sight:9,fov:160,hear:.8,tex:'patient',w:.95,h:.55,lost:5.5},
 };
 // ---- 괴물 AI ----
@@ -359,7 +388,12 @@ function monDirect(m,dt,sp){
 }
 function updMon(m,dt){
   const M=m.M,d=hyp(P.x-m.x,P.y-m.y);m.d=d;
+  if(m.dorm){m.d=99;return}
   if(m.stun>0){m.stun-=dt;return}
+  let mul=1;
+  if(M.look){const lk=Math.abs(angDiff(P.a,Math.atan2(m.y-P.y,m.x-P.x)+Math.PI))<.6&&d<16&&los(m.x,m.y,P.x,P.y);mul=lk?.22:1;m.looked=lk}
+  if(M.beep){m.pingT-=dt;if(m.pingT<=0&&m.st!=='chase'){m.pingT=9;m.st='investigate';m.tx=P.x;m.ty=P.y;m.path=null;m.rp=0}
+    m.bT-=dt;if(m.bT<=0){m.bT=clamp(.14+d*.055,.16,1.3);tone(1500,.05,'square',clamp(.16/(1+d*.12),.03,.16),0,panOf(m.x,m.y))}}
   if(m.windup>0){m.windup-=dt;m.face=Math.atan2(P.y-m.y,P.x-m.x)*(m.st==='chase'?1:0)+m.face*(m.st==='chase'?0:1);return}
   const seen=canSee(m,d);m.seen=seen;
   if(seen){
@@ -380,38 +414,38 @@ function updMon(m,dt){
         if(m.wait>0){m.wait-=dt;break}
         const c=L.wp.filter(w=>hyp(w.x-m.x,w.y-m.y)>6);const w=c.length?c[Math.floor(Math.random()*c.length)]:L.wp[0];
         monGo(m,w.x,w.y);if(!m.path){m.wait=1.5;break}m.wait=1+Math.random()*2.5;
-      }else follow(m,dt,M.sp[0]);
+      }else follow(m,dt,M.sp[0]*mul);
       break}
     case 'investigate':{
       m.rp-=dt;
       if(!m.path&&m.rp<=0)monGo(m,m.tx,m.ty);
       if(!m.path){m.st='search';m.search=3;break}
-      if(follow(m,dt,M.sp[0]*1.45)||hyp(m.tx-m.x,m.ty-m.y)<.7){m.st='search';m.search=4;m.path=null}
+      if(follow(m,dt,M.sp[0]*1.45*mul)||hyp(m.tx-m.x,m.ty-m.y)<.7){m.st='search';m.search=4;m.path=null}
       break}
     case 'chase':{
       m.rp-=dt;
       const tx=seen?P.x:m.lastX,ty=seen?P.y:m.lastY;
       if(P.hide&&m.knows){// 숨은 곳으로 접근
-        const hs=P.hide;if(hyp(hs.x-m.x,hs.y-m.y)<1.1){m.catchT+=dt;m.face=Math.atan2(hs.y-m.y,hs.x-m.x);if(m.catchT>2.4&&!god)return caught(m)}else{if(m.rp<=0||!m.path)monGo(m,hs.x,hs.y);follow(m,dt,M.sp[1])}
+        const hs=P.hide;if(hyp(hs.x-m.x,hs.y-m.y)<1.1){m.catchT+=dt;m.face=Math.atan2(hs.y-m.y,hs.x-m.x);if(m.catchT>2.4&&!god)return caught(m)}else{if(m.rp<=0||!m.path)monGo(m,hs.x,hs.y);follow(m,dt,M.sp[1]*mul)}
         break}
       if(!seen){m.lost+=dt;if(m.lost>M.lost){m.st='search';m.search=6;m.path=null;m.tx=m.lastX;m.ty=m.lastY;break}}
-      if(seen&&d<3.4&&monDirect(m,dt,M.sp[1])){m.path=null;break}
+      if(seen&&d<3.4&&monDirect(m,dt,M.sp[1]*mul)){m.path=null;break}
       if(m.rp<=0||!m.path){monGo(m,tx,ty)}
-      if(m.path)follow(m,dt,M.sp[1]);
+      if(m.path)follow(m,dt,M.sp[1]*mul);
       break}
     case 'search':{
       m.search-=dt;
       if(P.hide&&hyp(P.hide.x-m.x,P.hide.y-m.y)<1.2){m.catchT+=dt;if(m.catchT>3.2&&!god)return caught(m)}else m.catchT=Math.max(0,m.catchT-dt);
       if(!m.path||m.pi>=m.path.length){
         if(m.search>0&&Math.random()<dt*.9){const a=Math.random()*TAU,r=2+Math.random()*3;monGo(m,m.tx+Math.cos(a)*r,m.ty+Math.sin(a)*r);if(!m.path)m.path=null}
-      }else follow(m,dt,M.sp[0]*1.2);
+      }else follow(m,dt,M.sp[0]*1.2*mul);
       if(m.search<=0){m.st='patrol';m.path=null;m.wait=2;m.knows=false;m.catchT=0}
       break}
   }
   // 괴물 자체 소음 (예고)
   const mv=m.st==='chase'?M.sp[1]:M.sp[0];
   m.stepT-=dt;
-  if(m.stepT<=0&&d<20){
+  if(m.stepT<=0&&d<20&&!M.silent&&!M.beep){
     m.stepT=m.type==='after'?(m.st==='chase'?.3:.55):(m.st==='chase'?.26:.5);
     const vol=clamp(.34/(1+d*.35),0,.34)*(los(m.x,m.y,P.x,P.y)?1:.55),pan=panOf(m.x,m.y);
     if(m.type==='after')SFX.step(vol*1.5,pan);else nz(.16,vol*.9,m.st==='chase'?1600:700,pan,300);
@@ -442,7 +476,7 @@ function useItem(i){
 }
 // ---- QTE ----
 function startQTE(kind,d){
-  const lv=[{t:8,f:7,dec:6},{t:5,f:7,dec:10},{t:4,f:6,dec:14}][S.qte]||{t:5,f:7,dec:10};
+  let lv=[{t:8,f:7,dec:6},{t:5,f:7,dec:10},{t:4,f:6,dec:14}][S.qte]||{t:5,f:7,dec:10};if(kind==='exit'&&L.cfg.final)lv={t:lv.t*.85,f:lv.f,dec:lv.dec*1.15};
   QT={kind,d,t:lv.t,T:lv.t,fill:0,f:lv.f,dec:lv.dec};G.mode='qte';showQTE(true);SFX.click();
 }
 function qteTap(){if(G.mode!=='qte'||!QT)return;QT.fill=Math.min(100,QT.fill+QT.f);FX.shake=Math.max(FX.shake,.1);SFX.tap();vib(10);if(QT.fill>=100)qteEnd(true)}
@@ -460,7 +494,7 @@ function findTarget(){
   const cs=Math.cos(P.a),sn=Math.sin(P.a);
   for(let s=.3;s<=1.7;s+=.1){
     const x=P.x+cs*s,y=P.y+sn*s,t=tile(x,y);
-    if(t===4)return{k:'exit',txt:(L.cfg.key&&!P.key)?'비상구 (잠김 — 열쇠 필요)':'비상구 열기 (연타)'};
+    if(t===4)return{k:'exit',txt:(L.cfg.key&&!P.key)?'비상구 (잠김 — '+L.cfg.key.n+' 필요)':'비상구 열기 (연타)'};
     if(t===2||t===3){const d=doorAt(x,y);if(!d)continue;
       if(d.open<.9)return{k:'door',d,txt:d.qte?'문 열기 (뻑뻑함 · 연타)':'문 열기'};
       if(s<1.3&&!(Math.floor(P.x)===d.x&&Math.floor(P.y)===d.y))return{k:'close',d,txt:'문 닫기'}}
@@ -477,7 +511,7 @@ function interact(){
   if(t.k==='unhide')return leaveHide();
   if(t.k==='door'){if(t.d.qte)startQTE('door',t.d);else openDoor(t.d,'player')}
   else if(t.k==='close'){t.d.st='closing';SFX.click()}
-  else if(t.k==='exit'){if(L.cfg.key&&!P.key){msg('잠겨 있다. 이 층 어딘가에 열쇠가 있다');SFX.click();return}startQTE('exit',null)}
+  else if(t.k==='exit'){if(L.cfg.key&&!P.key){msg('잠겨 있다. 이 층 어딘가에 '+L.cfg.key.n+'이(가) 있다');SFX.click();return}startQTE('exit',null)}
   else if(t.k==='hide')enterHide(t.s);
 }
 function enterHide(s){
@@ -497,7 +531,8 @@ function pickups(){
     if(!s.pick||s.gone)continue;
     if(hyp(s.x-P.x,s.y-P.y)>.6)continue;
     if(s.pick==='coin'){s.gone=true;RUN.gold++;RUN.coins++;SFX.coin();noise(P.x,P.y,2,'player')}
-    else if(s.pick==='key'){s.gone=true;P.key=true;SFX.pick();msg('🔑 열쇠를 찾았다! 비상구로 가자')}
+    else if(s.pick==='key'){s.gone=true;P.key=true;SFX.pick();msg(L.cfg.key.ic+' '+L.cfg.key.n+'을(를) 찾았다! 비상구로 가자');
+      if(L.cfg.final){const v=MON.find(m=>m.type==='void');if(v&&v.dorm){let bs=L.mspawn[0],bd=-1;for(const sp of L.mspawn){const d=hyp(sp.x-P.x,sp.y-P.y);if(d>bd){bd=d;bs=sp}}v.x=bs.x;v.y=bs.y;v.dorm=false;v.st='investigate';v.tx=P.x;v.ty=P.y;v.path=null;v.windup=1.2;SFX.scare();FX.flash=.6;FX.flashC='#a00';msg('⚠ 무언가 깨어났다… 비상구로 서둘러!',4)}}}
     else if(s.pick==='torch'){s.gone=true;P.hasTorch=true;P.fl=true;SFX.pick();msg('🔦 손전등을 얻었다 (손전등 버튼으로 켜고 끈다)',3.5)}
     else if(ITEMDEF[s.pick]){
       if(addItem(s.pick)){s.gone=true;SFX.pick();msg(ITEMDEF[s.pick].ic+' '+ITEMDEF[s.pick].n+' 획득')}
@@ -578,20 +613,20 @@ function resizeGfx(){
   PL=clamp(.5*ar,.45,.85);VK=W/(2*PL);ZB=new Float32Array(W);RL=new Float32Array(W);BX2=new Float32Array(W);
   for(let x=0;x<W;x++){const c=2*(x+.5)/W-1;RL[x]=Math.sqrt(1+PL*PL*c*c)}
 }
-const LC=[0,0,0];
+const LC=[0,0,0];let TNT=[1,1,1],AMB0=.045,AMB1=.045,AMB2=.045;
 function lightAt(x,y){
   const N=L.N,fx=x-.5,fy=y-.5,ix=Math.floor(fx),iy=Math.floor(fy),tx=fx-ix,ty=fy-iy;
   const x0=ix<0?0:ix>=N?N-1:ix,x1=ix+1<0?0:ix+1>=N?N-1:ix+1,y0=iy<0?0:iy>=N?N-1:iy,y1=iy+1<0?0:iy+1>=N?N-1:iy+1;
   const a=(y0*N+x0)*4,b=(y0*N+x1)*4,c=(y1*N+x0)*4,d=(y1*N+x1)*4,w0=(1-tx)*(1-ty),w1=tx*(1-ty),w2=(1-tx)*ty,w3=tx*ty;
   const f=(LM[a+3]*w0+LM[b+3]*w1+LM[c+3]*w2+LM[d+3]*w3)*G.fk;
-  LC[0]=LM[a]*w0+LM[b]*w1+LM[c]*w2+LM[d]*w3+f;LC[1]=LM[a+1]*w0+LM[b+1]*w1+LM[c+1]*w2+LM[d+1]*w3+f;LC[2]=LM[a+2]*w0+LM[b+2]*w1+LM[c+2]*w2+LM[d+2]*w3+f*.9;
+  LC[0]=(LM[a]*w0+LM[b]*w1+LM[c]*w2+LM[d]*w3+f)*TNT[0];LC[1]=(LM[a+1]*w0+LM[b+1]*w1+LM[c+1]*w2+LM[d+1]*w3+f)*TNT[1];LC[2]=(LM[a+2]*w0+LM[b+2]*w1+LM[c+2]*w2+LM[d+2]*w3+f*.9)*TNT[2];
 }
 let SPR_LIST=[];
 function render(){
   if(!L||!P||!BUF)return;
   const N=L.N,g=L.g,doors=L.doors;
   const sh=FX.shake>0?(Math.random()-.5)*FX.shake*.06:0;
-  const bobY=Math.sin(P.bob)*P.spd*.0035+sh;
+  const bobY=sh;TNT=L.cfg.tint||[1,1,1];AMB0=.045*TNT[0];AMB1=.045*TNT[1];AMB2=.045*TNT[2];
   let ang=P.a+(FX.shake>0?(Math.random()-.5)*FX.shake*.05:0);
   const px=P.x,py=P.y,dx=Math.cos(ang),dy=Math.sin(ang),plx=-dy*PL,ply=dx*PL;
   const hz=Math.round(H*(.5+P.pitch+bobY));
@@ -601,7 +636,7 @@ function render(){
   const fRange=(P.boost>0?11.5:7.2),RX=W*.40*(P.boost>0?1.25:1),RY=VK*.62*(P.boost>0?1.15:1),iRX=1/RX,iRY=1/RY;
   const cxm=W*.5;
   for(let x=0;x<W;x++){const q=(x+.5-cxm)*iRX;BX2[x]=q*q}
-  const AMBL=.045,flr=P.flare>0?Math.min(1,P.flare/2):0;
+  const flr=P.flare>0?Math.min(1,P.flare/2):0;
   const flareR=9;
   const TW=TEX.wall,TF=TEX.floor,TC=TEX.ceil,TL=TEX.lamp;
   const fk=G.fk;
@@ -618,7 +653,7 @@ function render(){
       if(cxl<0||cyl<0||cxl>=N||cyl>=N)continue;
       const ci=cyl*N+cxl,u=((fxw-cxl)*TS)&63,v=((fyw-cyl)*TS)&63,ti=(v*TS+u)*4;
       lightAt(fxw,fyw);
-      let lr=AMBL+LC[0],lg=AMBL+LC[1],lb=AMBL+LC[2];
+      let lr=AMB0+LC[0],lg=AMB1+LC[1],lb=AMB2+LC[2];
       const dE=rd*RL[x];
       if(fStr>0){const f=1-BX2[x]-by2f;if(f>0){const t=1-dE/fRange;if(t>0){const b=f*t*t*1.5*fStr;lr+=b;lg+=b*.96;lb+=b*.82}}}
       if(flr>0){const t=1-dE/flareR;if(t>0){const b=t*t*1.4*flr;lr+=b;lg+=b*.75;lb+=b*.5}}
@@ -675,7 +710,7 @@ function render(){
     const hxw=px+perp*rdx,hyw=py+perp*rdy,nx=side===0?-stx:0,ny=side===1?-sty:0;
     lightAt(hxw+nx*.45,hyw+ny*.45);
     const sd=side?.8:1;
-    let lr0=(AMBL+LC[0])*sd,lg0=(AMBL+LC[1])*sd,lb0=(AMBL+LC[2])*sd;
+    let lr0=(AMB0+LC[0])*sd,lg0=(AMB1+LC[1])*sd,lb0=(AMB2+LC[2])*sd;
     const dE=perp*RL[x],fogK=Math.max(0,1-perp/20);
     let colB=0;if(fStr>0){const t=1-dE/fRange;if(t>0)colB=t*t*1.5*fStr}
     let colF=0;if(flr>0){const t=1-dE/flareR;if(t>0)colF=t*t*1.4*flr}
@@ -697,14 +732,47 @@ function render(){
   const addS=(o,tex,w,h,v,x,y,extra)=>{
     const rx=x-px,ry=y-py,tX=invDet*(dy*rx-dx*ry),tY=invDet*(-ply*rx+plx*ry);
     if(tY<.12||tY>16)return;
-    list.push({tex,w,h,v,tX,tY,x,y,o,e:extra||0});
+    list.push({tex,w,h,v,tX,tY,x,y,o,e:extra||0,box:(o&&o.box)||null});
   };
   for(const s of L.spr){if(s.gone)continue;const sd=SPD[s.type];if(!sd)continue;if(P.hide===s)continue;
-    let v=sd.v;if(s.pick)v+=Math.sin(G.t*3+s.x*5)*.02;addS(s,TEX.s[sd.t],sd.w,sd.h,v,s.x,s.y,s.pick?1:0)}
-  for(const m of MON)addS(m,TEX.s[m.M.tex],m.M.w,m.M.h,m.type==='patient'?0:0,m.x,m.y,m.type==='after'?2:3);
+    let v=sd.v;addS(s,TEX.s[sd.t],sd.w,sd.h,v,s.x,s.y,s.pick?1:0)}
+  for(const m of MON)if(!m.dorm)addS(m,TEX.s[m.M.tex],m.M.w,m.M.h,m.type==='patient'?0:0,m.x,m.y,m.type==='after'?2:3);
   if(DEC){addS(DEC,TEX.s.decoy,.22,.22,.08,DEC.x,DEC.y,1);addS(DEC,TEX.s.light,1.2,1.2,-.3,DEC.x,DEC.y,4)}
   list.sort((a,b)=>b.tY-a.tY);
   for(const s of list){
+    if(s.box){
+      const hx=s.box[0],hy=s.box[1],bh=s.box[2],cxw=s.x,cyw=s.y,swb=VK/s.tY;
+      const rad=Math.max(hx,hy)*1.5*swb,scb=cxm*(1+s.tX/(s.tY*PL));
+      const bxs=Math.max(0,Math.floor(scb-rad)),bxe=Math.min(W-1,Math.ceil(scb+rad));
+      const T=s.tex,tw=T.w,th=T.h,TD=T.d;
+      for(let x=bxs;x<=bxe;x++){
+        const c=2*(x+.5)/W-1,rdx=dx+plx*c,rdy=dy+ply*c;
+        let t0=-1e9,t1=1e9,ax=0;
+        if(rdx!==0){const a=(cxw-hx-px)/rdx,b=(cxw+hx-px)/rdx,lo=a<b?a:b,hi=a<b?b:a;if(lo>t0){t0=lo;ax=0}if(hi<t1)t1=hi}else if(px<cxw-hx||px>cxw+hx)continue;
+        if(rdy!==0){const a=(cyw-hy-py)/rdy,b=(cyw+hy-py)/rdy,lo=a<b?a:b,hi=a<b?b:a;if(lo>t0){t0=lo;ax=1}if(hi<t1)t1=hi}else if(py<cyw-hy||py>cyw+hy)continue;
+        if(t0>t1||t0<.1||t0>=ZB[x])continue;
+        const hxw=px+t0*rdx,hyw=py+t0*rdy;
+        let u=ax===0?(hyw-(cyw-hy))/(2*hy):(hxw-(cxw-hx))/(2*hx);
+        if((ax===0&&rdx>0)||(ax===1&&rdy<0))u=1-u;
+        const tu=Math.min(tw-1,Math.max(0,Math.floor(u*tw)));
+        const lh=VK/t0,yb=hz+lh*.5,yt=hz+lh*(.5-bh),hgt=yb-yt;
+        lightAt(hxw-(ax===0?Math.sign(rdx):0)*.25,hyw-(ax===1?Math.sign(rdy):0)*.25);
+        const sdb=ax?.75:1;
+        let lr=(AMB0+LC[0])*sdb,lg=(AMB1+LC[1])*sdb,lb=(AMB2+LC[2])*sdb;
+        const dE=t0*RL[x],fogK=Math.max(0,1-t0/20);
+        let colB=0;if(fStr>0){const t=1-dE/fRange;if(t>0)colB=t*t*1.5*fStr}
+        if(flr>0){const t=1-dE/flareR;if(t>0){const b=t*t*1.4*flr;lr+=b;lg+=b*.75;lb+=b*.5}}
+        const y0=Math.max(0,Math.floor(yt)),y1=Math.min(H-1,Math.ceil(yb));
+        for(let y=y0;y<=y1;y++){
+          const v=Math.floor((y-yt)*th/hgt);if(v<0||v>=th)continue;
+          const ti=(v*tw+tu)*4;if(TD[ti+3]<40)continue;
+          let l_r=lr,l_g=lg,l_b=lb;
+          if(colB>0){const f=1-BX2[x]-((y-hz)*iRY)**2;if(f>0){const b=f*colB*sdb;l_r+=b;l_g+=b*.96;l_b+=b*.82}}
+          const o=(y*W+x)*4;BUF[o]=TD[ti]*l_r*fogK;BUF[o+1]=TD[ti+1]*l_g*fogK;BUF[o+2]=TD[ti+2]*l_b*fogK;
+        }
+      }
+      continue;
+    }
     const sw=VK/s.tY,spW=s.w*sw*(s.e===4?1:1),spH=s.h*sw;
     const scx=cxm*(1+s.tX/(s.tY*PL));
     const yb=hz+(0.5-s.v)*sw,yt=yb-spH;
@@ -712,7 +780,7 @@ function render(){
     if(xe<0||xs>=W)continue;
     const T=s.tex,tw=T.w,th=T.h,TD=T.d;
     lightAt(s.x,s.y);
-    let lr=AMBL+LC[0],lg=AMBL+LC[1],lb=AMBL+LC[2];
+    let lr=AMB0+LC[0],lg=AMB1+LC[1],lb=AMB2+LC[2];
     if(s.e===1){lr+=.22+.1*Math.sin(G.t*4+s.x);lg+=.2;lb+=.08}
     if(s.e===2||s.e===3){lr+=.1;lg+=.1;lb+=.13}
     const dE=s.tY*Math.sqrt(1+(s.tX/s.tY)**2);
@@ -771,7 +839,7 @@ function startFloor(i,retry){
   show('fade',1);
   later(()=>{show('fade',0);G.mode='play';el.hud.hidden=false;showObj()},retry?1300:2600);
 }
-function showObj(){const cfg=L.cfg;let t=cfg.obj;if(cfg.id===0&&!P.hasTorch)t='손전등을 찾으세요';else if(cfg.key&&!P.key)t='열쇠를 찾으세요 → 비상구';el.obj.textContent=t}
+function showObj(){const cfg=L.cfg;let t=cfg.obj;if(cfg.id===0&&!P.hasTorch)t='손전등을 찾으세요';else if(cfg.key&&!P.key)t=cfg.key.ic+' '+cfg.key.n+'을(를) 찾으세요 → 비상구';else if(cfg.key&&P.key)t='비상구로 가세요!';el.obj.textContent=t}
 function flowAfterFloor(){
   hideAll();el.hud.hidden=true;$('fSub').textContent='CLEAR';$('fTitle').textContent='탈출 성공';$('fObj').textContent='';show('fade',1);
   later(()=>{
@@ -913,7 +981,7 @@ const setT=(e,k,v)=>{if(hc[k]!==v){hc[k]=v;e.textContent=v}};
 function hudUpdate(){
   if(el.hud.hidden||!P)return;
   setT(el.gold,'g','🪙 '+RUN.gold);
-  if(el.keyi.hidden===P.key)el.keyi.hidden=!(P.key);
+  if(el.keyi.hidden===P.key){el.keyi.hidden=!(P.key);if(P.key&&L.cfg.key)el.keyi.textContent=L.cfg.key.ic}
   showObj();
   el.stB.style.transform='scaleX('+(P.st/100).toFixed(3)+')';
   el.stB.style.filter=P.exh>0?'hue-rotate(-60deg)':'';
