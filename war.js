@@ -1136,7 +1136,7 @@ const CSS = `
 .wq{flex:1;min-width:0;display:flex;align-items:center;gap:3px;height:30px;padding:0 6px;border-radius:8px;background:#110d16;border:1px solid #2c2236;overflow:hidden;position:relative}
 .wq img{width:20px;height:20px;image-rendering:pixelated;border-radius:4px;background:#1e1626;flex:none}
 .wq em{font-style:normal;font-size:10.5px;color:#7a6a88;white-space:nowrap}
-.wq .pb{position:absolute;left:0;bottom:0;height:2px;background:#ffd65a}
+.wq .qn{flex:none;font-size:11px;font-weight:900;color:#ffd65a;padding:0 2px}.wq .pb{position:absolute;left:0;bottom:0;height:2px;background:#ffd65a}
 .wcards{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}.wcards::-webkit-scrollbar{display:none}
 .wcd{position:relative;flex:1 0 62px;max-width:96px;min-width:60px;height:74px;border-radius:10px;border:1px solid #3a2e44;background:linear-gradient(#1c1524,#120e18);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:3px 2px 4px;gap:1px;overflow:hidden}
 .wcd img{width:34px;height:34px;image-rendering:pixelated;margin-bottom:auto;margin-top:2px}
@@ -1632,10 +1632,10 @@ export function openWar(br) {
     $('wah').textContent = fshort(Math.max(0, B.A.hp)) + '/' + fshort(B.A.mh); $('weh').textContent = fshort(Math.max(0, B.E.hp)) + '/' + fshort(B.E.mh);
     $('wab').style.width = (100 * Math.max(0, B.A.hp) / B.A.mh) + '%'; $('web').style.width = (100 * Math.max(0, B.E.hp) / B.E.mh) + '%';
     $('wspd').textContent = ST.sp + 'x'; $('wspd').classList.toggle('on', ST.sp > 1); $('wsnd').textContent = AU.on ? '🔊' : '🔇'; $('wzm').classList.toggle('on', zoom > 1);
-    root.querySelectorAll('[data-a=buy]').forEach(b => { const li = +b.dataset.v, tt = +b.dataset.t, d = def(0, tt, li); b.classList.toggle('dis', ST.g < d.c || B.A.q.length >= 6); const n = B.A.q.filter(q => q.li === li && q.t === tt).length, bd = b.querySelector('.bd'); bd.hidden = !n; bd.textContent = n; });
+    root.querySelectorAll('[data-a=buy]').forEach(b => { const li = +b.dataset.v, tt = +b.dataset.t, d = def(0, tt, li); b.classList.toggle('dis', ST.g < d.c); const n = B.A.q.filter(q => q.li === li && q.t === tt).length, bd = b.querySelector('.bd'); bd.hidden = !n; bd.textContent = n; });
     root.querySelectorAll('[data-a=tpick]').forEach(b => b.classList.toggle('dis', ST.g < TCOST[+b.dataset.v]));
     root.querySelectorAll('[data-a=xp]').forEach(b => { const n = ST.slots[+b.dataset.v]; b.classList.toggle('dis', n >= 3 || ST.g < SLOT_COST[n]); });
-    if (qDirty) { qDirty = 0; const q = B.A.q; $('wq').innerHTML = q.length ? q.map(e => '<img alt="" src="' + port(def(0, e.t, e.li).key) + '" title="' + (e.lane ? '하단' : '상단') + '">').join('') + '<span class="pb" id="wpb"></span>' : '<em>대기열 비어 있음</em>'; }
+    if (qDirty) { qDirty = 0; const q = B.A.q; $('wq').innerHTML = q.length ? q.slice(0, 4).map(e => '<img alt="" src="' + port(def(0, e.t, e.li).key) + '" title="' + (e.lane ? '하단' : '상단') + '">').join('') + (q.length > 4 ? '<b class="qn">+' + (q.length - 4) + '</b>' : '') + '<span class="pb" id="wpb"></span>' : '<em>대기열 비어 있음</em>'; }
     const pb = $('wpb'); if (pb && B.A.q.length) pb.style.width = (100 * B.A.qt / def(0, B.A.q[0].t, B.A.q[0].li).train) + '%';
   }
   /* ---------- 배너·시트 ---------- */
@@ -1739,7 +1739,7 @@ export function openWar(br) {
     if (a === 'help') return helpSheet();
     if (!B) return;
     if (a === 'tab') { tab = v; sfx('click'); renderCards(); return; }
-    if (a === 'buy') { if (B.over) return; const li = +v, tt = +b.dataset.t, d = def(0, tt, li); if (B.A.q.length >= 6) { toast('대기열이 가득 찼습니다 (최대 6)'); return; } if (ST.g < d.c) { toast('골드가 부족합니다'); sfx('up_no'); return; } ST.g -= d.c; B.A.q.push({ t: tt, li, lane }); qDirty = 1; sfx('click'); hud(true); return; }
+    if (a === 'buy') { if (B.over) return; const li = +v, tt = +b.dataset.t, d = def(0, tt, li); if (ST.g < d.c) { toast('골드가 부족합니다'); sfx('up_no'); return; } ST.g -= d.c; B.A.q.push({ t: tt, li, lane }); qDirty = 1; sfx('click'); hud(true); return; }
     if (a === 'tpick') return tplaceSheet(+v);
     if (a === 'xp') return expandSheet(+v);
     if (a === 'snd') { AU.on = !AU.on; try { localStorage.setItem('war_snd', AU.on ? '1' : '0'); } catch (e) { } hud(true); return; }
