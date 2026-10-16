@@ -1170,6 +1170,12 @@ const CSS = `
 /* 영웅 선택 UI: 모바일에서 설명이 잘리지 않도록 큰 가로형 카드 */
 .wcards:has(.whcard){display:flex;flex-direction:column;gap:7px;max-height:214px;overflow-y:auto;overflow-x:hidden;padding:2px 3px 5px}
 .whintro{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;padding:5px 8px;color:#f4eaff}
+.whupgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;width:100%;padding:2px 3px 5px;box-sizing:border-box}
+.whupgrid .wcd{width:100%;max-width:none;min-width:0;height:78px;box-sizing:border-box}
+.whupgrid .wcd .ic{font-size:20px;line-height:26px;height:26px}
+.whupgrid .wcd b{font-size:11px}
+.whupgrid .wcd s{font-size:9px;white-space:normal;text-align:center}
+.whupgrid .wcd small{font-size:9px;color:#c8b8d4;font-weight:800}
 .whintro b{font-size:13px;color:#ffd65a}.whintro span{font-size:11px;line-height:1.35;color:#c8b8d4}
 .wcd.whcard{flex:0 0 auto;width:100%;max-width:none;min-width:0;height:62px;box-sizing:border-box;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:5px 10px;text-align:left;border:1px solid #453650;border-radius:12px;background:linear-gradient(110deg,#24172c,#14101b);overflow:hidden}
 .wcd.whcard img{width:48px;height:48px;flex:none;object-fit:contain;margin:0;image-rendering:pixelated;background:#100c16;border-radius:8px}
@@ -1246,8 +1252,10 @@ export function openWar(br) {
   ST.sk = { d: clamp((ST.sk && ST.sk.d) | 0 || 1, 1, SK_MAX), s: clamp((ST.sk && ST.sk.s) | 0 || 1, 1, SK_MAX) };
   ST.heroUp = Object.assign({ atk: 0, aspd: 0, hp: 0, spd: 0, heal: 0, total: 0 }, ST.heroUp || {});
   for (const k of ['atk','aspd','hp','spd','heal','total']) ST.heroUp[k] = Math.max(0, Math.floor(+ST.heroUp[k] || 0));
-  const HERO_UP_INFO = { atk: { n: '공격력', ic: '⚔️', desc: '공격력 +10%' }, aspd: { n: '공격속도', ic: '⚡', desc: '공격속도 +5%' }, hp: { n: '체력', ic: '❤️', desc: '최대 체력 +10%' }, spd: { n: '이동속도', ic: '👟', desc: '이동속도 +5%' }, heal: { n: '힐량', ic: '✨', desc: '힐러 회복량 +10%' } };
-  const heroUpCost = () => Math.pow(2, ST.heroUp.total);
+  /* 이전 버전의 힐량 강화는 공격력 강화로 통합해 4개 항목만 노출 */
+  ST.heroUp.atk += ST.heroUp.heal; ST.heroUp.heal = 0;
+  const HERO_UP_INFO = { atk: { n: '공격력·회복량', ic: '⚔️', desc: '공격력 +10% · 힐러 회복량 +10%' }, aspd: { n: '공격속도', ic: '⚡', desc: '공격속도 +5%' }, hp: { n: '체력', ic: '❤️', desc: '최대 체력 +10%' }, spd: { n: '이동속도', ic: '👟', desc: '이동속도 +5%' } };
+  const heroUpCost = k => Math.pow(2, ST.heroUp[k] || 0);
   const heroUpPrice = n => n >= 1024 ? n.toExponential(2) : Math.floor(n).toLocaleString('ko-KR');
   function applyLose(s) { ST.inb = 0; if (s >= ST.best) ST.best = Math.max(1, s - 1); ST.st = Math.max(1, s - 1); }
   let pendingPenalty = false; if (ST.inb) { applyLose(ST.st); pendingPenalty = true; }
@@ -1502,17 +1510,18 @@ export function openWar(br) {
         const dy = (v.y - u.y) * 1.4;
         const dd = Math.hypot(rawDx, dy) - (d.size + v.d.size) * .5;
         /* 영웅끼리는 차선/방향 판정 때문에 서로 지나치거나 멈춰 서는 일이 없도록 근접 교전 대상을 우선 탐색 */
-        if (d.hero && v.d.hero && dd <= 42 && dd < heroGap) { heroGap = dd; heroTgt = v; }
-        if (d.hero && !v.d.hero && v.lane !== u.lane) continue;
-        if (dx < -6) continue;
-        const reach = d.hero && (u.heroType === 'berserker' || u.heroType === 'siegeGolem') ? 5 : d.rng;
+        if (d.hero && v.d.hero && dd <= 48 && dd < heroGap) { heroGap = dd; heroTgt = v; }
+        /* 영웅은 차선/방향에 관계없이 실제로 가까운 적을 공격 대상으로 삼음 */
+        if (!d.hero && dx < -6) continue;
+        if (d.hero && !v.d.hero && Math.abs(v.y-u.y) > 68) continue;
+        const reach = d.hero ? Math.max(d.rng || 0, 24) : d.rng;
         if (dd <= reach && dd < best) { best = dd; tgt = v; }
       }
       if (d.hero && heroTgt) tgt = heroTgt;
       /* 근접 영웅은 접촉 직전의 거리 오차가 있어도 공격 범위로 인정 */
-      if (d.hero && heroTgt && (u.heroType === 'berserker' || u.heroType === 'siegeGolem')) { const gap = Math.hypot(heroTgt.x-u.x, (heroTgt.y-u.y)*1.4) - (d.size + heroTgt.d.size)*.5; if (gap <= 42) tgt = heroTgt; }
+      if (d.hero && heroTgt) tgt = heroTgt;
       const bd = (baseFront(1 - u.side) - u.x) * u.dir;
-      if (!tgt && bd <= d.rng + 2) tgt = { base: 1 - u.side };
+      if (!tgt && bd <= (d.hero ? Math.max(d.rng || 0, 24) + 4 : d.rng + 2)) tgt = { base: 1 - u.side };
       if (tgt) { if (u.cd <= 0) { u.atk = .38; u.tgt = tgt; u.cd = d.cd; } continue; }
       /* 이동 */
       let nx = u.x + u.dir * d.spd * (u.slow > 0 ? .45 : 1) * (u.side === 0 && SKR.s.act > 0 ? 1 + skPct('s', ST.sk.s) : 1) * dt;
@@ -1727,8 +1736,8 @@ export function openWar(br) {
     } else if (tab === 'h') {
       const active = livingHero(0);
       h.push('<div class="whintro"><b>' + (active ? '⚔️ ' + active.d.n + ' 출전 중' : '영웅 선택') + '</b><span>' + (active ? '영웅이 전사하면 다른 영웅을 선택할 수 있습니다.' : '영웅을 선택하면 즉시 전장에 출전합니다 · 무료') + '</span></div>');
-      h.push('<div class="whintro"><b>⬆️ 영웅 강화 · 총 ' + ST.heroUp.total + '회</b><span>다음 강화 비용: 💰' + heroUpPrice(heroUpCost()) + ' 골드 · 강화 비용은 매번 2배 · 무제한</span></div>');
-      for (const k of ['atk','aspd','hp','spd','heal']) { const I = HERO_UP_INFO[k]; h.push('<button class="wcd sp" data-a="hup" data-v="' + k + '"><span class="ic">' + I.ic + '</span><b>' + I.n + ' Lv.' + ST.heroUp[k] + '</b><s>' + I.desc + '</s><small>강화 💰' + heroUpPrice(heroUpCost()) + '</small></button>'); }
+      h.push('<div class="whintro"><b>⬆️ 영웅 강화 · 총 ' + ST.heroUp.total + '회</b><span>항목별 비용 별도 · 각 항목 1골드부터 2배씩 증가 · 무제한</span></div><div class="whupgrid">');
+      for (const k of ['atk','aspd','hp','spd']) { const I = HERO_UP_INFO[k], cost = heroUpCost(k); h.push('<button class="wcd sp" data-a="hup" data-v="' + k + '"><span class="ic">' + I.ic + '</span><b>' + I.n + ' Lv.' + ST.heroUp[k] + '</b><s>' + I.desc + '</s><small>강화 💰' + heroUpPrice(cost) + '</small></button>'); } h.push('</div>');
       for (const key of HERO_KEYS) { const H = HEROES[key], selected = heroChoice === key, portraitKey = key === 'berserker' ? 'aberserker' : H.spriteA; h.push('<button class="wcd whcard' + (selected ? ' whsel' : '') + '" data-a="hero" data-v="' + key + '"' + (active ? ' disabled' : '') + '><img alt="" src="' + port(portraitKey) + '"><span class="whinfo"><b>' + H.n + '</b><s>' + H.desc + '</s><small>' + (active ? '출전 중' : selected ? '선택됨 · 출전' : '눌러서 출전') + '</small></span><span class="wharrow">' + (selected ? '▶' : '＋') + '</span></button>'); }
     } else if (tab === 't') {
       for (let k = 0; k < 2; k++) { const n = ST.slots[k]; h.push('<button class="wcd sp" data-a="xp" data-v="' + k + '"><span class="ic">' + (n >= 3 ? '✅' : '➕') + '</span><b>' + (k ? '하단' : '상단') + ' 칸 ' + n + '/3</b><s>' + (n >= 3 ? 'MAX' : '💰' + fshort(SLOT_COST[n])) + '</s></button>'); }
@@ -1745,12 +1754,12 @@ export function openWar(br) {
   }
   function heroUpgrade(k) {
     if (!HERO_UP_INFO[k]) return;
-    const cost = heroUpCost();
+    const cost = heroUpCost(k);
     if (ST.g < cost) { toast('영웅 강화 골드가 부족합니다'); sfx('up_no'); return; }
-    ST.g -= cost; ST.heroUp[k]++; ST.heroUp.total++;
+    ST.g -= cost; ST.heroUp[k]++; ST.heroUp.total++; if (k === 'atk') ST.heroUp.heal++; // 공격력 강화는 힐러 회복량도 함께 강화
     save(); sfx('buy'); renderCards();
     if (B) { const u = livingHero(0); if (u) { const H = HEROES[u.heroType]; u.mh = H.hp * Math.pow(1.42, Math.max(0, ST.t - 1)) * Math.pow(1.1, ST.heroUp.hp); u.hp = Math.min(u.mh, u.hp + (u.mh * .1)); u.d.mh = u.mh; u.d.hp = u.mh; u.d.dmg = H.dmg * Math.pow(1.42, Math.max(0, ST.t - 1)) * Math.pow(1.1, ST.heroUp.atk); u.dmg = u.d.dmg; u.d.cd = Math.max(.05, H.cd * Math.pow(.95, ST.heroUp.aspd)); u.cd = Math.min(u.cd, u.d.cd); u.d.spd = (H.spd + Math.min(ST.t, 10) * .35) * Math.pow(1.05, ST.heroUp.spd); } }
-    banner('영웅 강화 완료', HERO_UP_INFO[k].n + ' Lv.' + ST.heroUp[k] + ' · 다음 비용 ' + heroUpPrice(heroUpCost()) + ' 골드'); hud(true);
+    banner('영웅 강화 완료', HERO_UP_INFO[k].n + ' Lv.' + ST.heroUp[k] + ' · 다음 비용 ' + heroUpPrice(heroUpCost(k)) + ' 골드'); hud(true);
   }
   let hudT = 0;
   function hud(force) {
@@ -1870,7 +1879,7 @@ export function openWar(br) {
     sheet(html, s => { if (s === 'x') return closeSheet(); if (s === 'up') { const c = SK_UP[ST.sk[k]]; if (ST.sk[k] >= SK_MAX || ST.g < c) { sfx('up_no'); return; } ST.g -= c; ST.sk[k]++; save(); sfx('up_ok'); banner(I.n + ' 강화!', 'Lv.' + ST.sk[k] + ' · ' + row(ST.sk[k])); skSheet(k); renderCards(); skHud(true); hud(true); } });
   }
   function helpSheet() {
-    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>영웅 탭에서 버서커·대마법사·시즈골렘·대신관(사제) 중 한 명을 무료 출전시킬 수 있습니다. 영웅은 아군/적군 각각 생존 중 1명만 존재하며, 쓰러진 뒤 다른 영웅을 출전할 수 있습니다. 적 영웅은 아군 영웅보다 능력치가 50% 낮습니다. 영웅 탭에서 공격력·공격속도·체력·이동속도·힐량을 골드로 무제한 강화할 수 있으며, 강화 비용은 1골드부터 매번 2배가 됩니다. 영웅은 타워·포탑 피해를 받지 않습니다. 버서커는 느리지만 강한 대검 공격, 대마법사는 마법진 광역 공격, 시즈골렘은 높은 체력·방어력, 대신관은 회복·적 약화 역할입니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
+    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>영웅 탭에서 버서커·대마법사·시즈골렘·대신관(사제) 중 한 명을 무료 출전시킬 수 있습니다. 영웅은 아군/적군 각각 생존 중 1명만 존재하며, 쓰러진 뒤 다른 영웅을 출전할 수 있습니다. 적 영웅은 아군 영웅보다 능력치가 50% 낮습니다. 영웅 탭에서 공격력(힐러 회복량 포함)·공격속도·체력·이동속도 네 항목을 무제한 강화할 수 있으며, 비용은 항목별로 1골드부터 각각 2배씩 증가합니다. 영웅은 타워·포탑 피해를 받지 않습니다. 버서커는 느리지만 강한 대검 공격, 대마법사는 마법진 광역 공격, 시즈골렘은 높은 체력·방어력, 대신관은 회복·적 약화 역할입니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
   }
   function resultSheet() {
     const win = B.over === 'win';
