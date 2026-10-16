@@ -98,7 +98,7 @@ const stageMul = st => st <= MAXST ? 1 + .08 * ((st - 1) % 5) : 1.32 + .06 * (st
 
 /* 영웅 시스템: 기존 유닛/전투 규칙은 유지하고 영웅만 별도 특성으로 처리 */
 const HEROES = {
-  berserker: { n: '버서커', ic: '⚔️', spriteA: 'a70', spriteE: 'e70', hp: 1800, dmg: 260, cd: 1.15, rng: 12, spd: 13, size: 15, desc: '느린 공속 · 대검으로 강력한 단일 공격' },
+  berserker: { n: '버서커 전사', ic: '⚔️', spriteA: 'aberserker', spriteE: 'eberserker', hp: 1800, dmg: 260, cd: 1.15, rng: 12, spd: 13, size: 15, desc: '느린 공속 · 대검으로 강력한 단일 공격' },
   archmage: { n: '대마법사', ic: '🔮', spriteA: 'a71', spriteE: 'e71', hp: 1250, dmg: 190, cd: 1.8, rng: 62, spd: 10, size: 13, desc: '느린 공속 · 마법진 광역 공격' },
   siegeGolem: { n: '시즈골렘', ic: '🗿', spriteA: 'a50', spriteE: 'e50', hp: 7200, dmg: 75, cd: 1.35, rng: 12, spd: 6, size: 18, desc: '공격력은 낮지만 체력과 방어력이 매우 높음' },
   highPriest: { n: '대신관(사제)', ic: '✨', spriteA: 'a60', spriteE: 'e60', hp: 2200, dmg: 0, cd: 1, rng: 48, spd: 8, size: 13, desc: '공격 불가 · 아군 대량 회복 및 적군 약화' }
@@ -651,6 +651,9 @@ Object.assign(LOOK, {
   e171: { body: 'hum', big: 1, skin: '#3a0a0a', head: 'hood', hc: '#0a0606', arm: '#0a0606', robe: 1, trim: '#ff3a1a', tg: 1, pants: '#0a0606', wpn: 'staff', wc: '#3a2a2a', orb: '#ff3a1a', oc: '#ffe14a', pose: 'staff', eye: '#ff3a1a', eg: 1, cape: '#2a0606' },
   e172: { body: 'fly', kind: 'dragon', c1: '#0a0606', c2: '#5a0a0a', wing: '#2a0606', horn: '#ff3a1a', eye: '#ff3a1a', glowc: '#ff3a1a' },
 });
+/* 영웅 전용 버서커: 큰 대검과 망토가 있는 전용 픽셀 스프라이트 */
+LOOK.aberserker = { body: 'hum', big: 2, skin: '#d6a078', head: 'hornhelm', hc: '#38333a', horn: '#d7b46a', eye: '#fff0a0', eg: 1, arm: '#6b2635', trim: '#d8b86b', tg: 1, pads: '#8a3540', tab: '#6f1828', pants: '#34222a', boots: '#21151c', wpn: 'great', wc: '#d8dde8', wr: '#9ba8bc', wg: 1, wl: 10, pose: 'melee', cape: '#a51f32' };
+LOOK.eberserker = { body: 'hum', big: 2, skin: '#9b6a58', head: 'hornhelm', hc: '#28222a', horn: '#9a302a', eye: '#ff6a4a', eg: 1, arm: '#4a1822', trim: '#a86a4a', tg: 1, pads: '#62202a', tab: '#3c101b', pants: '#21141b', boots: '#100b10', wpn: 'great', wc: '#aab0be', wr: '#ff5038', wg: 1, wl: 10, pose: 'melee', cape: '#40101c' };
 const SPR = {};
 function bakeUnit(key) {
   if (SPR[key]) return SPR[key];
@@ -1164,6 +1167,14 @@ const CSS = `
 .wcd.sp{flex-basis:56px;background:linear-gradient(#211a12,#140f0a);border-color:#4a3a20}
 .wcd.sp .ic{font-size:22px;line-height:34px;height:34px;margin-top:2px;margin-bottom:auto}
 .wcd.tu{border-color:#2e3a4a;background:linear-gradient(#141a22,#0e1218)}
+/* 영웅 선택 UI: 모바일에서 설명이 잘리지 않도록 큰 가로형 카드 */
+.wcards:has(.whcard){display:flex;flex-direction:column;gap:7px;max-height:214px;overflow-y:auto;overflow-x:hidden;padding:2px 3px 5px}
+.whintro{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;padding:5px 8px;color:#f4eaff}
+.whintro b{font-size:13px;color:#ffd65a}.whintro span{font-size:11px;line-height:1.35;color:#c8b8d4}
+.wcd.whcard{flex:0 0 auto;width:100%;max-width:none;min-width:0;height:62px;box-sizing:border-box;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:5px 10px;text-align:left;border:1px solid #453650;border-radius:12px;background:linear-gradient(110deg,#24172c,#14101b);overflow:hidden}
+.wcd.whcard img{width:48px;height:48px;flex:none;object-fit:contain;margin:0;image-rendering:pixelated;background:#100c16;border-radius:8px}
+.whinfo{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px}.wcd.whcard .whinfo b{font-size:13px;color:#fff;white-space:nowrap}.wcd.whcard .whinfo s{font-size:10.5px;color:#c8b8d4;white-space:normal;line-height:1.15;text-align:left;font-weight:600}.wcd.whcard .whinfo small{font-size:10px;color:#ffd65a;font-weight:900}.wharrow{font-size:16px;color:#ffd65a;padding:0 3px}.wcd.whcard.whsel{border-color:#ffd65a;background:linear-gradient(110deg,#48301b,#211522);box-shadow:inset 0 0 0 1px #ffd65a55}.wcd.whcard:disabled{opacity:.65}
+
 .wsep{flex:none;width:1px;background:#2c2236;margin:4px 1px}
 .wmm{position:absolute;right:max(10px,env(safe-area-inset-right,0px));z-index:3;height:22px;border-radius:6px;border:1px solid #3a2e44;background:#0b0910cc;image-rendering:pixelated}
 .wbn{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.6);opacity:0;z-index:4;text-align:center;pointer-events:none;transition:transform .35s cubic-bezier(.2,1.6,.4,1),opacity .3s;text-shadow:0 2px 0 #000,0 0 18px #000}
@@ -1577,8 +1588,13 @@ export function openWar(br) {
       const dx = Math.round(u.x) - (u.side ? 31 : 32), dy = Math.round(u.y - u.z) - 50;
       if (dying) { x.globalAlpha = 1 - e.t / .5; }
       if ((u.d.t >= 6 || u.d.hero) && !dying) { x.globalCompositeOperation = 'lighter'; x.globalAlpha = .35 + .15 * Math.sin(now * 5 + u.id); const ac = u.d.hero ? (u.side ? '#ff4a3a' : '#ffd65a') : u.side ? (u.d.t === 7 ? '#ff3a1a' : '#a03ad0') : (u.d.t === 7 ? '#ffd25a' : '#fff3b0'); x.drawImage(glow(ac, 14), Math.round(u.x) - 14, Math.round(u.y - u.z) - 26, 28, 28); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; }
-      x.drawImage(s.f[f], dx, dy);
-      if (u.hit > 0 || dying) { x.globalAlpha = dying ? .8 * (1 - e.t / .5) : .85; x.drawImage(s.w[f], dx, dy); }
+      if (u.d.hero && u.heroType === 'berserker' && !dying) {
+        const wave = Math.sin(now * 8 + u.id) * 3, back = u.side ? 1 : -1;
+        x.fillStyle = u.side ? '#40101c' : '#a51f32'; x.beginPath(); x.moveTo(u.x - back * 3, u.y - 31); x.lineTo(u.x - back * 15, u.y - 26 + wave); x.lineTo(u.x - back * 13, u.y - 10 + wave * 1.5); x.lineTo(u.x - back * 4, u.y - 15); x.closePath(); x.fill();
+        x.strokeStyle = u.side ? '#8e2929' : '#e05a60'; x.lineWidth = 1; x.beginPath(); x.moveTo(u.x - back * 5, u.y - 28); x.lineTo(u.x - back * 12, u.y - 14 + wave); x.stroke();
+      }
+      if (u.d.hero && u.heroType === 'berserker') { const sw = 1.35, sh = 1.35; x.drawImage(s.f[f], dx - 10, dy - 12, 84 * sw, 72 * sh); if (u.hit > 0 || dying) { x.globalAlpha = dying ? .8 * (1 - e.t / .5) : .85; x.drawImage(s.w[f], dx - 10, dy - 12, 84 * sw, 72 * sh); } }
+      else { x.drawImage(s.f[f], dx, dy); if (u.hit > 0 || dying) { x.globalAlpha = dying ? .8 * (1 - e.t / .5) : .85; x.drawImage(s.w[f], dx, dy); } }
       x.globalAlpha = 1;
       if (!dying && (u.d.hero || u.hp < u.mh)) { const hy = dy + s.bb.y0 - (u.d.hero ? 5 : 3), w = u.d.hero ? 22 : Math.max(6, Math.min(14, u.d.size + 4)), hx = Math.round(u.x - w / 2); x.fillStyle = '#000000'; x.fillRect(hx - 1, hy - 1, w + 2, 3); x.fillStyle = '#3a0a0a'; x.fillRect(hx, hy, w, 1); x.fillStyle = u.side ? '#ff4a3a' : '#5aff6a'; x.fillRect(hx, hy, Math.max(1, Math.round(w * u.hp / u.mh)), 1); }
     }
@@ -1685,8 +1701,8 @@ export function openWar(br) {
       for (let tt = t; tt >= 1; tt--) for (let li = 0; li < 3; li++) { const d = def(0, tt, li); h.push('<button class="wcd" data-a="buy" data-t="' + tt + '" data-v="' + li + '"><span class="tr">' + tt + '성</span>' + (d.fly ? '<span class="ag f">✈</span>' : d.air ? '<span class="ag">대공</span>' : '') + '<span class="bd" hidden></span><img alt="" src="' + port(d.key) + '"><b>' + d.n + '</b><s>💰' + fshort(d.c) + '</s></button>'); if (li === 2 && tt > 1) h.push('<span class="wsep"></span>'); }
     } else if (tab === 'h') {
       const active = livingHero(0);
-      h.push('<div style="flex:0 0 100%;font-size:11px;color:#c8b8d4;padding:2px 4px">' + (active ? '출전 중: ' + active.d.n + ' · 전사하기 전에는 다른 영웅을 선택할 수 없습니다.' : '영웅은 무료 출전 · 아군 영웅이 살아 있는 동안 추가 출전 불가') + '</div>');
-      for (const key of HERO_KEYS) { const H = HEROES[key], selected = heroChoice === key; h.push('<button class="wcd sp" data-a="hero" data-v="' + key + '"' + (active ? ' disabled' : '') + ' style="min-width:104px;border-color:' + (selected ? '#ffd65a' : '#3a2e44') + '"><span class="ic">' + H.ic + '</span><b>' + H.n + '</b><s>' + H.desc + '</s><small style="color:#ffd65a">' + (active ? '영웅 출전 중' : '출전하기') + '</small></button>'); }
+      h.push('<div class="whintro"><b>' + (active ? '⚔️ ' + active.d.n + ' 출전 중' : '영웅 선택') + '</b><span>' + (active ? '영웅이 전사하면 다른 영웅을 선택할 수 있습니다.' : '영웅을 선택하면 즉시 전장에 출전합니다 · 무료') + '</span></div>');
+      for (const key of HERO_KEYS) { const H = HEROES[key], selected = heroChoice === key, portraitKey = key === 'berserker' ? 'aberserker' : H.spriteA; h.push('<button class="wcd whcard' + (selected ? ' whsel' : '') + '" data-a="hero" data-v="' + key + '"' + (active ? ' disabled' : '') + '><img alt="" src="' + port(portraitKey) + '"><span class="whinfo"><b>' + H.n + '</b><s>' + H.desc + '</s><small>' + (active ? '출전 중' : selected ? '선택됨 · 출전' : '눌러서 출전') + '</small></span><span class="wharrow">' + (selected ? '▶' : '＋') + '</span></button>'); }
     } else if (tab === 't') {
       for (let k = 0; k < 2; k++) { const n = ST.slots[k]; h.push('<button class="wcd sp" data-a="xp" data-v="' + k + '"><span class="ic">' + (n >= 3 ? '✅' : '➕') + '</span><b>' + (k ? '하단' : '상단') + ' 칸 ' + n + '/3</b><s>' + (n >= 3 ? 'MAX' : '💰' + fshort(SLOT_COST[n])) + '</s></button>'); }
       h.push('<span class="wsep"></span>');
