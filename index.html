@@ -664,7 +664,7 @@ function mnNorm(o){o=o||{};var now=Date.now(),st=+o.start>0?+o.start:0,to=st?Mat
 function mnRw(st,i,j){var h=(Math.floor(st/1000)^Math.imul(i+1,2654435761)^Math.imul(j+1,40503))|0;h=Math.imul(h^(h>>>15),2246822507);h=Math.imul(h^(h>>>13),3266489909);h^=h>>>16;return Math.round((1+((h>>>0)/4294967296)*2)*100)/100}
 function mnCart(){return MNCART[Math.min(MNCART.length-1,(+mine.cart||0))]}
 function mnMul(){return (1+MNC.lvlStep*((+mine.lvl||0))+((MNSK[mine.skin]||MNSK.base).b))*mnCart().m}
-function mnSpd(){return mnCart().s*(1+MNC.accStep*((+mine.acc||0)))}
+function mnSpd(){return mnCart().s} /* 가속권 제거됨: 기존 구매분(mine.acc)은 더 이상 반영하지 않음 */
 /* 효율 단위: 0성 생쥐=1, 1성=5, 2성=1성×10=50 / 거북이도 동일 */
 function mnUM(){return ((+mine.mice||0))+MNC.uM1*((+mine.m1||0))+MNC.uM1*MNC.uM2*((+mine.m2||0))}
 function mnUT(){return ((+mine.tur||0))+MNC.uT1*((+mine.t1||0))+MNC.uT1*MNC.uT2*((+mine.t2||0))}
@@ -694,7 +694,6 @@ function mnMS(ms){ms=Math.max(0,Math.ceil(ms/1000));var m=Math.floor(ms/60),s=ms
 function mnShopList(){var now=Date.now(),left=Math.max(0,(+mine.bo||0)-now),mc=mnMiceN(),lv=(+mine.lvl||0),L=[],ct=(+mine.cart||0),nx=MNCART[ct+1];
  L.push({g:'아이템'});
  L.push({id:'lvl',ic:'⛏️',name:'채굴량 +0.2배',desc:'채굴 보상 배율이 0.2씩 오릅니다(생쥐·거북이·박쥐 모두). 구매 횟수 제한 없음.',st:'구매 '+lv+'회 · 현재 채굴량 ×'+mnMul().toFixed(1),price:MNC.lvlPrice,max:false});
- L.push({id:'accel',ic:'⏩',name:'채굴장 가속권 (영구)',desc:'채굴·이동 속도가 영구히 +'+MNC.accStep+'배 빨라집니다. 구매 횟수 제한 없음.',st:'구매 '+((+mine.acc||0))+'회 · 현재 속도 ×'+mnSpd().toFixed(1),price:MNC.accP,max:false});
  L.push({g:'일꾼'});
  L.push({id:'mouse',ic:'🐭',name:'채굴 생쥐 +1마리',desc:'생쥐가 1마리 늘 때마다 사이클 보상이 한 마리분 더해집니다. 고정 가격.',st:mc+' / '+MNC.miceMax+'마리 (1성·2성 포함)',price:mc>=MNC.miceMax?0:mnMouseP(),max:mc>=MNC.miceMax});
  L.push({id:'turtle',ic:'🐢',name:'드릴 거북이',desc:'1마리당 1분마다 '+fmtK(MNC.turY)+'원(채굴량 배율 적용)을 채굴합니다. 고정 가격, 수량 제한 없음.',st:'보유 '+(((+mine.tur||0))+((+mine.t1||0))+((+mine.t2||0)))+'마리 · 효율 '+mnUT(),price:MNC.turP,max:false});
@@ -705,7 +704,7 @@ function mnShopList(){var now=Date.now(),left=Math.max(0,(+mine.bo||0)-now),mc=m
  ['base','emerald','gold','diamond'].forEach(function(k){var d=MNSK[k],own=mine.skins.indexOf(k)>=0,on=mine.skin==k;
   L.push({id:own?'eq_'+k:'sk_'+k,ic:d.ic,name:d.n,desc:d.b?'채굴량 +'+Math.round(d.b*100)+'% (채굴량 배율에 더해집니다)':'기본 채굴장입니다.',st:on?'장착 중':own?'보유 중':'미보유',price:own?0:d.p,max:false,free:own,own:own,on:on})});
  return L.map(function(x){if(x.g)return x;x.priceTxt=x.free?(x.on?'장착 중':'장착'):(x.max?'최대':fmtK(x.price)+'원');x.can=x.free?!x.on:(!x.max&&bal>=x.price-1e-9);return x})}
-function mnBuy1(id){var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it)return{ok:false,msg:'알 수 없는 상품'};
+function mnBuy1(id){if(id=='accel')return{ok:false,msg:'판매가 종료된 상품입니다'};var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it)return{ok:false,msg:'알 수 없는 상품'};
  if(id.slice(0,3)=='eq_'){mine.skin=id.slice(3);return{ok:true,msg:it.name+' 장착'}}
  if(it.max)return{ok:false,msg:'이미 최대입니다'};if(bal<it.price-1e-9)return{ok:false,msg:'잔액이 부족합니다'};
  mnTick();bal=+(bal-it.price).toFixed(2);
@@ -721,7 +720,7 @@ function mnBuy1(id){var it=mnShopList().filter(function(x){return x.id==id})[0];
  return{ok:true,paid:it.price,name:it.name,msg:it.name+' 구매 완료 (−'+fmtK(it.price)+'원)'}}
 /* 수량 구매(x1/x10/x100): 최대 n개, 잔액·상한이 허락하는 만큼 */
 function mnQuote(id,n){if(id.slice(0,3)=='eq_'||id.slice(0,3)=='sk_')return{k:1,total:0};var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it||it.max)return{k:0,total:0};var b=bal,tot=0,k=0,p=it.price,cap=n;if(id=='mouse')cap=Math.min(n,Math.max(0,MNC.miceMax-mnMiceN()));if(id=='cart')cap=1;var lim=1e9;if(id=='turtle'||id=='bat'||id=='accel'||id=='lvl'||id=='shield'){var curN={turtle:+mine.tur||0,bat:+mine.bat||0,accel:+mine.acc||0,lvl:+mine.lvl||0,shield:+mine.sh||0}[id];cap=Math.min(cap,Math.max(0,lim-curN))}k=p>0?Math.max(0,Math.min(cap,Math.floor((b+1e-9)/p))):cap;tot=k*p;return{k:k,total:tot}}
-function mnBuy(id,n){n=Math.max(1,n|0);if(id.slice(0,3)=='eq_'||id.slice(0,3)=='sk_'||id=='cart'||n==1)return mnBuy1(id);
+function mnBuy(id,n){if(id=='accel')return{ok:false,msg:'판매가 종료된 상품입니다'};n=Math.max(1,n|0);if(id.slice(0,3)=='eq_'||id.slice(0,3)=='sk_'||id=='cart'||n==1)return mnBuy1(id);
  var it=mnShopList().filter(function(x){return x.id==id})[0];if(!it)return{ok:false,msg:'알 수 없는 상품'};if(it.max)return{ok:false,msg:'이미 최대입니다'};
  var q=mnQuote(id,n),k=q.k;if(!k)return{ok:false,msg:'잔액이 부족합니다'};
  mnTick();var before=bal,c=0,paid=0;
