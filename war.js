@@ -1244,6 +1244,11 @@ export function openWar(br) {
   ST.slots = Array.isArray(ST.slots) ? [clamp(ST.slots[0] | 0, 1, 3), clamp(ST.slots[1] | 0, 1, 3)] : [1, 1]; ST.v = 2;
   ST.best = Math.max(1, ST.best | 0, ST.st | 0); ST.t = clamp(ST.t | 0, 1, MAXT); ST.st = Math.max(1, ST.st | 0); ST.g = Math.max(0, +ST.g || 0); ST.gem = Math.max(0, ST.gem | 0); ST.spd = clamp(ST.spd | 0 || 1, 1, 3); ST.sp = clamp(ST.sp | 0 || 1, 1, ST.spd);
   ST.sk = { d: clamp((ST.sk && ST.sk.d) | 0 || 1, 1, SK_MAX), s: clamp((ST.sk && ST.sk.s) | 0 || 1, 1, SK_MAX) };
+  ST.heroUp = Object.assign({ atk: 0, aspd: 0, hp: 0, spd: 0, heal: 0, total: 0 }, ST.heroUp || {});
+  for (const k of ['atk','aspd','hp','spd','heal','total']) ST.heroUp[k] = Math.max(0, Math.floor(+ST.heroUp[k] || 0));
+  const HERO_UP_INFO = { atk: { n: '공격력', ic: '⚔️', desc: '공격력 +10%' }, aspd: { n: '공격속도', ic: '⚡', desc: '공격속도 +5%' }, hp: { n: '체력', ic: '❤️', desc: '최대 체력 +10%' }, spd: { n: '이동속도', ic: '👟', desc: '이동속도 +5%' }, heal: { n: '힐량', ic: '✨', desc: '힐러 회복량 +10%' } };
+  const heroUpCost = () => Math.pow(2, ST.heroUp.total);
+  const heroUpPrice = n => n >= 1024 ? n.toExponential(2) : Math.floor(n).toLocaleString('ko-KR');
   function applyLose(s) { ST.inb = 0; if (s >= ST.best) ST.best = Math.max(1, s - 1); ST.st = Math.max(1, s - 1); }
   let pendingPenalty = false; if (ST.inb) { applyLose(ST.st); pendingPenalty = true; }
   let saveT = 0; const save = () => { saveT = 0; if (br.setState) br.setState(JSON.parse(JSON.stringify(ST))); };
@@ -1304,15 +1309,18 @@ export function openWar(br) {
   function spawnHero(side, type, enemyScale = 1) {
     if (!B || B.over || livingHero(side)) return null;
     const H = HEROES[type] || HEROES.berserker, tier = side ? B.et : ST.t;
-    /* 적 영웅의 기본 능력치는 아군과 같은 기준으로 산출한 뒤 정확히 2.5배 적용 */
-    const tierScale = Math.pow(1.42, Math.max(0, ST.t - 1));
-    const scale = side ? enemyScale : 1;
+    /* 영구 강화 적용. 적 영웅은 아군 영웅 대비 모든 주요 능력치가 50% */
+    const tierScale = Math.pow(1.42, Math.max(0, ST.t - 1)), up = ST.heroUp;
+    const enemyFactor = side ? .5 : 1;
+    const hp = H.hp * tierScale * Math.pow(1.1, up.hp) * enemyFactor;
+    const dmg = H.dmg * tierScale * Math.pow(1.1, up.atk) * enemyFactor;
+    const cd = Math.max(.05, H.cd * Math.pow(.95, up.aspd) / enemyFactor);
+    const speed = (H.spd + Math.min(ST.t, 10) * .35) * Math.pow(1.05, up.spd) * enemyFactor;
     const d = { side, t: tier, li: 0, c: 0, n: H.n, key: side ? H.spriteE : H.spriteA,
-      hp: H.hp * tierScale * scale, dmg: H.dmg * tierScale * scale, cd: H.cd, rng: H.rng,
-      spd: (H.spd + Math.min(ST.t, 10) * .35) * scale, train: 0, size: H.size, fly: false, air: true,
+      hp, dmg, cd, rng: H.rng, spd: speed, train: 0, size: H.size, fly: false, air: true,
       proj: null, splash: 0, hero: true, heroType: type, armor: type === 'siegeGolem' ? .72 : type === 'highPriest' ? .18 : .08 };
     const u = { id: uid++, side, d, li: 0, lane, x: side ? EX + 6 : AX - 6, oy: 0,
-      hp: d.hp, mh: d.hp, dmg: d.dmg, cd: H.cd, atk: 0, an: Math.random() * 3, hit: 0, dead: 0,
+      hp: d.hp, mh: d.hp, dmg: d.dmg, cd: d.cd, atk: 0, an: Math.random() * 3, hit: 0, dead: 0,
       spr: bakeUnit(d.key), dir: side ? -1 : 1, z: 0, bobP: Math.random() * 6, hero: true, heroType: type,
       supportT: .2, walk: 0 };
     u.y = laneY(lane, u.x); B.U.push(u);
@@ -1326,7 +1334,7 @@ export function openWar(br) {
     if (livingHero(0)) { toast('아군 영웅이 살아 있는 동안 다른 영웅을 출전시킬 수 없습니다'); return; }
     heroChoice = HEROES[type] ? type : 'berserker';
     const own = spawnHero(0, heroChoice);
-    if (own && !livingHero(1)) { B.heroSpawned = true; spawnHero(1, heroChoice, 2.5); }
+    if (own && !livingHero(1)) { B.heroSpawned = true; spawnHero(1, heroChoice, .5); }
     renderCards(); hud(true);
   }
   /* 파티클·효과 */
@@ -1374,7 +1382,7 @@ export function openWar(br) {
     if (o.hp <= 0) { o.hp = 0; endBattle(side ? 'win' : 'lose'); }
   }
   /* 범위 피해 */
-  function area(side, x, y, r, dmg, slow) { for (const v of B.U) { if (v.dead || v.side === side) continue; const dx = v.x - x, dy = (v.y - y) * 1.3; if (dx * dx + dy * dy <= r * r) { hurt(v, dmg, side); if (slow) v.slow = 2.5; } } const bf = baseFront(1 - side); if (Math.abs(x - bf) < r + 6) hurtBase(1 - side, dmg * .7); }
+  function area(side, x, y, r, dmg, slow) { for (const v of B.U) { if (v.dead || v.side === side || v.d.hero) continue; const dx = v.x - x, dy = (v.y - y) * 1.3; if (dx * dx + dy * dy <= r * r) { hurt(v, dmg, side); if (slow) v.slow = 2.5; } } const bf = baseFront(1 - side); if (Math.abs(x - bf) < r + 6) hurtBase(1 - side, dmg * .7); }
   /* 발사체 */
   function shoot(side, type, sx, sy, sz, tgt, dmg, splash, slow) {
     const P = PJ[type]; if (!P) return;
@@ -1415,12 +1423,12 @@ export function openWar(br) {
     if (td.beam) { // 광선
       const bc = BEAMC[td.proj] || BEAMC.beam, dx = tg.x - mx, dy = tg.y - my, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, len = td.rng + 10;
       fx({ k: 'beam', x0: mx, y0: my - mz, x1: mx + ux * len, y1: my + uy * len - tg.z - 6, l: .35, c: bc, w: td.bw / 9 });
-      for (const v of B.U) { if (v.dead || v.side === side) continue; const px = v.x - mx, py = v.y - my, t = px * ux + py * uy; if (t < 0 || t > len) continue; const d = Math.abs(px * uy - py * ux); if (d < td.bw) { hurt(v, dmg, side); if (td.slow) v.slow = 2.5; burst(v.x, v.y, v.z + 8, [bc[0], bc[1]], 5, 40, { add: 1 }); } }
+      for (const v of B.U) { if (v.dead || v.side === side || v.d.hero) continue; const px = v.x - mx, py = v.y - my, t = px * ux + py * uy; if (t < 0 || t > len) continue; const d = Math.abs(px * uy - py * ux); if (d < td.bw) { hurt(v, dmg, side); if (td.slow) v.slow = 2.5; burst(v.x, v.y, v.z + 8, [bc[0], bc[1]], 5, 40, { add: 1 }); } }
       sfx('beam'); shake = Math.max(shake, 2); flashA = Math.max(flashA, .08); flashC = bc[1]; return;
     }
     shoot(side, td.proj === 'fireball' ? FIREBALL_T : td.proj, mx, my, mz, tg, dmg, td.splash, td.slow);
   }
-  function nearestEnemy(side, x, y, r, excl) { let best = null, bd = r * r; for (const v of B.U) { if (v.dead || v.side === side || (excl && excl.has(v.id))) continue; const dx = v.x - x, dy = (v.y - y) * 1.2, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = v; } } return best; }
+  function nearestEnemy(side, x, y, r, excl) { let best = null, bd = r * r; for (const v of B.U) { if (v.dead || v.side === side || v.d.hero || (excl && excl.has(v.id))) continue; const dx = v.x - x, dy = (v.y - y) * 1.2, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = v; } } return best; }
   /* 결과 */
   function endBattle(r) {
     if (B.over) return; B.over = r; B.overT = 0; ST.inb = 0;
@@ -1468,7 +1476,7 @@ export function openWar(br) {
         if (u.supportT <= 0) {
           u.supportT = 1.05;
           for (const ally of B.U) if (!ally.dead && ally.side === u.side && ally !== u && Math.hypot(ally.x-u.x, (ally.y-u.y)*1.2) <= 58) {
-            const heal = Math.min(ally.mh - ally.hp, u.mh * .075); if (heal > 0) { ally.hp += heal; num(ally.x, ally.y - 20, '+' + fshort(heal), '#75ffab'); fx({ k:'spark', x:ally.x, y:ally.y-12, l:.35, c:'#75ffab' }); }
+            const heal = Math.min(ally.mh - ally.hp, u.mh * .075 * Math.pow(1.1, ST.heroUp.heal)); if (heal > 0) { ally.hp += heal; num(ally.x, ally.y - 20, '+' + fshort(heal), '#75ffab'); fx({ k:'spark', x:ally.x, y:ally.y-12, l:.35, c:'#75ffab' }); }
           }
           for (const foe of B.U) if (!foe.dead && foe.side !== u.side && Math.hypot(foe.x-u.x, (foe.y-u.y)*1.2) <= 52) { foe.slow = Math.max(foe.slow || 0, 1.7); foe.dmgDebuff = Math.max(foe.dmgDebuff || 0, 1.7); }
           fx({ k:'ring', x:u.x, y:u.y, r0:8, r1:52, l:.45, c:u.side ? '#c84aff' : '#75ffab' });
@@ -1707,6 +1715,8 @@ export function openWar(br) {
     } else if (tab === 'h') {
       const active = livingHero(0);
       h.push('<div class="whintro"><b>' + (active ? '⚔️ ' + active.d.n + ' 출전 중' : '영웅 선택') + '</b><span>' + (active ? '영웅이 전사하면 다른 영웅을 선택할 수 있습니다.' : '영웅을 선택하면 즉시 전장에 출전합니다 · 무료') + '</span></div>');
+      h.push('<div class="whintro"><b>⬆️ 영웅 강화 · 총 ' + ST.heroUp.total + '회</b><span>다음 강화 비용: 💰' + heroUpPrice(heroUpCost()) + ' 골드 · 강화 비용은 매번 2배 · 무제한</span></div>');
+      for (const k of ['atk','aspd','hp','spd','heal']) { const I = HERO_UP_INFO[k]; h.push('<button class="wcd sp" data-a="hup" data-v="' + k + '"><span class="ic">' + I.ic + '</span><b>' + I.n + ' Lv.' + ST.heroUp[k] + '</b><s>' + I.desc + '</s><small>강화 💰' + heroUpPrice(heroUpCost()) + '</small></button>'); }
       for (const key of HERO_KEYS) { const H = HEROES[key], selected = heroChoice === key, portraitKey = key === 'berserker' ? 'aberserker' : H.spriteA; h.push('<button class="wcd whcard' + (selected ? ' whsel' : '') + '" data-a="hero" data-v="' + key + '"' + (active ? ' disabled' : '') + '><img alt="" src="' + port(portraitKey) + '"><span class="whinfo"><b>' + H.n + '</b><s>' + H.desc + '</s><small>' + (active ? '출전 중' : selected ? '선택됨 · 출전' : '눌러서 출전') + '</small></span><span class="wharrow">' + (selected ? '▶' : '＋') + '</span></button>'); }
     } else if (tab === 't') {
       for (let k = 0; k < 2; k++) { const n = ST.slots[k]; h.push('<button class="wcd sp" data-a="xp" data-v="' + k + '"><span class="ic">' + (n >= 3 ? '✅' : '➕') + '</span><b>' + (k ? '하단' : '상단') + ' 칸 ' + n + '/3</b><s>' + (n >= 3 ? 'MAX' : '💰' + fshort(SLOT_COST[n])) + '</s></button>'); }
@@ -1720,6 +1730,15 @@ export function openWar(br) {
       h.push('<button class="wcd sp" data-a="help"><span class="ic">📖</span><b>도움말</b><s>규칙</s></button>');
     }
     $('wcards').innerHTML = h.join(''); $('wcards').scrollLeft = 0; qDirty = 1; hud(true);
+  }
+  function heroUpgrade(k) {
+    if (!HERO_UP_INFO[k]) return;
+    const cost = heroUpCost();
+    if (ST.g < cost) { toast('영웅 강화 골드가 부족합니다'); sfx('up_no'); return; }
+    ST.g -= cost; ST.heroUp[k]++; ST.heroUp.total++;
+    save(); sfx('buy'); renderCards();
+    if (B) { const u = livingHero(0); if (u) { const H = HEROES[u.heroType]; u.mh = H.hp * Math.pow(1.42, Math.max(0, ST.t - 1)) * Math.pow(1.1, ST.heroUp.hp); u.hp = Math.min(u.mh, u.hp + (u.mh * .1)); u.d.mh = u.mh; u.d.hp = u.mh; u.d.dmg = H.dmg * Math.pow(1.42, Math.max(0, ST.t - 1)) * Math.pow(1.1, ST.heroUp.atk); u.dmg = u.d.dmg; u.d.cd = Math.max(.05, H.cd * Math.pow(.95, ST.heroUp.aspd)); u.cd = Math.min(u.cd, u.d.cd); u.d.spd = (H.spd + Math.min(ST.t, 10) * .35) * Math.pow(1.05, ST.heroUp.spd); } }
+    banner('영웅 강화 완료', HERO_UP_INFO[k].n + ' Lv.' + ST.heroUp[k] + ' · 다음 비용 ' + heroUpPrice(heroUpCost()) + ' 골드'); hud(true);
   }
   let hudT = 0;
   function hud(force) {
@@ -1839,7 +1858,7 @@ export function openWar(br) {
     sheet(html, s => { if (s === 'x') return closeSheet(); if (s === 'up') { const c = SK_UP[ST.sk[k]]; if (ST.sk[k] >= SK_MAX || ST.g < c) { sfx('up_no'); return; } ST.g -= c; ST.sk[k]++; save(); sfx('up_ok'); banner(I.n + ' 강화!', 'Lv.' + ST.sk[k] + ' · ' + row(ST.sk[k])); skSheet(k); renderCards(); skHud(true); hud(true); } });
   }
   function helpSheet() {
-    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>영웅 탭에서 버서커·대마법사·시즈골렘·대신관(사제) 중 한 명을 무료 출전시킬 수 있습니다. 영웅은 아군/적군 각각 생존 중 1명만 존재하며, 쓰러진 뒤 다른 영웅을 출전할 수 있습니다. 적 영웅은 아군 영웅보다 능력치가 2.5배입니다. 버서커는 느리지만 강한 대검 공격, 대마법사는 마법진 광역 공격, 시즈골렘은 높은 체력·방어력, 대신관은 회복·적 약화 역할입니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
+    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>영웅 탭에서 버서커·대마법사·시즈골렘·대신관(사제) 중 한 명을 무료 출전시킬 수 있습니다. 영웅은 아군/적군 각각 생존 중 1명만 존재하며, 쓰러진 뒤 다른 영웅을 출전할 수 있습니다. 적 영웅은 아군 영웅보다 능력치가 50% 낮습니다. 영웅 탭에서 공격력·공격속도·체력·이동속도·힐량을 골드로 무제한 강화할 수 있으며, 강화 비용은 1골드부터 매번 2배가 됩니다. 영웅은 타워·포탑 피해를 받지 않습니다. 버서커는 느리지만 강한 대검 공격, 대마법사는 마법진 광역 공격, 시즈골렘은 높은 체력·방어력, 대신관은 회복·적 약화 역할입니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
   }
   function resultSheet() {
     const win = B.over === 'win';
@@ -1860,6 +1879,7 @@ export function openWar(br) {
     if (a === 'go') { sfx('spawn'); newBattle(selSt); layout(); return; }
     if (a === 'upg') return upgSheet();
     if (a === 'sk') return useSk(v);
+    if (a === 'hup') return heroUpgrade(v);
     if (a === 'hero') { if (livingHero(0)) { toast('아군 영웅이 살아 있는 동안 다른 영웅을 출전시킬 수 없습니다'); return; } return deployHero(v); }
     if (a === 'skup') return skSheet(v);
     if (a === 'swap') return swapSheet();
