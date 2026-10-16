@@ -98,10 +98,10 @@ const stageMul = st => st <= MAXST ? 1 + .08 * ((st - 1) % 5) : 1.32 + .06 * (st
 
 /* 영웅 시스템: 기존 유닛/전투 규칙은 유지하고 영웅만 별도 특성으로 처리 */
 const HEROES = {
-  berserker: { n: '버서커 전사', ic: '⚔️', spriteA: 'aberserker', spriteE: 'eberserker', hp: 1800, dmg: 260, cd: 1.15, rng: 12, spd: 13, size: 15, desc: '느린 공속 · 대검으로 강력한 단일 공격' },
-  archmage: { n: '대마법사', ic: '🔮', spriteA: 'a71', spriteE: 'e71', hp: 1250, dmg: 190, cd: 1.8, rng: 62, spd: 10, size: 13, desc: '느린 공속 · 마법진 광역 공격' },
-  siegeGolem: { n: '시즈골렘', ic: '🗿', spriteA: 'a50', spriteE: 'e50', hp: 7200, dmg: 75, cd: 1.35, rng: 12, spd: 6, size: 18, desc: '공격력은 낮지만 체력과 방어력이 매우 높음' },
-  highPriest: { n: '대신관(사제)', ic: '✨', spriteA: 'a60', spriteE: 'e60', hp: 2200, dmg: 0, cd: 1, rng: 48, spd: 8, size: 13, desc: '공격 불가 · 아군 대량 회복 및 적군 약화' }
+  berserker: { n: '버서커 전사', ic: '⚔️', spriteA: 'aberserker', spriteE: 'eberserker', hp: 1800, dmg: 260, cd: 1.15, rng: 4, spd: 13, size: 30, desc: '느린 공속 · 대검으로 강력한 단일 공격' },
+  archmage: { n: '대마법사', ic: '🔮', spriteA: 'a71', spriteE: 'e71', hp: 1250, dmg: 190, cd: 1.8, rng: 62, spd: 10, size: 22, desc: '느린 공속 · 마법진 광역 공격' },
+  siegeGolem: { n: '시즈골렘', ic: '🗿', spriteA: 'a50', spriteE: 'e50', hp: 7200, dmg: 75, cd: 1.35, rng: 4, spd: 6, size: 34, desc: '공격력은 낮지만 체력과 방어력이 매우 높음' },
+  highPriest: { n: '대신관(사제)', ic: '✨', spriteA: 'a60', spriteE: 'e60', hp: 2200, dmg: 0, cd: 1, rng: 48, spd: 8, size: 22, desc: '공격 불가 · 아군 대량 회복 및 적군 약화' }
 };
 const HERO_KEYS = Object.keys(HEROES);
 
@@ -1490,14 +1490,16 @@ export function openWar(br) {
       }
       /* 대상 찾기 */
       let tgt = null, best = 1e9;
-      for (const v of B.U) { if (v.dead || v.side === u.side || (v.d.fly && !d.air)) continue; const dx = (v.x - u.x) * u.dir; if (dx < -6) continue; const dy = (v.y - u.y) * 1.4, dd = Math.hypot(dx, dy) - (d.size + v.d.size) * .5; if (dd <= d.rng && dd < best) { best = dd; tgt = v; } }
+      for (const v of B.U) { if (v.dead || v.side === u.side || (v.d.fly && !d.air)) continue; if (d.hero && v.lane !== u.lane) continue; const dx = (v.x - u.x) * u.dir; if (dx < -6) continue; const dy = (v.y - u.y) * 1.4, dd = Math.hypot(dx, dy) - (d.size + v.d.size) * .5; const reach = d.hero && (u.heroType === 'berserker' || u.heroType === 'siegeGolem') ? 5 : d.rng; if (dd <= reach && dd < best) { best = dd; tgt = v; } }
       const bd = (baseFront(1 - u.side) - u.x) * u.dir;
       if (!tgt && bd <= d.rng + 2) tgt = { base: 1 - u.side };
       if (tgt) { if (u.cd <= 0) { u.atk = .38; u.tgt = tgt; u.cd = d.cd; } continue; }
       /* 이동 */
       let nx = u.x + u.dir * d.spd * (u.slow > 0 ? .45 : 1) * (u.side === 0 && SKR.s.act > 0 ? 1 + skPct('s', ST.sk.s) : 1) * dt;
       if (u.side === 0) { if (SKR.d.act > 0 && Math.random() < dt * 5) part({ x: u.x + rnd(-6, 6), y: u.y, z: u.z + rnd(2, 22), vz: rnd(4, 10), l: rnd(.3, .6), c: ['#e0f4ff', '#5ab0ff', '#2a6ad0'], add: 1 }); if (SKR.s.act > 0 && Math.random() < dt * 8) part({ x: u.x - u.dir * rnd(4, 10), y: u.y, z: u.z + rnd(1, 14), vx: -u.dir * rnd(20, 40), l: rnd(.15, .3), c: ['#fff6c0', '#ffd65a'], add: 1 }); }
-      if (!d.fly) { for (const f of lanes[u.side][u.lane]) { if (f === u || f.dead) continue; const ahead = (f.x - u.x) * u.dir; if (ahead > 0 && ahead < 40) { const gap = (d.size + f.d.size) * .5 + 1.5; if ((f.x - nx) * u.dir < gap) nx = f.x - u.dir * gap; } } }
+      if (!d.fly) { for (const f of lanes[u.side][u.lane]) { if (f === u || f.dead) continue; const ahead = (f.x - u.x) * u.dir; if (ahead > 0 && ahead < 52) { const gap = (d.size + f.d.size) * .5 + 1.5; if ((f.x - nx) * u.dir < gap) nx = f.x - u.dir * gap; } } }
+      /* 영웅은 적 유닛과 겹치지 않게 접촉 거리에서 멈춤. 차선이 다른 적은 무시하고 도로를 따라감. */
+      if (d.hero) { for (const f of B.U) { if (f.dead || f.side === u.side || f.lane !== u.lane) continue; const ahead = (f.x - u.x) * u.dir; if (ahead > 0) { const gap = (d.size + f.d.size) * .5 + 4; if ((f.x - nx) * u.dir < gap) nx = f.x - u.dir * gap; } } }
       if (u.side === 0) nx = Math.max(u.x, Math.min(nx, EX - 2)); else nx = Math.min(u.x, Math.max(nx, AX + 2));
       if (Math.abs(nx - u.x) > .01) { u.x = nx; u.walk = (u.walk || 0) + Math.abs(nx - u.x) + dt * d.spd; if (d.li === 2 && !d.fly && Math.random() < dt * 8) part({ x: u.x - u.dir * 4, y: u.y, vx: -u.dir * 8, vz: rnd(4, 10), l: .5, c: [u.x < 240 ? '#c8a878' : '#5a4a44', u.x < 240 ? '#a08860' : '#3a2e2a'], s: 1, drag: 2 }); }
       u.y = laneY(u.lane, u.x) + u.oy;
@@ -1593,7 +1595,10 @@ export function openWar(br) {
         x.fillStyle = u.side ? '#40101c' : '#a51f32'; x.beginPath(); x.moveTo(u.x - back * 3, u.y - 31); x.lineTo(u.x - back * 15, u.y - 26 + wave); x.lineTo(u.x - back * 13, u.y - 10 + wave * 1.5); x.lineTo(u.x - back * 4, u.y - 15); x.closePath(); x.fill();
         x.strokeStyle = u.side ? '#8e2929' : '#e05a60'; x.lineWidth = 1; x.beginPath(); x.moveTo(u.x - back * 5, u.y - 28); x.lineTo(u.x - back * 12, u.y - 14 + wave); x.stroke();
       }
-      if (u.d.hero && u.heroType === 'berserker') { const sw = 1.35, sh = 1.35; x.drawImage(s.f[f], dx - 10, dy - 12, 84 * sw, 72 * sh); if (u.hit > 0 || dying) { x.globalAlpha = dying ? .8 * (1 - e.t / .5) : .85; x.drawImage(s.w[f], dx - 10, dy - 12, 84 * sw, 72 * sh); } }
+      if (u.d.hero && u.heroType === 'berserker') { const hw = 76, hh = 67, hx0 = Math.round(u.x - hw / 2), hy0 = Math.round(u.y - u.z - hh + 5); x.drawImage(s.f[f], hx0, hy0, hw, hh); if (u.hit > 0 || dying) { x.globalAlpha = dying ? .8 * (1 - e.t / .5) : .85; x.drawImage(s.w[f], hx0, hy0, hw, hh); x.globalAlpha = 1; }
+        /* 대검: 캐릭터 전방에 크게 보이도록 별도 픽셀 검을 렌더링 */
+        if (!dying) { const dir = u.dir, sx = Math.round(u.x + dir * 10), sy = Math.round(u.y - 26 - (u.atk > 0 ? 5 : 0)); x.lineCap = 'round'; x.lineJoin = 'round'; x.strokeStyle = '#241c27'; x.lineWidth = 7; x.beginPath(); x.moveTo(sx - dir * 4, sy + 10); x.lineTo(sx + dir * 18, sy - 18); x.stroke(); x.strokeStyle = '#bfcbd9'; x.lineWidth = 4; x.beginPath(); x.moveTo(sx - dir * 4, sy + 10); x.lineTo(sx + dir * 18, sy - 18); x.stroke(); x.strokeStyle = '#f5f7ff'; x.lineWidth = 1.5; x.beginPath(); x.moveTo(sx + dir * 1, sy + 4); x.lineTo(sx + dir * 18, sy - 18); x.stroke(); x.strokeStyle = '#8a5b35'; x.lineWidth = 4; x.beginPath(); x.moveTo(sx - dir * 8, sy + 14); x.lineTo(sx + dir * 1, sy + 5); x.stroke(); }
+      }
       else { x.drawImage(s.f[f], dx, dy); if (u.hit > 0 || dying) { x.globalAlpha = dying ? .8 * (1 - e.t / .5) : .85; x.drawImage(s.w[f], dx, dy); } }
       x.globalAlpha = 1;
       if (!dying && (u.d.hero || u.hp < u.mh)) { const hy = dy + s.bb.y0 - (u.d.hero ? 5 : 3), w = u.d.hero ? 22 : Math.max(6, Math.min(14, u.d.size + 4)), hx = Math.round(u.x - w / 2); x.fillStyle = '#000000'; x.fillRect(hx - 1, hy - 1, w + 2, 3); x.fillStyle = '#3a0a0a'; x.fillRect(hx, hy, w, 1); x.fillStyle = u.side ? '#ff4a3a' : '#5aff6a'; x.fillRect(hx, hy, Math.max(1, Math.round(w * u.hp / u.mh)), 1); }
