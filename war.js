@@ -1326,7 +1326,7 @@ export function openWar(br) {
     u.y = laneY(lane, u.x); B.U.push(u);
     fx({ k: 'ring', x: u.x, y: u.y, r0: 4, r1: 22, l: .65, c: side ? '#ff4a3a' : '#ffd65a' });
     for (let i = 0; i < 22; i++) part({ x: u.x + rnd(-8, 8), y: u.y, z: rnd(0, 18), vz: rnd(15, 42), l: rnd(.4, .9), c: side ? ['#ff5a3a', '#b04aff', '#fff0c0'] : ['#fff6c0', '#ffd65a', '#7ff0ff'], add: 1 });
-    banner(H.n + (side ? ' · 적 영웅' : ' 출전!'), side ? '아군 영웅보다 강력한 능력치' : '영웅은 한 번에 한 명만 출전할 수 있습니다');
+    banner(H.n + (side ? ' · 적 영웅' : ' 출전!'), side ? '아군 영웅보다 능력치 50% 낮음' : '적 영웅과 교전 가능 · 한 번에 한 명만 출전');
     sfx('spawn'); return u;
   }
   function deployHero(type) {
@@ -1382,7 +1382,7 @@ export function openWar(br) {
     if (o.hp <= 0) { o.hp = 0; endBattle(side ? 'win' : 'lose'); }
   }
   /* 범위 피해 */
-  function area(side, x, y, r, dmg, slow) { for (const v of B.U) { if (v.dead || v.side === side || v.d.hero) continue; const dx = v.x - x, dy = (v.y - y) * 1.3; if (dx * dx + dy * dy <= r * r) { hurt(v, dmg, side); if (slow) v.slow = 2.5; } } const bf = baseFront(1 - side); if (Math.abs(x - bf) < r + 6) hurtBase(1 - side, dmg * .7); }
+  function area(side, x, y, r, dmg, slow, includeHeroes = false) { for (const v of B.U) { if (v.dead || v.side === side || (v.d.hero && !includeHeroes)) continue; const dx = v.x - x, dy = (v.y - y) * 1.3; if (dx * dx + dy * dy <= r * r) { hurt(v, dmg, side); if (slow) v.slow = 2.5; } } const bf = baseFront(1 - side); if (Math.abs(x - bf) < r + 6) hurtBase(1 - side, dmg * .7); }
   /* 발사체 */
   function shoot(side, type, sx, sy, sz, tgt, dmg, splash, slow) {
     const P = PJ[type]; if (!P) return;
@@ -1481,7 +1481,19 @@ export function openWar(br) {
           for (const foe of B.U) if (!foe.dead && foe.side !== u.side && Math.hypot(foe.x-u.x, (foe.y-u.y)*1.2) <= 52) { foe.slow = Math.max(foe.slow || 0, 1.7); foe.dmgDebuff = Math.max(foe.dmgDebuff || 0, 1.7); }
           fx({ k:'ring', x:u.x, y:u.y, r0:8, r1:52, l:.45, c:u.side ? '#c84aff' : '#75ffab' });
         }
-        /* 사제는 전선으로 이동하되 직접 공격하지 않음 */
+        /* 사제도 적 영웅과는 교전한다. 일반 적 유닛을 직접 공격하지 않고 지원 역할을 유지한다. */
+        let priestHero = null, priestHeroGap = 1e9;
+        for (const foe of B.U) {
+          if (foe.dead || foe.side === u.side || !foe.d.hero || foe.lane !== u.lane) continue;
+          const dx = (foe.x - u.x) * u.dir;
+          if (dx < -6) continue;
+          const gap = Math.hypot(dx, (foe.y-u.y)*1.4) - (d.size + foe.d.size) * .5;
+          if (gap <= Math.max(5, d.rng) && gap < priestHeroGap) { priestHero = foe; priestHeroGap = gap; }
+        }
+        if (priestHero) {
+          if (u.cd <= 0 && u.atk <= 0) { u.atk = .38; u.tgt = priestHero; u.cd = d.cd; }
+          continue;
+        }
         const priestTarget = B.U.find(v => !v.dead && v.side !== u.side && (v.x-u.x)*u.dir >= 0);
         if (!priestTarget && Math.abs(baseFront(1-u.side)-u.x) > 52) { u.x += u.dir * d.spd * dt; u.y = laneY(u.lane,u.x); u.walk = (u.walk||0) + dt * 8; }
         continue;
@@ -1491,14 +1503,23 @@ export function openWar(br) {
         const pr0 = 1 - u.atk / .38; u.atk -= dt; const pr1 = 1 - u.atk / .38;
         if (pr0 < .45 && pr1 >= .45) {
           const t = u.tgt; const hx = u.x + u.dir * 6, hz = u.z + (50 - u.spr.bb.y0) * .55;
-          if (t && t.base != null) { if (d.hero && u.heroType === 'archmage') { fx({ k:'ring', x:baseFront(t.base), y:u.y, r0:5, r1:32, l:.45, c:'#b58aff' }); area(u.side, baseFront(t.base), u.y, 30, u.dmg * .7 * (u.dmgDebuff > 0 ? .65 : 1)); } else if (d.proj) shoot(u.side, d.proj, hx, u.y, hz, { base: 1, side: t.base, y: u.y }, u.dmg, d.splash); else { hurtBase(t.base, u.dmg * (u.dmgDebuff > 0 ? .65 : 1)); burst(baseFront(t.base), u.y, 8, ['#ffffff', '#ffe680'], 4, 40, { add: 1 }); sfx('hit'); } }
-          else if (t && !t.dead) { if (d.hero && u.heroType === 'archmage') { fx({ k:'ring', x:t.x, y:t.y, r0:4, r1:30, l:.4, c:'#b58aff' }); area(u.side, t.x, t.y, 30, u.dmg); } else if (d.proj) shoot(u.side, d.proj, hx, u.y, hz, t, u.dmg * (u.dmgDebuff > 0 ? .65 : 1), d.splash); else { hurt(t, u.dmg * (u.dmgDebuff > 0 ? .65 : 1), u.side); fx({ k: 'spark', x: t.x - u.dir * 2, y: t.y, z: t.z + 8, l: .12, c: '#ffffff' }); burst(t.x, t.y, t.z + 8, t.side ? ['#7a1a3a', '#3a0a1a', '#b04aff'] : ['#ff3a2a', '#a01a1a'], 4, 45); sfx(d.li === 0 ? 'slash' : 'hit', .8); } }
+          if (t && t.base != null) { if (d.hero && u.heroType === 'archmage') { fx({ k:'ring', x:baseFront(t.base), y:u.y, r0:5, r1:32, l:.45, c:'#b58aff' }); area(u.side, baseFront(t.base), u.y, 30, u.dmg * .7 * (u.dmgDebuff > 0 ? .65 : 1), false, true); } else if (d.proj) shoot(u.side, d.proj, hx, u.y, hz, { base: 1, side: t.base, y: u.y }, u.dmg, d.splash); else { hurtBase(t.base, u.dmg * (u.dmgDebuff > 0 ? .65 : 1)); burst(baseFront(t.base), u.y, 8, ['#ffffff', '#ffe680'], 4, 40, { add: 1 }); sfx('hit'); } }
+          else if (t && !t.dead) { if (d.hero && u.heroType === 'archmage') { fx({ k:'ring', x:t.x, y:t.y, r0:4, r1:30, l:.4, c:'#b58aff' }); area(u.side, t.x, t.y, 30, u.dmg, false, true); } else if (d.proj) shoot(u.side, d.proj, hx, u.y, hz, t, u.dmg * (u.dmgDebuff > 0 ? .65 : 1), d.splash); else { hurt(t, u.dmg * (u.dmgDebuff > 0 ? .65 : 1), u.side); fx({ k: 'spark', x: t.x - u.dir * 2, y: t.y, z: t.z + 8, l: .12, c: '#ffffff' }); burst(t.x, t.y, t.z + 8, t.side ? ['#7a1a3a', '#3a0a1a', '#b04aff'] : ['#ff3a2a', '#a01a1a'], 4, 45); sfx(d.li === 0 ? 'slash' : 'hit', .8); } }
         }
         continue;
       }
       /* 대상 찾기 */
-      let tgt = null, best = 1e9;
-      for (const v of B.U) { if (v.dead || v.side === u.side || (v.d.fly && !d.air)) continue; if (d.hero && v.lane !== u.lane) continue; const dx = (v.x - u.x) * u.dir; if (dx < -6) continue; const dy = (v.y - u.y) * 1.4, dd = Math.hypot(dx, dy) - (d.size + v.d.size) * .5; const reach = d.hero && (u.heroType === 'berserker' || u.heroType === 'siegeGolem') ? 5 : d.rng; if (dd <= reach && dd < best) { best = dd; tgt = v; } }
+      let tgt = null, best = 1e9, heroTgt = null, heroGap = 1e9;
+      for (const v of B.U) {
+        if (v.dead || v.side === u.side || (v.d.fly && !d.air)) continue;
+        if (d.hero && v.lane !== u.lane) continue;
+        const dx = (v.x - u.x) * u.dir; if (dx < -6) continue;
+        const dy = (v.y - u.y) * 1.4, dd = Math.hypot(dx, dy) - (d.size + v.d.size) * .5;
+        const reach = d.hero && (u.heroType === 'berserker' || u.heroType === 'siegeGolem') ? 5 : d.rng;
+        if (d.hero && v.d.hero && dd <= Math.max(5, reach) && dd < heroGap) { heroGap = dd; heroTgt = v; }
+        if (dd <= reach && dd < best) { best = dd; tgt = v; }
+      }
+      if (d.hero && heroTgt) tgt = heroTgt;
       const bd = (baseFront(1 - u.side) - u.x) * u.dir;
       if (!tgt && bd <= d.rng + 2) tgt = { base: 1 - u.side };
       if (tgt) { if (u.cd <= 0) { u.atk = .38; u.tgt = tgt; u.cd = d.cd; } continue; }
