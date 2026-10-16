@@ -1512,14 +1512,20 @@ export function openWar(br) {
       let tgt = null, best = 1e9, heroTgt = null, heroGap = 1e9;
       for (const v of B.U) {
         if (v.dead || v.side === u.side || (v.d.fly && !d.air)) continue;
+        const rawDx = v.x - u.x;
+        const dx = rawDx * u.dir;
+        const dy = (v.y - u.y) * 1.4;
+        const dd = Math.hypot(rawDx, dy) - (d.size + v.d.size) * .5;
+        /* 영웅끼리는 차선/방향 판정 때문에 서로 지나치거나 멈춰 서는 일이 없도록 근접 교전 대상을 우선 탐색 */
+        if (d.hero && v.d.hero && dd <= 42 && dd < heroGap) { heroGap = dd; heroTgt = v; }
         if (d.hero && v.lane !== u.lane) continue;
-        const dx = (v.x - u.x) * u.dir; if (dx < -6) continue;
-        const dy = (v.y - u.y) * 1.4, dd = Math.hypot(dx, dy) - (d.size + v.d.size) * .5;
+        if (dx < -6) continue;
         const reach = d.hero && (u.heroType === 'berserker' || u.heroType === 'siegeGolem') ? 5 : d.rng;
-        if (d.hero && v.d.hero && dd <= Math.max(5, reach) && dd < heroGap) { heroGap = dd; heroTgt = v; }
         if (dd <= reach && dd < best) { best = dd; tgt = v; }
       }
       if (d.hero && heroTgt) tgt = heroTgt;
+      /* 근접 영웅은 접촉 직전의 거리 오차가 있어도 공격 범위로 인정 */
+      if (d.hero && heroTgt && (u.heroType === 'berserker' || u.heroType === 'siegeGolem')) { const gap = Math.hypot(heroTgt.x-u.x, (heroTgt.y-u.y)*1.4) - (d.size + heroTgt.d.size)*.5; if (gap <= 42) tgt = heroTgt; }
       const bd = (baseFront(1 - u.side) - u.x) * u.dir;
       if (!tgt && bd <= d.rng + 2) tgt = { base: 1 - u.side };
       if (tgt) { if (u.cd <= 0) { u.atk = .38; u.tgt = tgt; u.cd = d.cd; } continue; }
