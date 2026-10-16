@@ -1285,14 +1285,16 @@ export function openWar(br) {
 
   /* ---------- 전투 ---------- */
   let B = null, uid = 1, lane = 0, zoom = 1, cam = { x: 0, auto: true, manualT: 0 }, shake = 0, flashA = 0, flashC = '#ffffff', paused = false, alive = true;
+  let requestedMode = 'story';
+  const battleY = (l, x) => { if (!B || B.mode !== '2v2') return laneY(l, x); const ys = [88, 126, 178, 216]; const base = ys[clamp(l|0,0,3)]; if (x < 156) return lerp(GATE_Y, base, smooth((x - AX + 6) / (156 - AX + 6))); if (x > 324) return lerp(base, GATE_Y, smooth((x - 324) / (EX + 6 - 324))); return base; };
   const DEFC = {};
   const def = (side, t, li) => { const k = side + '_' + t + '_' + li; return DEFC[k] || (DEFC[k] = unitDef(side, t, li)); };
-  function newBattle(stg) {
+  function newBattle(stg, mode = 'story') {
     if (stg) ST.st = stg; SKR.d.cd = SKR.d.act = SKR.s.cd = SKR.s.act = 0;
     const et = enemyTier(ST.st), mul = stageMul(ST.st), pre = ST.st > MAXST ? 4 : (ST.st - 1) % 5, ens = 1 + (pre >> 1);
     root.classList.remove('lob');
     B = {
-      st: ST.st, et, mul, time: 0, over: null, overT: 0, kills: 0, gems: 0, goldGot: 0,
+      st: ST.st, et, mul, mode, time: 0, over: null, overT: 0, kills: 0, gems: 0, goldGot: 0, allyAI: 1.0, enemyAI2: 1.4, jumpFX: [],
       A: { hp: BASE_HP(ST.t), mh: BASE_HP(ST.t), tur: ST.tur.map(t => ({ t, cd: 1 + Math.random(), fire: 0 })), q: [], qt: 0, hitT: 0 },
       E: { hp: Math.round(BASE_HP(et) * mul), mh: Math.round(BASE_HP(et) * mul), g: 6 * Math.pow(2.6, et - 1), tur: [0, 1, 2, 3, 4, 5].map(i => ({ t: 0, cd: 2 + i * .3, fire: 0 })), ns: ens, ai: 1.2, hitT: 0 },
       U: [], P: [], X: [], N: [], D: [], FX: [], heroSpawned: false,
@@ -1300,7 +1302,7 @@ export function openWar(br) {
     if (pre >= 2) B.E.tur[0].t = et; if (pre >= 4) B.E.tur[3].t = et; if (ST.st > MAXST) { B.E.tur[1].t = et; B.E.tur[4].t = et; }
     ST.inb = 1; save();
     cam.auto = true; cam.x = 0;
-    banner('STAGE ' + ST.st, ETIER_NAME[et] + ' · 악마 군단 Lv.' + et + (mul > 1 ? ' (강화 ×' + mul.toFixed(2) + ')' : ''));
+    banner((mode === '2v2' ? '2 VS 2 · ' : 'STAGE ') + ST.st, mode === '2v2' ? '아군 AI + 플레이어 vs 적군 AI 2명 · 기지 2개씩' : ETIER_NAME[et] + ' · 악마 군단 Lv.' + et + (mul > 1 ? ' (강화 ×' + mul.toFixed(2) + ')' : ''));
     renderCards(); hud(true);
   }
   const sideObj = s => s ? B.E : B.A;
@@ -1308,7 +1310,7 @@ export function openWar(br) {
   function spawn(side, li, ln, tt) {
     const d = def(side, tt || tierOf(side), li);
     const u = { id: uid++, side, d, li, lane: ln, x: side ? EX + 6 : AX - 6, oy: rnd(-3.5, 3.5), hp: d.hp * (side ? B.mul : 1), mh: d.hp * (side ? B.mul : 1), dmg: d.dmg * (side ? B.mul : 1), cd: rnd(.1, .4), atk: 0, an: Math.random() * 3, hit: 0, dead: 0, spr: bakeUnit(d.key), dir: side ? -1 : 1, z: d.fly ? 12 : 0, bobP: Math.random() * 6 };
-    u.y = laneY(ln, u.x) + u.oy; B.U.push(u);
+    u.y = battleY(ln, u.x) + u.oy; u.aiMate = false; B.U.push(u);
     if (side) { for (let i = 0; i < 14; i++) part({ x: u.x + rnd(-6, 6), y: u.y + rnd(-2, 2), vz: rnd(10, 40), vx: rnd(-8, 8), l: rnd(.4, .8), c: ['#ffe680', '#ff8a1a', '#ff3a1a', '#5a0a0a'], add: 1 }); fx({ k: 'ring', x: u.x, y: u.y, r0: 2, r1: 10, l: .4, c: '#ff3a1a' }); sfx('espawn'); }
     else { fx({ k: 'pillar', x: u.x, y: u.y, l: .5, c: '#fff6c0' }); for (let i = 0; i < 10; i++) part({ x: u.x + rnd(-5, 5), y: u.y, z: rnd(0, 20), vz: rnd(10, 30), l: rnd(.4, .9), c: ['#ffffff', '#fff3b0', '#ffd25a'], add: 1 }); sfx('spawn'); }
     return u;
@@ -1327,12 +1329,12 @@ export function openWar(br) {
     const d = { side, t: tier, li: 0, c: 0, n: H.n, key: side ? H.spriteE : H.spriteA,
       hp, dmg, cd, rng: H.rng, spd: speed, train: 0, size: H.size, fly: false, air: true,
       proj: null, splash: 0, hero: true, heroType: type, armor: type === 'siegeGolem' ? .72 : type === 'highPriest' ? .18 : .08 };
-    const heroLane = 0;
+    const heroLane = B.mode === '2v2' ? (side ? 1 : 0) : 0;
     const u = { id: uid++, side, d, li: 0, lane: heroLane, x: side ? EX + 6 : AX - 6, oy: 0,
       hp: d.hp, mh: d.hp, dmg: d.dmg, cd: d.cd, atk: 0, an: Math.random() * 3, hit: 0, dead: 0,
       spr: bakeUnit(d.key), dir: side ? -1 : 1, z: 0, bobP: Math.random() * 6, hero: true, heroType: type,
       supportT: .2, walk: 0 };
-    u.y = laneY(heroLane, u.x); B.U.push(u);
+    u.y = battleY(heroLane, u.x); B.U.push(u);
     fx({ k: 'ring', x: u.x, y: u.y, r0: 4, r1: 22, l: .65, c: side ? '#ff4a3a' : '#ffd65a' });
     for (let i = 0; i < 22; i++) part({ x: u.x + rnd(-8, 8), y: u.y, z: rnd(0, 18), vz: rnd(15, 42), l: rnd(.4, .9), c: side ? ['#ff5a3a', '#b04aff', '#fff0c0'] : ['#fff6c0', '#ffd65a', '#7ff0ff'], add: 1 });
     banner(H.n + (side ? ' · 적 영웅' : ' 출전!'), side ? '아군 영웅보다 능력치 50% 낮음' : '적 영웅과 교전 가능 · 한 번에 한 명만 출전');
@@ -1466,15 +1468,23 @@ export function openWar(br) {
     let ln = Math.random() < .5 ? 0 : 1; const al = [0, 0]; B.U.forEach(u => { if (!u.dead && !u.side) al[u.lane]++; }); if (Math.random() < .45 && al[0] !== al[1]) ln = al[0] > al[1] ? 0 : 1;
     spawn(1, pickLi, ln, tt); E.ai += def(1, tt, pickLi).train * .8;
   }
+  function spawnModeAI(side, airOnly = false) {
+    if (!B || B.mode !== '2v2' || B.over) return;
+    const tier = side ? B.et : ST.t;
+    const opts = [0,1,2].filter(li => COST[tier][li] <= (side ? B.E.g : ST.g));
+    const li = opts.length ? pick(opts) : 0;
+    const ln = airOnly ? (Math.random() < .5 ? 0 : 3) : ri(0,3);
+    const u = spawn(side, li, ln, tier); if (u) u.aiMate = true;
+  }
   /* ---------- 갱신 ---------- */
   function step(dt) {
     B.time += dt;
     const A = B.A, E = B.E;
-    if (!B.over) { ST.g += INCOME(ST.t) * dt; E.g += INCOME(B.et) * (1 + .05 * ((B.st - 1) % 5)) * dt; aiTick(dt); }
+    if (!B.over) { ST.g += INCOME(ST.t) * dt; E.g += INCOME(B.et) * (1 + .05 * ((B.st - 1) % 5)) * dt; aiTick(dt); if (B.mode === '2v2') { B.allyAI -= dt; B.enemyAI2 -= dt; if (B.allyAI <= 0 && B.U.filter(u=>!u.dead && u.side===0 && u.aiMate).length < 8) { spawnModeAI(0); B.allyAI = rnd(2.2,4.2); } if (B.enemyAI2 <= 0 && B.U.filter(u=>!u.dead && u.side===1 && u.aiMate).length < 10) { spawnModeAI(1); B.enemyAI2 = rnd(1.8,3.7); } } }
     /* 아군 훈련 대기열 */
     if (A.q.length && !B.over) { const q = A.q[0], d = def(0, q.t, q.li); A.qt += dt; if (A.qt >= d.train) { A.qt = 0; A.q.shift(); spawn(0, q.li, q.lane, q.t); qDirty = 1; } }
     /* 유닛 */
-    const lanes = [[[], []], [[], []]]; for (const u of B.U) if (!u.dead && !u.d.fly) lanes[u.side][u.lane].push(u);
+    const lanes = [[[], [], [], []], [[], [], [], []]]; for (const u of B.U) if (!u.dead && !u.d.fly) lanes[u.side][u.lane].push(u);
     for (const u of B.U) {
       if (u.dead) continue; const d = u.d; u.an += dt; u.hit = Math.max(0, u.hit - dt); if (u.dmgDebuff > 0) u.dmgDebuff = Math.max(0, u.dmgDebuff - dt); u.cd -= dt * (u.slow > 0 ? .6 : 1); if (u.slow > 0) { u.slow -= dt; if (Math.random() < dt * 6) part({ x: u.x + rnd(-3, 3), y: u.y, z: u.z + rnd(2, 14), vz: 4, l: .5, c: ['#aee4ff', '#5ad0ff'], add: 1 }); }
       if (u.d.fly) u.z = 12 + Math.sin(B.time * 3 + u.bobP) * 1.5;
@@ -1523,16 +1533,22 @@ export function openWar(br) {
       const bd = (baseFront(1 - u.side) - u.x) * u.dir;
       if (!tgt && bd <= (d.hero ? Math.max(d.rng || 0, 24) + 4 : d.rng + 2)) tgt = { base: 1 - u.side };
       if (tgt) { if (u.cd <= 0) { u.atk = .38; u.tgt = tgt; u.cd = d.cd; } continue; }
+      /* 2vs2 경로: 지상은 중앙의 끊긴 다리에서 점프 후 4개 경로 중 무작위로 착지. 비행 유닛은 상·하단 바람길만 사용. */
+      if (B.mode === '2v2' && d.fly) { if (u.lane !== 0 && u.lane !== 3) u.lane = Math.random() < .5 ? 0 : 3; }
       /* 이동 */
       let nx = u.x + u.dir * d.spd * (u.slow > 0 ? .45 : 1) * (u.side === 0 && SKR.s.act > 0 ? 1 + skPct('s', ST.sk.s) : 1) * dt;
+      if (B.mode === '2v2' && !d.fly && !u.jumpLock && ((u.side === 0 && u.x < 214 && nx >= 214) || (u.side === 1 && u.x > 266 && nx <= 266))) {
+        const choices = [0,1,2,3].filter(n => n !== u.lane); u.lane = pick(choices); u.jumpLock = true; u.jumpT = .42; u.jumpFromY = u.y; u.z = 24; burst(u.x, u.y, 4, ['#c9e8ff','#ffffff','#8ccaff'], 8, 30, {add:1});
+      }
+      if (B.mode === '2v2' && u.jumpLock) { u.jumpT -= dt; u.z = Math.max(0, 24 * Math.sin(Math.PI * (1 - Math.max(0,u.jumpT)/.42))); if (u.jumpT <= 0) { u.jumpLock = false; u.z = d.fly ? 12 : 0; } }
       if (u.side === 0) { if (SKR.d.act > 0 && Math.random() < dt * 5) part({ x: u.x + rnd(-6, 6), y: u.y, z: u.z + rnd(2, 22), vz: rnd(4, 10), l: rnd(.3, .6), c: ['#e0f4ff', '#5ab0ff', '#2a6ad0'], add: 1 }); if (SKR.s.act > 0 && Math.random() < dt * 8) part({ x: u.x - u.dir * rnd(4, 10), y: u.y, z: u.z + rnd(1, 14), vx: -u.dir * rnd(20, 40), l: rnd(.15, .3), c: ['#fff6c0', '#ffd65a'], add: 1 }); }
       if (!d.fly) { for (const f of lanes[u.side][u.lane]) { if (f === u || f.dead) continue; const ahead = (f.x - u.x) * u.dir; if (ahead > 0 && ahead < 52) { const gap = (d.size + f.d.size) * .5 + 1.5; if ((f.x - nx) * u.dir < gap) nx = f.x - u.dir * gap; } } }
       /* 영웅은 적 유닛과 겹치지 않게 접촉 거리에서 멈춤. 차선이 다른 적은 무시하고 도로를 따라감. */
       if (d.hero) { for (const f of B.U) { if (f.dead || f.side === u.side || f.lane !== u.lane) continue; const ahead = (f.x - u.x) * u.dir; if (ahead > 0) { const gap = (d.size + f.d.size) * .5 + 4; if ((f.x - nx) * u.dir < gap) nx = f.x - u.dir * gap; } } }
       if (u.side === 0) nx = Math.max(u.x, Math.min(nx, EX - 2)); else nx = Math.min(u.x, Math.max(nx, AX + 2));
       if (Math.abs(nx - u.x) > .01) { u.x = nx; u.walk = (u.walk || 0) + Math.abs(nx - u.x) + dt * d.spd; if (d.li === 2 && !d.fly && Math.random() < dt * 8) part({ x: u.x - u.dir * 4, y: u.y, vx: -u.dir * 8, vz: rnd(4, 10), l: .5, c: [u.x < 240 ? '#c8a878' : '#5a4a44', u.x < 240 ? '#a08860' : '#3a2e2a'], s: 1, drag: 2 }); }
-      u.y = laneY(u.lane, u.x) + u.oy;
-      if ((LOOK[d.key] || {}).body === 'tank' && Math.random() < dt * 3) part({ x: u.x - 6, y: u.y, z: 16, vz: 14, vx: -4, l: 1, c: ['#d8d8d8', '#8a8a8a', '#5a5a5a'], s: 2, drag: .5 });
+      if (B.mode === '2v2' && d.fly) { const foe = B.U.filter(v=>!v.dead && v.side!==u.side && !v.d.fly).sort((a,b)=>Math.abs(a.x-u.x)-Math.abs(b.x-u.x))[0]; if (foe && Math.abs(foe.x-u.x)<78) { u.airCombatT = .8; u.y = foe.y - 8; } else if (u.airCombatT>0) { u.airCombatT -= dt; u.y = lerp(u.y, 48 + (u.lane===3?14:0), .12); } else u.y = 48 + (u.lane===3?14:0); } else u.y = battleY(u.lane, u.x) + u.oy;
+      if ((LOOK[d.key || {}).body === 'tank' && Math.random() < dt * 3) part({ x: u.x - 6, y: u.y, z: 16, vz: 14, vx: -4, l: 1, c: ['#d8d8d8', '#8a8a8a', '#5a5a5a'], s: 2, drag: .5 });
     }
     /* 포탑 */
     for (const side of [0, 1]) { const o = sideObj(side); o.tur.forEach((T, i) => { if (!T.t) return; T.fire = Math.max(0, T.fire - dt); T.cd -= dt; if (T.cd > 0 || B.over) return; const td = turretDef(side, T.t), sp = slotPos(side, i); const tg = nearestEnemy(side, sp.x, sp.y, td.rng); if (!tg) { T.cd = .2; return; } T.cd = td.cd; turretFire(side, i, T, tg); }); }
@@ -1571,6 +1587,14 @@ export function openWar(br) {
     const x = bx, t = B ? B.time : 0, now = performance.now() / 1000;
     x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1;
     x.drawImage(BG, 0, 0);
+    if (B && B.mode === '2v2') {
+      /* 네 개의 지상 길과 중앙 점프 구간 */
+      const ys = [88,126,178,216];
+      for (let i=0;i<4;i++) { x.strokeStyle='rgba(190,157,119,.62)'; x.lineWidth=7; x.beginPath(); x.moveTo(78,166); x.lineTo(156,ys[i]); x.lineTo(214,ys[i]); x.moveTo(266,ys[i]); x.lineTo(324,ys[i]); x.lineTo(402,166); x.stroke(); x.strokeStyle='rgba(65,44,35,.8)'; x.lineWidth=2; x.setLineDash([3,3]); x.beginPath(); x.moveTo(214,ys[i]); x.lineTo(266,ys[i]); x.stroke(); x.setLineDash([]); }
+      /* 반투명 공중 바람길 2개 */
+      for (const wy of [42,58]) { x.strokeStyle='rgba(125,220,255,.20)'; x.lineWidth=8; x.beginPath(); x.moveTo(78,wy+18); x.bezierCurveTo(160,wy-4,320,wy-4,402,wy+18); x.stroke(); x.strokeStyle='rgba(170,240,255,.55)'; x.lineWidth=1; x.setLineDash([5,5]); x.beginPath(); x.moveTo(78,wy+18); x.bezierCurveTo(160,wy-4,320,wy-4,402,wy+18); x.stroke(); x.setLineDash([]); }
+      x.fillStyle='#e8f7ff'; x.font='bold 8px sans-serif'; x.fillText('2 VS 2 · 지상 4개 점프 경로 / 공중 바람길 2개',118,14);
+    }
     /* 구름 */
     for (let i = 0; i < 7; i++) { const cx = ((i * 83 + now * (3 + i % 3)) % 300) - 40, cy = 8 + (i * 13) % 26; x.fillStyle = i % 2 ? 'rgba(255,255,255,.75)' : 'rgba(255,250,240,.55)'; x.fillRect(Math.round(cx), cy, 16 + i % 3 * 4, 3); x.fillRect(Math.round(cx) + 4, cy - 2, 9, 2); x.fillRect(Math.round(cx) + 2, cy + 3, 14, 1); }
     for (let i = 0; i < 6; i++) { const cx = 300 + ((i * 61 + now * (2 + i % 2)) % 200), cy = 6 + (i * 11) % 22; x.fillStyle = 'rgba(40,10,16,.85)'; x.fillRect(Math.round(cx) % 480, cy, 22, 4); x.fillRect(Math.round(cx) % 480 + 5, cy - 2, 10, 2); x.fillStyle = 'rgba(122,30,26,.5)'; x.fillRect(Math.round(cx) % 480, cy + 4, 20, 1); }
@@ -1591,6 +1615,7 @@ export function openWar(br) {
     /* 기지 */
     const etr = B ? B.et : enemyTier(selSt), ba = getBase(0, ST.t), be = getBase(1, etr);
     x.drawImage(ba.c, B && B.A.hitT > 0 ? -1 : 0, 62); x.drawImage(be.c, 380 + (B && B.E.hitT > 0 ? 1 : 0), 62);
+    if (B && B.mode === '2v2') { x.save(); x.globalAlpha=.9; x.drawImage(ba.c, 14, 62); x.drawImage(be.c, 366, 62); x.restore(); x.fillStyle='#9fffb0'; x.font='bold 7px sans-serif'; x.fillText('ALLY BASE 2',8,58); x.fillStyle='#ff9c9c'; x.fillText('ENEMY BASE 2',364,58); }
     baseFx(x, 0, ST.t, now); baseFx(x, 1, etr, now);
     for (const side of [0, 1]) {
       const tier = side ? etr : ST.t, list = B ? sideObj(side).tur : side ? [] : ST.tur.map(t => ({ t, fire: 0 }));
@@ -1606,7 +1631,7 @@ export function openWar(br) {
     for (const tc of TORCH) flame(x, tc.x, tc.y, now, tc.x > 240);
     if (!B) return;
     /* 선택 차선 표시 */
-    if (!B.over) { x.globalAlpha = .55 + .3 * Math.sin(now * 5); for (let i = 0; i < 6; i++) { const px = AX + 6 + ((i * 16 + now * 30) % 96), py = laneY(lane, px); x.fillStyle = '#ffd65a'; x.fillRect(Math.round(px), Math.round(py) - 1, 2, 1); x.fillRect(Math.round(px) + 1, Math.round(py), 2, 1); x.fillRect(Math.round(px), Math.round(py) + 1, 2, 1); } x.globalAlpha = 1; }
+    if (!B.over) { x.globalAlpha = .55 + .3 * Math.sin(now * 5); for (let i = 0; i < 6; i++) { const px = AX + 6 + ((i * 16 + now * 30) % 96), py = battleY(lane, px); x.fillStyle = '#ffd65a'; x.fillRect(Math.round(px), Math.round(py) - 1, 2, 1); x.fillRect(Math.round(px) + 1, Math.round(py), 2, 1); x.fillRect(Math.round(px), Math.round(py) + 1, 2, 1); } x.globalAlpha = 1; }
     /* 개체 정렬 */
     const L = []; for (const u of B.U) L.push(u); for (const d of B.D) L.push(d); for (const p of B.P) if (p.k === 'gem') L.push(p);
     L.sort((a, b) => (a.u ? a.u.y : a.y) - (b.u ? b.u.y : b.y));
@@ -1879,7 +1904,7 @@ export function openWar(br) {
     sheet(html, s => { if (s === 'x') return closeSheet(); if (s === 'up') { const c = SK_UP[ST.sk[k]]; if (ST.sk[k] >= SK_MAX || ST.g < c) { sfx('up_no'); return; } ST.g -= c; ST.sk[k]++; save(); sfx('up_ok'); banner(I.n + ' 강화!', 'Lv.' + ST.sk[k] + ' · ' + row(ST.sk[k])); skSheet(k); renderCards(); skHud(true); hud(true); } });
   }
   function helpSheet() {
-    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>영웅 탭에서 버서커·대마법사·시즈골렘·대신관(사제) 중 한 명을 무료 출전시킬 수 있습니다. 영웅은 아군/적군 각각 생존 중 1명만 존재하며, 쓰러진 뒤 다른 영웅을 출전할 수 있습니다. 적 영웅은 아군 영웅보다 능력치가 50% 낮습니다. 영웅 탭에서 공격력(힐러 회복량 포함)·공격속도·체력·이동속도 네 항목을 무제한 강화할 수 있으며, 비용은 항목별로 1골드부터 각각 2배씩 증가합니다. 영웅은 타워·포탑 피해를 받지 않습니다. 버서커는 느리지만 강한 대검 공격, 대마법사는 마법진 광역 공격, 시즈골렘은 높은 체력·방어력, 대신관은 회복·적 약화 역할입니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
+    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>출정하기에서 스토리 또는 2vs2를 선택합니다. 2vs2는 플레이어+아군 AI 대 적군 AI 2명이며, 지상 4개 경로는 중앙에서 점프해 무작위 경로로 착지하고 공중 유닛은 반투명 바람길 2개를 이용합니다.</li><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>영웅 탭에서 버서커·대마법사·시즈골렘·대신관(사제) 중 한 명을 무료 출전시킬 수 있습니다. 영웅은 아군/적군 각각 생존 중 1명만 존재하며, 쓰러진 뒤 다른 영웅을 출전할 수 있습니다. 적 영웅은 아군 영웅보다 능력치가 50% 낮습니다. 영웅 탭에서 공격력(힐러 회복량 포함)·공격속도·체력·이동속도 네 항목을 무제한 강화할 수 있으며, 비용은 항목별로 1골드부터 각각 2배씩 증가합니다. 영웅은 타워·포탑 피해를 받지 않습니다. 버서커는 느리지만 강한 대검 공격, 대마법사는 마법진 광역 공격, 시즈골렘은 높은 체력·방어력, 대신관은 회복·적 약화 역할입니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
   }
   function resultSheet() {
     const win = B.over === 'win';
@@ -1897,7 +1922,7 @@ export function openWar(br) {
     if (a === 'lane') return setLane(+v);
     if (a === 'lclose') return close(true);
     if (a === 'sel') { const st = +v; if (st > ST.best) { toast('이전 스테이지를 먼저 클리어하세요'); sfx('up_no'); return; } selSt = st; sfx('click'); renderLobby(false); return; }
-    if (a === 'go') { sfx('spawn'); newBattle(selSt); layout(); return; }
+    if (a === 'go') { sfx('click'); sheet('<h4>⚔️ 출정하기</h4><p>전투 모드를 선택하세요.</p><div class="row"><button data-s="story">📖 스토리</button><button class="go" data-s="2v2">⚔️ 2vs2</button></div>', (mode) => { closeSheet(); requestedMode = mode === '2v2' ? '2v2' : 'story'; newBattle(selSt, requestedMode); layout(); }); return; }
     if (a === 'upg') return upgSheet();
     if (a === 'sk') return useSk(v);
     if (a === 'hup') return heroUpgrade(v);
