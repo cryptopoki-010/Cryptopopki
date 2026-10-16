@@ -688,18 +688,17 @@ service cloud.firestore {
     // ───────── 공통 ─────────
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
-    // 표시용 문자열: HTML/스크립트에 쓰이는 문자 금지 (저장형 XSS 방어, 클라이언트의 이스케이프와 이중 방어)
+    // 표시용 문자열: HTML/스크립트에 쓰이는 문자 금지 (저장형 XSS 방어)
     function cleanStr(s, max) {
       return s is string && s.size() >= 1 && s.size() <= max
         && !s.matches(".*[<>&\\"'\`\\\\\\\\].*");
     }
 
     // ───────── 내 진행 데이터 ─────────
-    // 주의: 게임 결과(잔액 증감)는 클라이언트가 계산하므로 규칙만으로는 '정당한 값'을 증명할 수 없다.
-    //       여기서는 스키마·타입·상한만 강제한다. 서버 권위 정산은 SECURITY.md 의 '남은 위험' 참고.
+    // 주의: 잔액 증감은 클라이언트가 계산하므로 규칙은 스키마·타입·상한만 강제한다.
     function validUser(d) {
-      return d.keys().hasOnly(['bal','inv','invV','opens','urN','col','used','exp','eq','mine','rr','shl','tr','ts'])
-        && d.bal is number && d.bal >= 0 && d.bal <= 1000000000000000
+      return d.keys().hasOnly(['bal','inv','invV','opens','urN','col','used','exp','eq','mine','rr','shl','tr','war','ts','wt'])
+        && d.bal is number && d.bal >= 0 && d.bal <= 1000000000000000000.0 * 1000000000000.0
         && d.get('inv', {}) is map && d.get('inv', {}).size() <= 2000
         && d.get('invV', {}) is map && d.get('invV', {}).size() <= 2000
         && d.get('col', {}) is map && d.get('col', {}).size() <= 2000
@@ -712,18 +711,27 @@ service cloud.firestore {
         && d.get('eq', -1) is number
         && d.get('ts', 0) is number
         && (!('shl' in d) || d.shl == null || d.shl is map)
+        // 전쟁시대 진행 (스테이지·기지 등급·골드·젬·포탑·배속)
+        && (!('war' in d) || d.war == null || (d.war is map && d.war.size() <= 20))
         // 가상 트레이딩 상태 (포지션·주문·현물·내역)
         && (!('tr' in d) || d.tr == null
             || (d.tr is map && d.tr.keys().hasOnly(['v','usdt','pos','ord','spot','hist','lev','mode','seq','last'])
-                && d.tr.get('usdt', 0) is number && d.tr.get('usdt', 0) >= 0 && d.tr.get('usdt', 0) <= 1000000000000
+                && d.tr.get('usdt', 0) is number && d.tr.get('usdt', 0) >= 0
                 && d.tr.get('pos', {}) is map && d.tr.get('pos', {}).size() <= 20
                 && d.tr.get('ord', []) is list && d.tr.get('ord', []).size() <= 50
                 && d.tr.get('spot', {}) is map && d.tr.get('spot', {}).size() <= 20
                 && d.tr.get('hist', []) is list && d.tr.get('hist', []).size() <= 60));
     }
+    // 쓰기 속도 제한 (도배·DoS 방어): wt 는 서버 시각(serverTimestamp)이어야 하고,
+    // 직전 저장으로부터 secs 초가 지나야 다시 쓸 수 있다. 클라이언트가 시계를 속일 수 없다.
+    function rateOk(secs) {
+      return request.resource.data.wt == request.time
+        && (resource == null || !('wt' in resource.data)
+            || request.time > resource.data.wt + duration.value(secs, 's'));
+    }
     match /users/{uid} {
       allow read: if isOwner(uid);
-      allow create, update: if isOwner(uid) && validUser(request.resource.data);
+      allow create, update: if isOwner(uid) && validUser(request.resource.data) && rateOk(15);
       allow delete: if false;
 
       match /prefs/banner {
@@ -733,7 +741,7 @@ service cloud.firestore {
           && request.resource.data.coins is list
           && request.resource.data.coins.size() <= 6;
       }
-      // 닉네임: 24시간에 한 번. nickAt 은 서버 시각 ±5분이어야 한다(과거 값으로 쿨다운 우회 방지).
+      // 닉네임: 24시간에 한 번. nickAt 은 서버 시각 ±5분이어야 한다.
       match /prefs/profile {
         allow read: if isOwner(uid);
         allow write: if isOwner(uid)
@@ -755,14 +763,15 @@ service cloud.firestore {
     // ───────── 랭킹 (공개 읽기) ─────────
     function lbBalOk(uid, d) {
       return !('bal' in d)
-        || (d.bal is number && d.bal >= 0 && d.bal <= 1000000000000000
+        || (d.bal is number && d.bal >= 0 && d.bal <= 1000000000000000000.0 * 1000000000000.0
             && exists(/databases/$(database)/documents/users/$(uid))
             && math.abs(get(/databases/$(database)/documents/users/$(uid)).data.bal - d.bal) <= 0.01);
     }
     match /leaderboard/{uid} {
       allow read: if true;
       allow create, update: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['n','L','bal','exp','eq','opens','rf','t'])
+        && request.resource.data.keys().hasOnly(['n','L','bal','exp','eq','opens','rf','t','wt'])
+        && rateOk(60)
         && cleanStr(request.resource.data.n, 20)
         && request.resource.data.L is number && request.resource.data.L >= 1 && request.resource.data.L <= 1000
         && request.resource.data.exp is number && request.resource.data.exp >= 0 && request.resource.data.exp <= 1000000000000
@@ -791,10 +800,9 @@ service cloud.firestore {
         && request.resource.data.guest == null
         && request.resource.data.status == 'open'
         && request.resource.data.get('ev', []).size() == 0;
-      // 방장/참가자 갱신 (방장 uid 변경 불가, 이벤트 로그 상한)
       allow update: if signedIn() && (
         ((isHost() || isGuest()) && sameHost() && evOk())
-        // 입장: 빈 방에 '내가' guest 로 들어가며, 방장이 정한 비밀번호 해시(sec/ph)를 제시해야 한다
+        // 입장: 방장이 정한 비밀번호 해시(sec/ph)를 guest.pw 로 제시해야 한다
         || (resource.data.guest == null
             && resource.data.status == 'open'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guest','status'])
@@ -804,7 +812,7 @@ service cloud.firestore {
             && request.resource.data.guest.pw == get(/databases/$(database)/documents/rooms/$(rid)/sec/ph).data.ph));
       allow delete: if isHost() || isGuest();
 
-      // 비밀번호 해시는 방 문서와 분리 — 방장만 읽을 수 있고 다른 사용자는 볼 수 없다
+      // 비밀번호 해시는 방 문서와 분리 — 방장만 읽을 수 있음
       match /sec/ph {
         allow create: if signedIn() && getAfter(/databases/$(database)/documents/rooms/$(rid)).data.host.uid == request.auth.uid
           && request.resource.data.keys().hasOnly(['ph','uid'])
@@ -877,13 +885,14 @@ export function openRR(br) {
     pane.innerHTML = '<div class="rrrow"><button class="rrbtn g" id="rf" style="flex:none;width:120px">새로고침</button><div class="rrmsg" id="rm" style="align-self:center">방 목록</div></div><div id="rl" style="display:flex;flex-direction:column;gap:8px"></div>';
     const load = async () => {
       if (view !== 'lobby' || tab !== 'join') return;
+      load.t = Date.now();
       try { const L = (await net.listRooms()).filter(r => r.host && r.host.uid !== me && Date.now() - (r.hb || 0) < 70000).sort((a, b) => b.t - a.t);
         const box = $('rl'); if (!box) return; $('rm').textContent = L.length ? ('현재 ' + L.length + '개의 방') : '열려 있는 방이 없습니다';
         box.innerHTML = L.map(r => '<div class="rrroom" data-id="' + esc(r.id) + '"><div class="t"><b>🔒 ' + esc(r.name) + '</b><small>방장 ' + esc(r.host.n) + '</small></div><button>입장</button></div>').join('');
         box.onclick = e => { const b = e.target.closest('button'), row = e.target.closest('.rrroom'); if (!b || !row) return; askPw(row.dataset.id, L.find(x => x.id === row.dataset.id)); };
       } catch (e) { console.error(e); const m = $('rm'); if (m) m.textContent = '방 목록을 불러오지 못했습니다'; }
     };
-    $('rf').onclick = load; load(); lobT = setInterval(load, 4000);
+    $('rf').onclick = () => { if (Date.now() - (load.t || 0) > 3000) load(); }; load(); lobT = setInterval(() => { if (!document.hidden) load(); }, 15000);
   }
   function askPw(id, r) {
     if (!r) return; const m = el('div', 'rrmodal'); m.innerHTML = '<div class="rrbox"><h3>' + esc(r.name) + '</h3><p>방장이 설정한 비밀번호를 입력하세요.</p><input id="jp" type="password" maxlength="12" placeholder="비밀번호" autocomplete="off"><div class="rrmsg" id="jm"></div><div class="rrrow"><button class="rrbtn g" id="jc">취소</button><button class="rrbtn" id="jo">입장</button></div></div>'; ov.appendChild(m);
