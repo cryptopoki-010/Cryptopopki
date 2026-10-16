@@ -1067,6 +1067,8 @@ function sfx(n, v = 1) {
       case 'lose': [392, 349, 311, 262, 196].forEach((f, i) => tone(f, f * .98, .35, 'sawtooth', .06, i * .18)); break;
       case 'click': tone(1000, 700, .03, 'square', .04); break;
       case 'buy': tone(660, 990, .1, 'square', .06); tone(990, 1320, .1, 'square', .05, .06); break;
+      case 'skd': tone(300, 600, .25, 'triangle', .1); tone(600, 900, .3, 'sine', .07, .08); noise(.3, 2500, 1.5, .05); break;
+      case 'sks': [700, 1050, 1400].forEach((f, i) => tone(f, f * 1.3, .12, 'square', .05, i * .05)); noise(.25, 5000, 1, .05); break;
     }
   } catch (e) { }
 }
@@ -1136,6 +1138,12 @@ const CSS = `
 .wq{flex:1;min-width:0;display:flex;align-items:center;gap:3px;height:30px;padding:0 6px;border-radius:8px;background:#110d16;border:1px solid #2c2236;overflow:hidden;position:relative}
 .wq img{width:20px;height:20px;image-rendering:pixelated;border-radius:4px;background:#1e1626;flex:none}
 .wq em{font-style:normal;font-size:10.5px;color:#7a6a88;white-space:nowrap}
+.wsk{position:absolute;right:max(8px,env(safe-area-inset-right,0px));bottom:calc(100% + 8px);display:flex;gap:8px;z-index:4}
+.wsk button{position:relative;width:58px;height:58px;border-radius:14px;border:2px solid #3a2e4a;background:#14101cd8;color:#fff;font:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;overflow:hidden;box-shadow:0 3px 0 #000a;cursor:pointer;padding:0}
+.wsk button .ic{font-size:22px;line-height:1;position:relative;z-index:1}.wsk button b{font-size:10.5px;font-weight:800;position:relative;z-index:1}.wsk button em{position:absolute;right:3px;top:2px;font-style:normal;font-size:9.5px;font-weight:900;color:#ffd65a;z-index:1}
+.wsk button i{position:absolute;inset:0;background:conic-gradient(#000000b8 var(--cd,0%),transparent 0);z-index:2;pointer-events:none}
+.wsk button.cd .ic,.wsk button.cd b{opacity:.55}.wsk button .t{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:900;z-index:3;text-shadow:0 1px 3px #000}
+.wsk button.act{border-color:var(--c);box-shadow:0 0 0 2px var(--c),0 0 16px var(--c)}.wsk button.act::after{content:'';position:absolute;left:0;bottom:0;height:4px;width:var(--a,0%);background:var(--c);z-index:3}
 .wq .qn{flex:none;font-size:11px;font-weight:900;color:#ffd65a;padding:0 2px}.wq .pb{position:absolute;left:0;bottom:0;height:2px;background:#ffd65a}
 .wcards{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}.wcards::-webkit-scrollbar{display:none}
 .wcd{position:relative;flex:1 0 62px;max-width:96px;min-width:60px;height:74px;border-radius:10px;border:1px solid #3a2e44;background:linear-gradient(#1c1524,#120e18);display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:3px 2px 4px;gap:1px;overflow:hidden}
@@ -1203,11 +1211,19 @@ export function openWar(br) {
   try { AU.on = localStorage.getItem('war_snd') !== '0'; } catch (e) { }
   const fmtW = v => br.fmtBal ? br.fmtBal(v) : fK(v);
   const toast = m => br.toast ? br.toast(m) : console.log(m);
+  /* ---------- 스킬 (실시간 쿨다운, 배속 무관) ---------- */
+  const SK_MAX = 10, SK_CD = 10;
+  const SK_UP = [0, 300, 800, 2000, 5000, 12000, 30000, 70000, 160000, 400000]; // Lv → Lv+1 골드
+  const SKI = { d: { n: '철벽', ic: '🛡️', c: '#5ab0ff', desc: '아군 유닛이 받는 피해 감소' }, s: { n: '질주', ic: '👟', c: '#ffd65a', desc: '아군 유닛 이동 속도 증가' } };
+  const skPct = (k, lv) => k === 'd' ? .25 + .05 * (lv - 1) : .4 + .1 * (lv - 1);
+  const skDur = lv => 5 + .5 * (lv - 1);
+  const SKR = { d: { cd: 0, act: 0 }, s: { cd: 0, act: 0 } };
   /* ---------- 영구 상태 ---------- */
   const ST = Object.assign({ v: 2, st: 1, best: 1, t: 1, g: 10, gem: 0, tur: [0, 0, 0, 0, 0, 0], slots: [1, 1], spd: 1, sp: 1, kills: 0, inb: 0, wins: 0 }, br.getState ? (br.getState() || {}) : {});
   { const T0 = ST.tur; ST.tur = Array.isArray(T0) ? (T0.length >= 6 ? T0.slice(0, 6).map(v => clamp(v | 0, 0, MAXT)) : [T0[0] | 0, 0, 0, T0[1] | 0, 0, 0]) : [0, 0, 0, 0, 0, 0]; }
   ST.slots = Array.isArray(ST.slots) ? [clamp(ST.slots[0] | 0, 1, 3), clamp(ST.slots[1] | 0, 1, 3)] : [1, 1]; ST.v = 2;
   ST.best = Math.max(1, ST.best | 0, ST.st | 0); ST.t = clamp(ST.t | 0, 1, MAXT); ST.st = Math.max(1, ST.st | 0); ST.g = Math.max(0, +ST.g || 0); ST.gem = Math.max(0, ST.gem | 0); ST.spd = clamp(ST.spd | 0 || 1, 1, 3); ST.sp = clamp(ST.sp | 0 || 1, 1, ST.spd);
+  ST.sk = { d: clamp((ST.sk && ST.sk.d) | 0 || 1, 1, SK_MAX), s: clamp((ST.sk && ST.sk.s) | 0 || 1, 1, SK_MAX) };
   function applyLose(s) { ST.inb = 0; if (s >= ST.best) ST.best = Math.max(1, s - 1); ST.st = Math.max(1, s - 1); }
   let pendingPenalty = false; if (ST.inb) { applyLose(ST.st); pendingPenalty = true; }
   let saveT = 0; const save = () => { saveT = 0; if (br.setState) br.setState(JSON.parse(JSON.stringify(ST))); };
@@ -1220,7 +1236,7 @@ export function openWar(br) {
     + '<div class="whp"><div class="a"><small><span id="wan">아군 기지</span><b id="wah"></b></small><div class="wbar"><i id="wab"></i></div></div><div class="e"><small><span id="wen">악마 기지</span><b id="weh"></b></small><div class="wbar"><i id="web"></i></div></div></div></div>'
     + '<canvas class="wmm" id="wmm" width="160" height="32" hidden></canvas>'
     + '<div class="wbn" id="wbn"><b></b><span></span></div>'
-    + '<div class="wdock"><div class="wrow"><div class="wlane"><button data-a="lane" data-v="0">▲ 상단</button><button data-a="lane" data-v="1">▼ 하단</button></div><div class="wtabs"><button data-a="tab" data-v="u">유닛</button><button data-a="tab" data-v="t">포탑</button><button data-a="tab" data-v="b">기지</button></div><div class="wq" id="wq"></div></div><div class="wcards" id="wcards"></div></div>'
+    + '<div class="wdock"><div class="wrow"><div class="wlane"><button data-a="lane" data-v="0">▲ 상단</button><button data-a="lane" data-v="1">▼ 하단</button></div><div class="wtabs"><button data-a="tab" data-v="u">유닛</button><button data-a="tab" data-v="t">포탑</button><button data-a="tab" data-v="b">기지</button></div><div class="wq" id="wq"></div></div><div class="wcards" id="wcards"></div><div class="wsk" id="wsk"><button data-a="sk" data-v="d" aria-label="철벽 스킬"><i></i><span class="ic">🛡️</span><b>철벽</b><em></em></button><button data-a="sk" data-v="s" aria-label="질주 스킬"><i></i><span class="ic">👟</span><b>질주</b><em></em></button></div></div>'
     + '<div class="wlob" id="wlob"><div class="wlh"><button class="wx" data-a="lclose" aria-label="닫기">✕</button><b>⚔️ 전쟁시대</b><span class="wsp"></span><div class="wpill g">💰<b id="wlg">0</b></div><div class="wpill m">💎<b id="wlgem">0</b></div><button class="wib" data-a="help">?</button></div><div class="wlb" id="wlb"></div><div class="wls" id="wls"></div><div class="wli" id="wli"></div></div>';
   document.body.appendChild(root);
   const $ = id => root.querySelector('#' + id), cv = root.querySelector('canvas.wc'), ctx = cv.getContext('2d');
@@ -1239,7 +1255,7 @@ export function openWar(br) {
   const DEFC = {};
   const def = (side, t, li) => { const k = side + '_' + t + '_' + li; return DEFC[k] || (DEFC[k] = unitDef(side, t, li)); };
   function newBattle(stg) {
-    if (stg) ST.st = stg;
+    if (stg) ST.st = stg; SKR.d.cd = SKR.d.act = SKR.s.cd = SKR.s.act = 0;
     const et = enemyTier(ST.st), mul = stageMul(ST.st), pre = ST.st > MAXST ? 4 : (ST.st - 1) % 5, ens = 1 + (pre >> 1);
     root.classList.remove('lob');
     B = {
@@ -1283,7 +1299,7 @@ export function openWar(br) {
   function slotOpen(side, i) { const n = side ? (B ? B.E.ns : 1) : ST.slots[i < 3 ? 0 : 1]; return i % 3 < n; }
   /* 피해 */
   function hurt(v, amt, srcSide) {
-    if (v.dead) return; v.hp -= amt; v.hit = .09;
+    if (v.dead) return; if (v.side === 0 && SKR.d.act > 0) amt *= 1 - skPct('d', ST.sk.d); v.hp -= amt; v.hit = .09;
     if (amt >= 1) num(v.x, v.y - v.z - (50 - v.spr.bb.y0) - 4, fshort(amt), srcSide ? '#ff8a7a' : '#fff6c0');
     if (v.hp <= 0) kill(v, srcSide);
   }
@@ -1414,7 +1430,8 @@ export function openWar(br) {
       if (!tgt && bd <= d.rng + 2) tgt = { base: 1 - u.side };
       if (tgt) { if (u.cd <= 0) { u.atk = .38; u.tgt = tgt; u.cd = d.cd; } continue; }
       /* 이동 */
-      let nx = u.x + u.dir * d.spd * (u.slow > 0 ? .45 : 1) * dt;
+      let nx = u.x + u.dir * d.spd * (u.slow > 0 ? .45 : 1) * (u.side === 0 && SKR.s.act > 0 ? 1 + skPct('s', ST.sk.s) : 1) * dt;
+      if (u.side === 0) { if (SKR.d.act > 0 && Math.random() < dt * 5) part({ x: u.x + rnd(-6, 6), y: u.y, z: u.z + rnd(2, 22), vz: rnd(4, 10), l: rnd(.3, .6), c: ['#e0f4ff', '#5ab0ff', '#2a6ad0'], add: 1 }); if (SKR.s.act > 0 && Math.random() < dt * 8) part({ x: u.x - u.dir * rnd(4, 10), y: u.y, z: u.z + rnd(1, 14), vx: -u.dir * rnd(20, 40), l: rnd(.15, .3), c: ['#fff6c0', '#ffd65a'], add: 1 }); }
       if (!d.fly) { for (const f of lanes[u.side][u.lane]) { if (f === u || f.dead) continue; const ahead = (f.x - u.x) * u.dir; if (ahead > 0 && ahead < 40) { const gap = (d.size + f.d.size) * .5 + 1.5; if ((f.x - nx) * u.dir < gap) nx = f.x - u.dir * gap; } } }
       if (u.side === 0) nx = Math.max(u.x, Math.min(nx, EX - 2)); else nx = Math.min(u.x, Math.max(nx, AX + 2));
       if (Math.abs(nx - u.x) > .01) { u.x = nx; u.walk = (u.walk || 0) + Math.abs(nx - u.x) + dt * d.spd; if (d.li === 2 && !d.fly && Math.random() < dt * 8) part({ x: u.x - u.dir * 4, y: u.y, vx: -u.dir * 8, vz: rnd(4, 10), l: .5, c: [u.x < 240 ? '#c8a878' : '#5a4a44', u.x < 240 ? '#a08860' : '#3a2e2a'], s: 1, drag: 2 }); }
@@ -1619,6 +1636,7 @@ export function openWar(br) {
       h.push('<button class="wcd sp" data-a="upg"><span class="ic">🏰</span><b>기지 ' + t + '성</b><s>' + (t < MAXT ? '강화' : 'MAX') + '</s></button>');
       h.push('<button class="wcd sp" data-a="swap"><span class="ic">💎</span><b>젬 스왑</b><s>→ 골드</s></button>');
       h.push('<button class="wcd sp" data-a="spd"><span class="ic">⏩</span><b>배속</b><s>' + ST.sp + 'x</s></button>');
+      ['d', 's'].forEach(k => h.push('<button class="wcd sp" data-a="skup" data-v="' + k + '"><span class="ic">' + SKI[k].ic + '</span><b>' + SKI[k].n + ' Lv.' + ST.sk[k] + '</b><s>' + (ST.sk[k] >= SK_MAX ? 'MAX' : '💰' + fshort(SK_UP[ST.sk[k]])) + '</s></button>'));
       h.push('<button class="wcd sp" data-a="help"><span class="ic">📖</span><b>도움말</b><s>규칙</s></button>');
     }
     $('wcards').innerHTML = h.join(''); $('wcards').scrollLeft = 0; qDirty = 1; hud(true);
@@ -1713,8 +1731,35 @@ export function openWar(br) {
     $('wli').innerHTML = '<div class="inf"><b>STAGE ' + selSt + '</b><span>' + ETIER_NAME[et] + ' · 악마 군단 ' + et + '성' + (mul > 1 ? ' · 강화 ×' + mul.toFixed(2) : '') + '</span><div class="ims">' + [0, 1, 2].map(li => '<img alt="" src="' + port('e' + et + li) + '" title="' + ENAMES[et][li] + '">').join('') + '</div></div><button class="wgo" data-a="go">⚔️ 출정</button>';
     if (scroll) requestAnimationFrame(() => { const el = $('wls').querySelector('.sel'); if (el) $('wls').scrollLeft = el.offsetLeft - $('wls').clientWidth / 2 + el.offsetWidth / 2; });
   }
+  function useSk(k) {
+    if (!B || B.over) return; const R_ = SKR[k]; if (R_.cd > 0) { toast(SKI[k].n + ' 재사용까지 ' + Math.ceil(R_.cd) + '초'); sfx('up_no'); return; }
+    const lv = ST.sk[k]; R_.act = skDur(lv); R_.cd = SK_CD; sfx(k === 'd' ? 'skd' : 'sks');
+    banner('', SKI[k].ic + ' ' + SKI[k].n + ' 발동! ' + (k === 'd' ? '받는 피해 -' : '이동 속도 +') + Math.round(skPct(k, lv) * 100) + '% · ' + skDur(lv) + '초');
+    for (const u of B.U) if (!u.dead && u.side === 0) for (let i = 0; i < 8; i++) part({ x: u.x + rnd(-6, 6), y: u.y, z: u.z + rnd(0, 20), vz: rnd(10, 30), vx: rnd(-8, 8), l: rnd(.4, .8), c: k === 'd' ? ['#ffffff', '#5ab0ff', '#2a6ad0'] : ['#ffffff', '#ffd65a', '#ff9a2a'], add: 1 });
+    skHud(true);
+  }
+  let skLast = '';
+  function skHud(force) {
+    const el = $('wsk'); if (!el) return;
+    el.querySelectorAll('button').forEach(b => {
+      const k = b.dataset.v, R_ = SKR[k], lv = ST.sk[k], cd = R_.cd > 0, key = k + lv + Math.ceil(R_.cd * 10) + '|' + Math.ceil(R_.act * 10);
+      if (!force && b._k === key) return; b._k = key;
+      b.style.setProperty('--c', SKI[k].c); b.style.setProperty('--cd', (R_.cd / SK_CD * 100) + '%'); b.style.setProperty('--a', (R_.act / skDur(lv) * 100) + '%');
+      b.classList.toggle('cd', cd); b.classList.toggle('act', R_.act > 0);
+      b.querySelector('em').textContent = 'Lv' + lv;
+      let t = b.querySelector('.t'); if (cd) { if (!t) { t = document.createElement('span'); t.className = 't'; b.appendChild(t); } t.textContent = Math.ceil(R_.cd); } else if (t) t.remove();
+    });
+  }
+  function skSheet(k) {
+    const lv = ST.sk[k], mx = lv >= SK_MAX, cost = SK_UP[lv] || 0, I = SKI[k];
+    const row = (L) => (k === 'd' ? '피해 -' : '속도 +') + Math.round(skPct(k, L) * 100) + '% · ' + skDur(L) + '초';
+    const html = '<h4>' + I.ic + ' ' + I.n + ' Lv.' + lv + (mx ? ' (MAX)' : '') + '</h4><p>' + I.desc + ' 스킬입니다. 전투 중 화면 오른쪽 아래 버튼으로 사용하며, 사용 후 ' + SK_CD + '초마다 다시 쓸 수 있습니다. 쿨다운과 지속 시간은 게임 배속과 관계없이 실제 시간으로 흐릅니다.</p>'
+      + '<div class="wopt" style="display:block;font-size:13px;line-height:1.8;margin:8px 0"><div>현재: <b>' + row(lv) + '</b></div>' + (mx ? '' : '<div>다음: <b style="color:#7aff9a">' + row(lv + 1) + '</b></div><div>비용: <b>💰 ' + fK(cost) + '</b> (보유 ' + fK(ST.g) + ')</div>') + '</div>'
+      + '<div class="wopt"><button data-s="x">닫기</button>' + (mx ? '' : '<button data-s="up" class="on"' + (ST.g < cost ? ' disabled' : '') + '>강화 (Lv.' + (lv + 1) + ')</button>') + '</div>';
+    sheet(html, s => { if (s === 'x') return closeSheet(); if (s === 'up') { const c = SK_UP[ST.sk[k]]; if (ST.sk[k] >= SK_MAX || ST.g < c) { sfx('up_no'); return; } ST.g -= c; ST.sk[k]++; save(); sfx('up_ok'); banner(I.n + ' 강화!', 'Lv.' + ST.sk[k] + ' · ' + row(ST.sk[k])); skSheet(k); renderCards(); skHud(true); hud(true); } });
+  }
   function helpSheet() {
-    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
+    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
   }
   function resultSheet() {
     const win = B.over === 'win';
@@ -1734,6 +1779,8 @@ export function openWar(br) {
     if (a === 'sel') { const st = +v; if (st > ST.best) { toast('이전 스테이지를 먼저 클리어하세요'); sfx('up_no'); return; } selSt = st; sfx('click'); renderLobby(false); return; }
     if (a === 'go') { sfx('spawn'); newBattle(selSt); layout(); return; }
     if (a === 'upg') return upgSheet();
+    if (a === 'sk') return useSk(v);
+    if (a === 'skup') return skSheet(v);
     if (a === 'swap') return swapSheet();
     if (a === 'spd') return spdSheet();
     if (a === 'help') return helpSheet();
@@ -1745,7 +1792,7 @@ export function openWar(br) {
     if (a === 'snd') { AU.on = !AU.on; try { localStorage.setItem('war_snd', AU.on ? '1' : '0'); } catch (e) { } hud(true); return; }
     if (a === 'zoom') { zoom = zoom >= 2 ? 1 : zoom + .5; layout(); hud(true); return; }
   });
-  const onKey = e => { if (e.key === 'Escape') { if (sheetEl) closeSheet(); else exitAsk(); } if (!B || sheetEl) return; if ((e.key === '1' || e.key === '2' || e.key === '3') && tab === 'u') { const el = root.querySelector('[data-a=buy][data-t="' + ST.t + '"][data-v="' + (+e.key - 1) + '"]'); if (el) el.click(); } if (e.key === 'ArrowUp' || e.key === 'w') setLane(0); if (e.key === 'ArrowDown' || e.key === 's') setLane(1); };
+  const onKey = e => { if (e.key === 'Escape') { if (sheetEl) closeSheet(); else exitAsk(); } if (!B || sheetEl) return; if ((e.key === '1' || e.key === '2' || e.key === '3') && tab === 'u') { const el = root.querySelector('[data-a=buy][data-t="' + ST.t + '"][data-v="' + (+e.key - 1) + '"]'); if (el) el.click(); } if (e.key === 'q' || e.key === 'Q') useSk('d'); if (e.key === 'e' || e.key === 'E') useSk('s'); if (e.key === 'ArrowUp' || e.key === 'w') setLane(0); if (e.key === 'ArrowDown' || e.key === 's') setLane(1); };
   window.addEventListener('keydown', onKey);
   const onResize = () => layout(); window.addEventListener('resize', onResize);
   const onVis = () => { last = performance.now(); if (document.hidden) save(); }; document.addEventListener('visibilitychange', onVis);
@@ -1755,6 +1802,7 @@ export function openWar(br) {
   function loop(now) {
     if (!alive) return; raf = requestAnimationFrame(loop);
     let dt = Math.min(.05, (now - last) / 1000); last = now;
+    if (B && !paused) { for (const k in SKR) { SKR[k].cd = Math.max(0, SKR[k].cd - dt); SKR[k].act = Math.max(0, SKR[k].act - dt); } skHud(); }
     if (B && !paused) { let sdt = dt * ST.sp; while (sdt > 0) { const h = Math.min(.025, sdt); step(h); sdt -= h; } camStep(dt); }
     if (saveT > 0) { saveT -= dt; if (saveT <= 0) save(); }
     hudT -= dt; if (hudT <= 0) { hudT = .15; hud(); }
