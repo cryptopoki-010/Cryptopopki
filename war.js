@@ -1319,11 +1319,12 @@ export function openWar(br) {
     const d = { side, t: tier, li: 0, c: 0, n: H.n, key: side ? H.spriteE : H.spriteA,
       hp, dmg, cd, rng: H.rng, spd: speed, train: 0, size: H.size, fly: false, air: true,
       proj: null, splash: 0, hero: true, heroType: type, armor: type === 'siegeGolem' ? .72 : type === 'highPriest' ? .18 : .08 };
-    const u = { id: uid++, side, d, li: 0, lane, x: side ? EX + 6 : AX - 6, oy: 0,
+    const heroLane = 0;
+    const u = { id: uid++, side, d, li: 0, lane: heroLane, x: side ? EX + 6 : AX - 6, oy: 0,
       hp: d.hp, mh: d.hp, dmg: d.dmg, cd: d.cd, atk: 0, an: Math.random() * 3, hit: 0, dead: 0,
       spr: bakeUnit(d.key), dir: side ? -1 : 1, z: 0, bobP: Math.random() * 6, hero: true, heroType: type,
       supportT: .2, walk: 0 };
-    u.y = laneY(lane, u.x); B.U.push(u);
+    u.y = laneY(heroLane, u.x); B.U.push(u);
     fx({ k: 'ring', x: u.x, y: u.y, r0: 4, r1: 22, l: .65, c: side ? '#ff4a3a' : '#ffd65a' });
     for (let i = 0; i < 22; i++) part({ x: u.x + rnd(-8, 8), y: u.y, z: rnd(0, 18), vz: rnd(15, 42), l: rnd(.4, .9), c: side ? ['#ff5a3a', '#b04aff', '#fff0c0'] : ['#fff6c0', '#ffd65a', '#7ff0ff'], add: 1 });
     banner(H.n + (side ? ' · 적 영웅' : ' 출전!'), side ? '아군 영웅보다 능력치 50% 낮음' : '적 영웅과 교전 가능 · 한 번에 한 명만 출전');
@@ -1481,22 +1482,6 @@ export function openWar(br) {
           for (const foe of B.U) if (!foe.dead && foe.side !== u.side && Math.hypot(foe.x-u.x, (foe.y-u.y)*1.2) <= 52) { foe.slow = Math.max(foe.slow || 0, 1.7); foe.dmgDebuff = Math.max(foe.dmgDebuff || 0, 1.7); }
           fx({ k:'ring', x:u.x, y:u.y, r0:8, r1:52, l:.45, c:u.side ? '#c84aff' : '#75ffab' });
         }
-        /* 사제도 적 영웅과는 교전한다. 일반 적 유닛을 직접 공격하지 않고 지원 역할을 유지한다. */
-        let priestHero = null, priestHeroGap = 1e9;
-        for (const foe of B.U) {
-          if (foe.dead || foe.side === u.side || !foe.d.hero || foe.lane !== u.lane) continue;
-          const dx = (foe.x - u.x) * u.dir;
-          if (dx < -6) continue;
-          const gap = Math.hypot(dx, (foe.y-u.y)*1.4) - (d.size + foe.d.size) * .5;
-          if (gap <= Math.max(5, d.rng) && gap < priestHeroGap) { priestHero = foe; priestHeroGap = gap; }
-        }
-        if (priestHero) {
-          if (u.cd <= 0 && u.atk <= 0) { u.atk = .38; u.tgt = priestHero; u.cd = d.cd; }
-          continue;
-        }
-        const priestTarget = B.U.find(v => !v.dead && v.side !== u.side && (v.x-u.x)*u.dir >= 0);
-        if (!priestTarget && Math.abs(baseFront(1-u.side)-u.x) > 52) { u.x += u.dir * d.spd * dt; u.y = laneY(u.lane,u.x); u.walk = (u.walk||0) + dt * 8; }
-        continue;
       }
       /* 공격 진행 */
       if (u.atk > 0) {
@@ -1518,7 +1503,7 @@ export function openWar(br) {
         const dd = Math.hypot(rawDx, dy) - (d.size + v.d.size) * .5;
         /* 영웅끼리는 차선/방향 판정 때문에 서로 지나치거나 멈춰 서는 일이 없도록 근접 교전 대상을 우선 탐색 */
         if (d.hero && v.d.hero && dd <= 42 && dd < heroGap) { heroGap = dd; heroTgt = v; }
-        if (d.hero && v.lane !== u.lane) continue;
+        if (d.hero && !v.d.hero && v.lane !== u.lane) continue;
         if (dx < -6) continue;
         const reach = d.hero && (u.heroType === 'berserker' || u.heroType === 'siegeGolem') ? 5 : d.rng;
         if (dd <= reach && dd < best) { best = dd; tgt = v; }
