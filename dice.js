@@ -1097,7 +1097,7 @@ export function openDice(br) {
     } else if (tab === 'i') {
       const s = stats(); h = '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('b', 24) + '">장착 장비 <span class="sp"></span><span class="pw">⚔ ' + fN(s.power) + '</span></h3><div class="grid8">' + SLOTS.map(sl => { const it = ST.eq[sl.k]; return '<button class="slot' + (it ? ' has' : '') + '" data-a="eqv" data-v="' + sl.k + '">' + (it ? '<img alt="" src="' + itemIcon(sl.k, it.w >= 0 ? WEAPONS[it.w].k : null, it.r) + '">' + (it.e ? '<span class="e">+' + it.e + '</span>' : '') + '<span class="gm">' + (it.g || []).map(g => g ? '<img alt="" src="' + gemIcon(g.t, 20) + '">' : '').join('') + '</span>' : '<img alt="" style="opacity:.28;filter:grayscale(1)" src="' + itemIcon(sl.k, sl.k === 'weapon' ? 'sword' : null, 0) + '"><span style="position:absolute;bottom:3px">' + sl.n + '</span>') + '</button>'; }).join('') + '</div>'
         + '<div class="stats" style="margin-top:10px">' + [['공격력', fS(s.atk)], ['주문력', fS(s.mag)], ['방어력', fS(s.def)], ['체력', fS(s.hp)], ['회피', s.eva.toFixed(1) + '%'], ['공격 속도', s.aspd.toFixed(2) + '/초']].map(([a, b]) => '<div>' + a + '<b>' + b + '</b></div>').join('') + '</div>'
-        + '<div class="row" style="margin-top:10px"><button class="dbtn s g" data-a="autoeq">⚡ 최강 장비 자동 장착</button><button class="dbtn s r" data-a="sellj">N·R 일괄 판매</button></div></div>'
+        + '<div class="row" style="margin-top:10px"><button class="dbtn s g" data-a="autoeq">⚡ 최강 장비 자동 장착</button><button class="dbtn s r" data-a="sellall">장비 일괄 판매</button></div></div>'
         + '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('i', 24) + '">가방 <small style="font-size:12px;color:#7a6a7e">' + ST.inv.length + '/120</small></h3><div class="invg">' + ST.inv.slice().sort((a, b) => b.r - a.r || b.l - a.l || itemPower(b) - itemPower(a)).map(it => '<button class="slot has" data-a="item" data-v="' + it.i + '" style="border-color:' + RAR[it.r].c + '"><img alt="" src="' + itemIcon(SLOTS[it.s].k, it.w >= 0 ? WEAPONS[it.w].k : null, it.r) + '">' + (it.e ? '<span class="e">+' + it.e + '</span>' : '') + (it.k ? '<span style="position:absolute;left:3px;top:2px;font-size:10px">🔒</span>' : '') + '</button>').join('') + '</div>' + (ST.inv.length ? '' : '<p style="color:#a89a80;font-size:12.5px">주사위 ⚀·⚅ 이 나오면 장비 주머니를 얻습니다</p>') + '</div>'
         + '<div class="card"><h3><img class="hi" alt="" src="' + gemIcon(1, 24) + '">보석 가방 <small style="font-size:12px;color:#7a6a7e">' + ST.gems.length + '/80</small><span class="sp"></span><button class="dbtn s b" data-a="craft">조각 10 → 보석</button></h3><div class="invg">' + ST.gems.map((g, i) => '<button class="slot has" data-a="gemv" data-v="' + i + '" title="' + fmtGem(g) + '"><img alt="" src="' + gemIcon(g.t, 40) + '" style="width:60%;height:60%"><span style="font-size:10px;color:#2a1d2e">' + g.v.toFixed(1) + (GEMS[g.t].pp ? '%p' : '%') + '</span></button>').join('') + '</div>' + (ST.gems.length >= 3 ? '<button class="dbtn s w" style="margin-top:8px" data-a="fuse">같은 종류 3개 합성 (자동)</button>' : '') + '</div>';
     } else if (tab === 'e') {
@@ -1175,6 +1175,22 @@ export function openDice(br) {
       });
   }
   function autoEquip() { let n = 0; SLOTS.forEach(sl => { const cands = ST.inv.filter(x => SLOTS[x.s].k === sl.k); if (!cands.length) return; const best = cands.reduce((a, b) => itemPower(b) > itemPower(a) ? b : a); const cur = ST.eq[sl.k]; if (!cur || itemPower(best) > itemPower(cur)) { equip(best); n++; } }); toast(n ? n + '개 부위를 더 강한 장비로 교체했습니다' : '이미 가장 강한 장비를 착용 중입니다'); if (n) sfx('up'); }
+  let SELL = { r: [1, 1, 0, 0, 0], enh: 0, weak: 0 };
+  function sellList() { return ST.inv.filter(x => !x.k && SELL.r[x.r] && (SELL.enh || !x.e) && (!SELL.weak || !ST.eq[SLOTS[x.s].k] || itemPower(x) < itemPower(ST.eq[SLOTS[x.s].k]))); }
+  function sellSheet() {
+    const L = sellList(), g = L.reduce((a, x) => a + sellValue(x), 0), cnt = RAR.map((_, i) => ST.inv.filter(x => x.r === i && !x.k).length), lk = ST.inv.filter(x => x.k).length;
+    const chk = (on, lab, key) => '<button class="dbtn s ' + (on ? 'g' : 'w') + '" style="flex:1;min-width:0;padding:0 6px" data-s="' + key + '">' + (on ? '☑ ' : '☐ ') + lab + '</button>';
+    sheet('<h4>장비 일괄 판매</h4><p>판매할 등급을 고르세요. 장착 중인 장비와 🔒 잠금 장비는 판매되지 않습니다' + (lk ? ' (잠금 ' + lk + '개 보호 중)' : '') + '.</p>'
+      + '<div class="row" style="flex-wrap:wrap;gap:6px">' + RAR.map((r, i) => '<button class="dbtn s" style="flex:1;min-width:58px;padding:0 4px;background:' + (SELL.r[i] ? r.c : '#fff') + ';color:' + (SELL.r[i] ? '#fff' : '#2a1d2e') + '" data-s="r' + i + '">' + r.k + ' <small>(' + cnt[i] + ')</small></button>').join('') + '</div>'
+      + '<div class="row" style="margin-top:8px;gap:6px">' + chk(SELL.enh, '강화 장비 포함', 'enh') + chk(SELL.weak, '착용보다 약한 것만', 'weak') + '</div>'
+      + '<div class="kv"><span>판매 수량</span><b>' + L.length + '개</b><span>받을 골드</span><b>' + fN(g) + '</b><span>남는 장비</span><b>' + (ST.inv.length - L.length) + '개</b></div>'
+      + '<div class="row"><button class="dbtn w" style="flex:1" data-s="x">취소</button><button class="dbtn r" style="flex:2" data-s="go" ' + (L.length ? '' : 'disabled') + '>' + L.length + '개 판매 · 골드 +' + fN(g) + '</button></div>', k => {
+        if (k === 'x') return closeSheet();
+        if (k[0] === 'r') { const i = +k.slice(1); SELL.r[i] = SELL.r[i] ? 0 : 1; return sellSheet(); }
+        if (k === 'enh' || k === 'weak') { SELL[k] = SELL[k] ? 0 : 1; return sellSheet(); }
+        if (k === 'go') { const L2 = sellList(); if (!L2.length) return; const hi = L2.some(x => x.r >= 3); if (hi && !SELL.ok) { SELL.ok = 1; toast('UR·L 장비가 포함되어 있습니다. 한 번 더 누르면 판매합니다'); return; } SELL.ok = 0; let gg = 0; L2.forEach(x => gg += sellValue(x)); ST.inv = ST.inv.filter(x => !L2.includes(x)); ST.gold += gg; mark(); sfx('coin'); closeSheet(); toast('장비 ' + L2.length + '개 판매 · 골드 +' + fN(gg)); hudCur(); renderPanel(); }
+      });
+  }
   function sellJunk() { const L = ST.inv.filter(x => !x.k && x.r <= 1); if (!L.length) return toast('판매할 N·R 장비가 없습니다'); let g = 0; L.forEach(x => g += sellValue(x)); ST.inv = ST.inv.filter(x => !L.includes(x)); ST.gold += g; sfx('coin'); toast('N·R 장비 ' + L.length + '개 판매 · 골드 +' + fN(g)); mark(); }
   function doEnh() {
     const it = selItem; if (!it) return; const e = it.e, cost = ENH_COST(it, e); if (e >= ENH_MAX || ST.gold < cost.gold || ST.scroll < cost.scroll) return;
@@ -1213,6 +1229,7 @@ export function openDice(br) {
       case 'item': { const it = findItem(+v); if (it) itemSheet(it); return; }
       case 'autoeq': autoEquip(); renderPanel(); return;
       case 'sellj': sellJunk(); renderPanel(); hudCur(); return;
+      case 'sellall': return sellSheet();
       case 'craft': return craftGem();
       case 'fuse': return fuseGems();
       case 'gemv': { const g = ST.gems[+v]; if (g) toast(fmtGem(g) + ' · 장착: 강화 탭에서 장비 선택 후 소켓'); return; }
