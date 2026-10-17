@@ -1185,7 +1185,7 @@ export function openDice(br) {
     krwN = Math.max(1, Math.floor(Number(krwN) || 1));
     return '<div class="card krw"><h3><img class="hi" alt="" src="' + curIcon('dice', 24) + '">원화로 주사위 구매<span class="sp"></span><small style="font-size:12px;color:#7a6a7e">10만원당 1개</small></h3>'
       + '<div class="kv"><span>내 잔고</span><b id="kbal">' + fW(bal()) + '원</b><span>보유 주사위</span><b>' + fN(ST.dice) + '개 (보유 제한 없음)</b><span>구매 가능</span><b id="kcap">' + fN(krwCap()) + '개</b></div>'
-      + '<div class="krow"><input type="number" id="krng" min="1" step="1" value="' + krwN + '" aria-label="구매할 주사위 수" style="width:120px;max-width:45%;padding:8px;border:2px solid #2a1d2e;font-weight:900"><b id="kn">' + fN(krwN) + '개</b></div>
+      + '<div class="krow"><input type="number" id="krng" min="1" step="1" value="' + krwN + '" aria-label="구매할 주사위 수" style="width:120px;max-width:45%;padding:8px;border:2px solid #2a1d2e;font-weight:900"><b id="kn">' + fN(krwN) + '개</b></div>'
       + '<div class="row" style="margin:6px 0 8px"><button class="dbtn s w" style="flex:1" data-a="kq" data-v="-100">-100</button><button class="dbtn s w" style="flex:1" data-a="kq" data-v="-1">-1</button><button class="dbtn s w" style="flex:1" data-a="kq" data-v="1">+1</button><button class="dbtn s w" style="flex:1" data-a="kq" data-v="100">+100</button><button class="dbtn s w" style="flex:1" data-a="kq" data-v="max">최대</button></div>'
       + '<button class="dbtn" style="width:100%" id="kbuy" data-a="kbuy"></button><p id="kmsg" style="margin:6px 0 0;font-size:11.5px;color:#c8302a;min-height:15px"></p></div>';
   }
