@@ -743,9 +743,7 @@ const DCSS = `
 .pw{font-size:22px;font-weight:900;color:#c8302a}
 .row{display:flex;gap:8px;align-items:center}.sp{flex:1}
 .krow{display:flex;gap:10px;align-items:center;margin:4px 0}.krow b{min-width:66px;text-align:right;font-size:15px;font-variant-numeric:tabular-nums}
-.krow input{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:14px;background:linear-gradient(90deg,#ffd24a var(--p,0%),#e8dcc4 var(--p,0%));border:2px solid #2a1d2e;border-radius:0;outline:none;margin:0}
-.krow input::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:26px;background:#fff8ec;border:3px solid #2a1d2e;border-radius:0;box-shadow:0 2px 0 #2a1d2e;cursor:pointer}
-.krow input::-moz-range-thumb{width:18px;height:22px;background:#fff8ec;border:3px solid #2a1d2e;border-radius:0;cursor:pointer}
+.krow input{flex:1;min-width:0;border:2px solid #2a1d2e;border-radius:0;outline:none;margin:0;background:#fff8ec;padding:8px;font-weight:900}
 .dm{position:fixed;inset:0;z-index:9100;background:#14101ec0;display:flex;align-items:center;justify-content:center;padding:16px}
 .dsh{width:min(430px,100%);max-height:calc(100% - 20px);overflow:auto;background:#fff8ec;border:3px solid #2a1d2e;border-radius:0;padding:16px;box-shadow:0 6px 0 #2a1d2e}
 .dsh h4{margin:0 0 6px;font-size:17px;font-weight:900}.dsh p{margin:0 0 8px;font-size:12.5px;line-height:1.55;color:#5a4a5e}
@@ -779,19 +777,20 @@ export function openDice(br) {
   try { SND.on = localStorage.getItem('dz_snd') !== '0'; } catch (e) { }
   /* ---------- 상태 ---------- */
   const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
-  const DEF = () => ({ v: 1, gold: 300, dice: 30, scroll: 3, shard: 0, gems: [], inv: [], eq: {}, region: 1, stage: 1, kills: 0, maxR: 1, bossC: {}, keys: { gold: 3, scroll: 3, gem: 3, dice: 3 }, kday: today(), tower: { best: 0 }, cos: { own: {}, eq: { mount: -1, outfit: -1, skin: -1 } }, uid: 1, rolls: 0, shake: 1 });
+  const DEF = () => ({ v: 1, gold: 300, dice: 30, scroll: 3, shard: 0, gems: [], inv: [], eq: {}, region: 1, stage: 1, kills: 0, maxR: 1, bossC: {}, keys: { gold: 3, scroll: 3, gem: 3, dice: 3 }, kday: today(), tower: { best: 0 }, raidRank: [], cos: { own: {}, eq: { mount: -1, outfit: -1, skin: -1 } }, uid: 1, rolls: 0, shake: 1 });
   let ST; try { ST = Object.assign(DEF(), JSON.parse(JSON.stringify(br.getState ? br.getState() || {} : {}))); } catch (e) { ST = DEF(); }
-  ['gems', 'inv'].forEach(k => { if (!Array.isArray(ST[k])) ST[k] = []; }); if (!ST.eq || typeof ST.eq !== 'object') ST.eq = {}; ST.keys = Object.assign({ gold: 3, scroll: 3, gem: 3, dice: 3 }, ST.keys || {}); ST.cos = Object.assign({ own: {}, eq: { mount: -1, outfit: -1, skin: -1 } }, ST.cos || {}); ST.tower = ST.tower || { best: 0 }; ST.bossC = ST.bossC || {};
+  ['gems', 'inv'].forEach(k => { if (!Array.isArray(ST[k])) ST[k] = []; }); if (!ST.eq || typeof ST.eq !== 'object') ST.eq = {}; ST.keys = Object.assign({ gold: 3, scroll: 3, gem: 3, dice: 3 }, ST.keys || {}); ST.cos = Object.assign({ own: {}, eq: { mount: -1, outfit: -1, skin: -1 } }, ST.cos || {}); ST.tower = ST.tower || { best: 0 }; ST.bossC = ST.bossC || {}; ST.raidRank = Array.isArray(ST.raidRank) ? ST.raidRank : [];
   if (ST.kday !== today()) { ST.kday = today(); ST.keys = { gold: KEYS_PER_DAY, scroll: KEYS_PER_DAY, gem: KEYS_PER_DAY, dice: KEYS_PER_DAY }; }
-  const DICE_MAX = 5000, DICE_KRW = 100000;
-  if (ST.dice > DICE_MAX) ST.dice = DICE_MAX;
-  const addDice = n => { const before = ST.dice; ST.dice = Math.min(DICE_MAX, ST.dice + n); return ST.dice - before; };
+  const DICE_MAX = 5000, DICE_KRW = 100000; // 직접 오픈만 제한, 보유·구매 수량은 무제한
+  ST.dice = Math.max(0, Number(ST.dice) || 0);
+  ST.gems = ST.gems.map(g => Object.assign({ r: 0 }, g));
+  const addDice = n => { const before = ST.dice; ST.dice = Math.max(0, ST.dice + Math.max(0, Number(n) || 0)); return ST.dice - before; };
   let dirty = 0; const save = () => { dirty = 0; if (br.setState) br.setState(JSON.parse(JSON.stringify(ST))); };
   const mark = () => { dirty = 1; };
   save();
   /* ---------- 아이템 ---------- */
   const isW = it => SLOTS[it.s].k === 'weapon', wpnOf = it => isW(it) ? WEAPONS[it.w] : null;
-  function itemName(it) { const key = isW(it) ? WEAPONS[it.w].k : SLOTS[it.s].k; return ITEM_NAMES[key][it.r]; }
+  function itemName(it) { if (it.ds) return ['드래곤 슬레이어 투구','드래곤 슬레이어 목걸이','드래곤 슬레이어 갑옷','드래곤 슬레이어 검','드래곤 슬레이어 각반','드래곤 슬레이어 벨트','드래곤 슬레이어 반지','드래곤 슬레이어 장화'][it.s] || '드래곤 슬레이어 장비'; const key = isW(it) ? WEAPONS[it.w].k : SLOTS[it.s].k; return ITEM_NAMES[key][it.r]; }
   function itemStats(it) {
     const base = isW(it) ? WPN_STAT[WEAPONS[it.w].k] : SLOT_STAT[SLOTS[it.s].k], m = RAR_MUL[it.r] * LV_MUL(it.l) * ENH_MUL(it.e), o = {};
     for (const k in base) o[k] = k === 'eva' ? +(base[k] * (1 + it.r * .5) * (1 + it.e * .04)).toFixed(2) : Math.round(base[k] * m);
@@ -801,7 +800,9 @@ export function openDice(br) {
   function newItem(r, l) { const s = ri(0, 7), it = { i: ST.uid++, s, w: SLOTS[s].k === 'weapon' ? ri(0, WEAPONS.length - 1) : -1, r, l, e: 0, g: [], k: 0 }; it.g = Array.from({ length: RAR_SOCK[r] }, () => null); return it; }
   const rollRarity = () => wpick(RAR.map(x => x.w));
   function gemVal() { return Math.round((0.1 + 9.9 * Math.pow(Math.random(), 3.4)) * 10) / 10; }
-  const fmtGem = g => GEMS[g.t].n + ' +' + g.v.toFixed(1) + (GEMS[g.t].pp ? '%p' : '%');
+  const GEM_RAR = [{ k: 'R', n: '레어', c: '#46a6ff', rate: .90 }, { k: 'SR', n: '슈퍼 레어', c: '#b65cff', rate: .70 }, { k: 'UR', n: '울트라 레어', c: '#ffae2b', rate: .02 }, { k: 'L', n: '레전더리', c: '#ff4a72', rate: 0 }];
+  const gemR = g => clamp(Number.isInteger(g.r) ? g.r : 0, 0, 3);
+  const fmtGem = g => GEM_RAR[gemR(g)].k + ' ' + GEMS[g.t].n + ' +' + g.v.toFixed(1) + (GEMS[g.t].pp ? '%p' : '%');
   function costumeBonus() { const b = { all: 0, hpdef: 0, atkmag: 0 }; const e = ST.cos.eq; ['mount', 'outfit', 'skin'].forEach(cat => { const id = e[cat]; if (id == null || id < 0) return; const r = ST.cos.own[cat + '_' + id]; if (r == null) return; const v = C_BONUS[r]; if (cat === 'mount') b.all += v; if (cat === 'outfit') b.hpdef += v; if (cat === 'skin') b.atkmag += v; }); return b; }
   function stats() {
     const s = Object.assign({}, BASE), pct = { atk: 0, mag: 0, def: 0, hp: 0, aspd: 0 }; let eva = 0;
@@ -856,14 +857,21 @@ export function openDice(br) {
     mons.push(monBase(pick(R.mons), MON(ST.region, ST.stage, false), false));
   }
   function spawnDungeon() {
-    const D = mode; if (D.over) return;
+    const D = mode; if (D.over || D.k === 'raid') return;
     if (D.k === 'tower') { if (mons.length) return; const boss = D.floor % 10 === 0, i = Math.round(D.floor * 1.25); const st = { hp: Math.round(60 * Math.pow(1.17, i) * (boss ? 6 : 1.6)), atk: Math.round(7 * Math.pow(1.155, i) * (boss ? 1.6 : 1.1)), gold: Math.round(5 * Math.pow(1.15, i)), def: Math.round(Math.pow(1.13, i)) }; const R = regionOf(1 + Math.floor((D.floor - 1) / 10)); mons.push(monBase(boss ? R.boss : pick(R.mons), st, boss)); return; }
     if (mons.filter(m => !m.dead).length >= 4) return; if (D.kills + mons.length >= (D.need || 1e9)) return;
     const r = Math.max(1, ST.maxR), st = MON(r, 4, false); st.hp = Math.round(st.hp * .7);
-    const kind = { gold: 'slime', scroll: 'mush', gem: 'golem', dice: 'bat' }[D.k]; mons.push(monBase(kind, st, false));
+    const kind = { gold: 'goblin', scroll: 'mush', gem: 'golem', dice: 'bat' }[D.k]; mons.push(monBase(kind, st, false));
   }
-  const mH = m => monSpr(m.kind, 0).cv.height - (m.kind === 'bat' || m.kind === 'ghost' || m.kind === 'wraith' ? -6 : 2);
-  function damageMon(m, d, crit) { m.hp -= d; m.hit = .14; num(m.x, gy - mH(m) - 8, fS(d) + (crit ? '!' : ''), crit ? '#ffd24a' : '#ffffff', crit); if (m.hp <= 0 && !m.dead) killMon(m); }
+  const mH = m => m.kind === 'cerberus' ? Math.floor(H*.8) : monSpr(m.kind, 0).cv.height - (m.kind === 'bat' || m.kind === 'ghost' || m.kind === 'wraith' ? -6 : 2);
+  function damageMon(m, d, crit) {
+    if (mode.k === 'raid') {
+      if (mode.over) return; mode.damage = (mode.damage || 0) + Math.max(0, d); m.hit = .14; num(Math.max(W*.58,m.x-W*.08), gy - mH(m) - 8, fS(d) + (crit ? '!' : ''), crit ? '#ffd24a' : '#ffffff', crit);
+      if (!mode.rewarded && mode.damage >= 1000000) { mode.rewarded = 1; const it = newItem(4, Math.max(1,ST.maxR)); it.ds = 1; if (it.s === 3) it.w = 0; if (ST.inv.length >= 120) { const weak = ST.inv.filter(x => !x.k).sort((a,b)=>itemPower(a)-itemPower(b))[0]; if (weak) ST.inv.splice(ST.inv.indexOf(weak),1); } ST.inv.push(it); mode.rewardName = itemName(it); banner('드래곤 슬레이어 획득!', mode.rewardName + ' · 임계 피해 달성'); sfx('legend'); flash=.8; mark(); hudCur(); }
+      m.hp = m.mh; return;
+    }
+    m.hp -= d; m.hit = .14; num(m.x, gy - mH(m) - 8, fS(d) + (crit ? '!' : ''), crit ? '#ffd24a' : '#ffffff', crit); if (m.hp <= 0 && !m.dead) killMon(m);
+  }
   function num(x, y, t, col, big, ic) { nums.push({ x: x + rnd(-4, 4), y, t, col, big, ic, a: 0 }); }
   function burst(x, y, cols, n, sp, g = 300) { sp *= .45; g *= .45; for (let i = 0; i < n; i++) { const a = Math.random() * TAU, v = rnd(sp * .3, sp); parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - sp * .3, g, l: rnd(.35, .7), m: 0, c: pick(cols), r: rnd(1, 2.6) }); } }
   let KC = 0;
@@ -874,7 +882,7 @@ export function openDice(br) {
     if (D.k === 'gold') g = Math.round(g * 3);
     if (D.k === 'field' || D.k === 'gold') { ST.gold += g; for (let i = 0; i < Math.min(8, 3 + (m.boss ? 5 : 0)); i++) coins.push({ x: m.x + rnd(-5, 5), y: gy - 10, vx: rnd(-36, 36), vy: rnd(-120, -75), t: 0, k: 'gold' }); num(m.x, gy - mH(m) - 16, '+' + fS(g), '#ffd24a'); sfx('coin'); }
     if (D.k === 'field') {
-      if (Math.random() < DICE_DROP && ST.dice < DICE_MAX) { addDice(1); coins.push({ x: m.x, y: gy - 10, vx: rnd(-18, 18), vy: -135, t: 0, k: 'dice' }); num(m.x, gy - mH(m) - 24, '+1', '#ffffff', 0, 'dice'); }
+      if (Math.random() < DICE_DROP) { addDice(1); coins.push({ x: m.x, y: gy - 10, vx: rnd(-18, 18), vy: -135, t: 0, k: 'dice' }); num(m.x, gy - mH(m) - 24, '+1', '#ffffff', 0, 'dice'); }
       if (Math.random() < .06) { ST.scroll += 1; num(m.x + 8, gy - mH(m) - 30, '+1', '#e8d0ff', 0, 'scroll'); }
       if (m.boss) { bossDown(); } else { ST.kills++; if (ST.kills >= KILLS_PER_STAGE) stageUp(); }
     } else if (D.k === 'tower') { towerFloor(); }
@@ -905,9 +913,18 @@ export function openDice(br) {
     mode.floor++; ST.tower.best = Math.max(ST.tower.best | 0, f); P.hp = Math.min(P.mh, P.hp + P.mh * .3); hudStage();
   }
   function startDungeon(k) {
+    if (k === 'raid') { mode = { k: 'raid', t: 0, time: 30, damage: 0, over: 0, rewarded: 0 }; const st = { hp: Number.MAX_SAFE_INTEGER, atk: 0, def: 0, gold: 0 }; const boss = monBase('cerberus', st, true); boss.x = W * .83; boss.mh = Number.MAX_SAFE_INTEGER; boss.hp = boss.mh; mons = [boss]; proj = []; P.hp = P.mh; tab = 'b'; renderPanel(); banner('보스 레이드', '30초 동안 켈베로스를 공격하세요!'); hudStage(); mark(); return; }
     if (k === 'tower') { mode = { k: 'tower', floor: 1, kills: 0 }; }
     else { if ((ST.keys[k] | 0) <= 0) { toast('오늘 입장권을 모두 사용했습니다 (매일 자정 충전)'); return; } ST.keys[k]--; const D = DUNGEONS.find(x => x.k === k); mode = { k, kills: 0, need: D.kills || 0, time: D.time || 0, t: 0 }; }
     mons = []; proj = []; P.hp = P.mh; tab = 'b'; renderPanel(); banner(k === 'tower' ? '무한의 탑' : DUNGEONS.find(x => x.k === k).n, '입장!'); hudStage(); mark();
+  }
+  function endRaid() {
+    if (mode.over) return; mode.over = 1; const damage = Math.floor(mode.damage || 0);
+    ST.raidRank.push({ damage, date: new Date().toLocaleString('ko-KR'), reward: !!mode.rewarded });
+    ST.raidRank.sort((a,b)=>b.damage-a.damage); ST.raidRank = ST.raidRank.slice(0,20); mark();
+    const rank = ST.raidRank.findIndex(x => x.damage === damage) + 1;
+    sheetResult('보스 레이드 결과', '피해량 ' + fN(damage), '랭킹 ' + (rank || '-') + '위' + (mode.rewarded ? '<br>보상: 드래곤 슬레이어 ' + (mode.rewardName || '레전더리 장비') : '<br>임계 피해 1,000,000 미달성 · 보상 없음') + '<br><br><b>피해량 TOP 10</b><br>' + ST.raidRank.slice(0,10).map((x,i)=>(i+1)+'. ' + fN(x.damage) + (x.reward?' · 보상 획득':'')).join('<br>'));
+    hudCur(); hudStage();
   }
   function dungeonEnd(win) {
     const D = mode; if (D.over) return; D.over = 1; let rw = [];
@@ -923,13 +940,13 @@ export function openDice(br) {
     mark(); hudCur();
   }
   function sheetResult(title, head, body) { setTimeout(() => sheet('<h4>' + title + '</h4><p style="font-size:20px;font-weight:900;color:#c8302a;margin:6px 0">' + head + '</p><p>' + body + '</p><button class="dbtn" style="width:100%" data-s="ok">필드로 돌아가기</button>', () => { closeSheet(); mode = { k: 'field' }; mons = []; P.hp = P.mh; hudStage(); }), 700); }
-  function addGem(g) { if (ST.gems.length >= 80) { ST.shard += 3; return; } ST.gems.push(g); }
+  function addGem(g) { if (ST.gems.length >= 80) { ST.shard += 3; return; } if (g.r == null) g.r = 0; ST.gems.push(g); }
   /* ---------- 갱신 ---------- */
   function step(dt) {
     T += dt; const s = SC(), px = PX(), W0 = S.wpn;
     P.hit = Math.max(0, P.hit - dt * 4); P.mv = Math.max(0, (P.mv || 0) - dt); P.sl = Math.max(0, (P.sl || 0) - dt); if (P.down > 0) { P.down -= dt; if (P.down <= 0) { P.hp = P.mh; } }
     if (mode.k === 'field') { spawnT -= dt; if (spawnT <= 0) { spawnT = .7; spawnField(); } }
-    else { spawnT -= dt; if (spawnT <= 0) { spawnT = mode.k === 'gold' ? .55 : .9; spawnDungeon(); } if (mode.k === 'gold' && !mode.over) { mode.t += dt; if (mode.t >= mode.time) dungeonEnd(true); } }
+    else { spawnT -= dt; if (spawnT <= 0) { spawnT = mode.k === 'gold' ? .55 : .9; spawnDungeon(); } if (mode.k === 'gold' && !mode.over) { mode.t += dt; if (mode.t >= mode.time) dungeonEnd(true); } if (mode.k === 'raid' && !mode.over) { mode.t += dt; if (mode.t >= 30) endRaid(); } }
     /* 몬스터 이동/공격 */
     const live = mons.filter(m => !m.dead);
     live.sort((a, b) => a.x - b.x);
@@ -937,7 +954,7 @@ export function openDice(br) {
     live.forEach((m, i) => {
       m.hit = Math.max(0, m.hit - dt * 4); const stopX = frontX + (i ? (m.boss ? 34 : 24) : 0);
       if (m.x > stopX) { m.x = Math.max(stopX, m.x - (m.boss ? 80 : 130) * s * dt); m.atkA = -1; }
-      else if (i === 0 && P.down <= 0) { m.cd -= dt; if (m.atkA >= 0) { m.atkA += dt / .4; if (m.atkA >= .5 && !m.hitDone) { m.hitDone = 1; if (Math.random() * 100 < S.eva) { num(px, gy - 40, 'MISS', '#9ad8ff'); } else { const d = Math.max(Math.round(m.atk * .15), Math.round(m.atk * rnd(.9, 1.1) - S.def * .6)); P.hp -= d; P.hit = 1; num(px, gy - 40, '-' + fS(d), '#ff6a6a'); sfx('ouch'); if (shakeOn()) shakeA = Math.max(shakeA, m.boss ? 3 : 1.5); if (P.hp <= 0) { P.hp = 0; playerDown(); } } } if (m.atkA >= 1) m.atkA = -1; } else if (m.cd <= 0) { m.cd = m.boss ? 1.6 : 1.4; m.atkA = 0; m.hitDone = 0; } }
+      else if (i === 0 && P.down <= 0 && mode.k !== 'raid') { m.cd -= dt; if (m.atkA >= 0) { m.atkA += dt / .4; if (m.atkA >= .5 && !m.hitDone) { m.hitDone = 1; if (Math.random() * 100 < S.eva) { num(px, gy - 40, 'MISS', '#9ad8ff'); } else { const d = Math.max(Math.round(m.atk * .15), Math.round(m.atk * rnd(.9, 1.1) - S.def * .6)); P.hp -= d; P.hit = 1; num(px, gy - 40, '-' + fS(d), '#ff6a6a'); sfx('ouch'); if (shakeOn()) shakeA = Math.max(shakeA, m.boss ? 3 : 1.5); if (P.hp <= 0) { P.hp = 0; playerDown(); } } } if (m.atkA >= 1) m.atkA = -1; } else if (m.cd <= 0) { m.cd = m.boss ? 1.6 : 1.4; m.atkA = 0; m.hitDone = 0; } }
       frontX = m.x;
     });
     mons.forEach(m => { if (m.dead) m.dead += dt * 2.2; }); mons = mons.filter(m => !m.dead || m.dead < 1);
@@ -991,15 +1008,46 @@ export function openDice(br) {
   }
   function shadowAt(c, x, y, w) { c.fillStyle = 'rgba(20,10,30,.28)'; const hw = Math.round(w / 2); for (let i = -hw; i <= hw; i++) { const k = 1 - (i / (hw + 1)) ** 2; c.fillRect(Math.round(x) + i, y - (k > .55 ? 1 : 0), 1, k > .55 ? 2 : 1); } }
   const FLOAT = { bat: 1, ghost: 1, wraith: 1 };
+  function drawGoldVault(c) {
+    // 알리바바의 보물창고: 금빛 석벽, 보물 더미, 반짝이는 금화
+    c.fillStyle = '#5a3516'; c.fillRect(0, 0, W, H);
+    c.fillStyle = '#8a5720'; c.fillRect(0, 0, W, Math.floor(H * .65));
+    for (let y=4; y<H*.62; y+=Math.max(8,Math.floor(H*.12))) { c.fillStyle='#b87a2a'; c.fillRect(0,y,W,2); for(let x=0;x<W;x+=Math.max(20,Math.floor(W*.12))) { c.fillStyle='#6b3d17'; c.fillRect(x,y,2,Math.max(8,Math.floor(H*.12))); } }
+    // 아치형 창고 벽감
+    for (let x=Math.floor(W*.08); x<W; x+=Math.floor(W*.28)) { c.fillStyle='#3a2415'; c.fillRect(x,Math.floor(H*.12),Math.floor(W*.17),Math.floor(H*.35)); c.fillStyle='#d99b37'; c.fillRect(x+3,Math.floor(H*.14),Math.floor(W*.17)-6,Math.floor(H*.32)); c.fillStyle='#7a471b'; c.fillRect(x+7,Math.floor(H*.18),Math.floor(W*.17)-14,Math.floor(H*.27)); }
+    // 바닥과 금화 산
+    c.fillStyle='#b87a23'; c.fillRect(0,Math.floor(H*.63),W,H*.37);
+    for(let i=0;i<7;i++){ const x=Math.floor(W*(i/6)), base=gy-3, radius=Math.max(8,Math.floor(W*.09)); c.fillStyle='#8a4c12'; c.beginPath(); c.ellipse(x,base,radius,Math.max(5,radius*.42),0,0,Math.PI*2); c.fill(); c.fillStyle='#e9a92f'; c.beginPath(); c.ellipse(x,base-3,radius,Math.max(5,radius*.42),0,0,Math.PI*2); c.fill(); c.strokeStyle='#ffdf62'; c.lineWidth=2; c.stroke(); for(let j=0;j<9;j++){const cx=x+(((i*17+j*13)%19)/19-.5)*radius*1.6, cy=base-(((i*7+j*11)%13)/13)*radius*.4; c.fillStyle=['#ffe777','#f8c43a','#d9921f'][(i+j)%3]; c.beginPath(); c.ellipse(cx,cy,2.5,1.6,0,0,Math.PI*2); c.fill();} }
+    c.fillStyle='rgba(255,218,90,.10)'; c.fillRect(0,0,W,H);
+  }
+  function drawCerberus(c, m) {
+    const z=Math.max(.8,Math.min(W/85,H/70)), x=m.x, y=gy;
+    c.save(); c.translate(x,y);
+    // 거대한 검은 몸통과 세 갈래 목
+    c.fillStyle='#291722'; c.beginPath(); c.ellipse(-12*z,-20*z,38*z,24*z,0,0,Math.PI*2); c.fill();
+    c.fillStyle='#4b1d2b'; c.fillRect(-38*z,-22*z,48*z,22*z);
+    for (const dx of [-25,0,25]) { c.strokeStyle='#4b1d2b'; c.lineWidth=10*z; c.beginPath(); c.moveTo(-12*z,-24*z); c.lineTo(dx*z,-47*z); c.stroke(); }
+    for (const [i,dx] of [-25,0,25].entries()) {
+      const hy=(-47-(i===1?3:0))*z; c.fillStyle=i===1?'#6b2631':'#57202e'; c.beginPath(); c.ellipse(dx*z,hy,15*z,13*z,0,0,Math.PI*2); c.fill();
+      c.fillStyle='#d9c6a5'; c.beginPath(); c.moveTo((dx-10)*z,hy-7*z); c.lineTo((dx-17)*z,hy-20*z); c.lineTo((dx-5)*z,hy-12*z); c.fill(); c.beginPath(); c.moveTo((dx+7)*z,hy-8*z); c.lineTo((dx+15)*z,hy-20*z); c.lineTo((dx+12)*z,hy-5*z); c.fill();
+      c.fillStyle='#ffb52e'; c.fillRect((dx-7)*z,hy-2*z,4*z,3*z); c.fillRect((dx+3)*z,hy-2*z,4*z,3*z); c.fillStyle='#ff493f'; c.fillRect((dx-3)*z,hy+4*z,7*z,2*z);
+    }
+    // claws and fire mane
+    c.fillStyle='#1b1119'; for(const dx of [-35,-14,8]) c.fillRect(dx*z,-4*z,9*z,10*z);
+    c.fillStyle='#e24a22'; for(let i=0;i<9;i++){const fx=(-40+i*7)*z;c.beginPath();c.moveTo(fx,-28*z);c.lineTo(fx+3*z,-42*z);c.lineTo(fx+7*z,-27*z);c.fill();}
+    c.restore();
+  }
   function draw() {
     const c = ctx; c.setTransform(1, 0, 0, 1, 0, 0); c.imageSmoothingEnabled = false; c.globalAlpha = 1;
     const sh = shakeA > .5 ? Math.round(rnd(-shakeA, shakeA)) : 0; c.translate(sh, 0);
     const R = mode.k === 'field' ? regionOf(ST.region) : mode.k === 'tower' ? regionOf(1 + Math.floor((mode.floor - 1) / 10)) : regionOf(Math.max(1, ST.maxR));
     drawBG(c, W, H, gy, R, scroll, T);
+    if (mode.k === 'gold') drawGoldVault(c);
     if (mode.k !== 'field') { c.fillStyle = mode.k === 'tower' ? 'rgba(40,20,80,.22)' : { gold: 'rgba(255,200,40,.14)', scroll: 'rgba(120,80,200,.16)', gem: 'rgba(60,200,220,.14)', dice: 'rgba(255,120,200,.14)' }[mode.k]; c.fillRect(0, 0, W, H); }
     const px = Math.round(PX()), L = lookOf();
     shadowAt(c, px + 2, gy, L.mount ? 26 : 14); mons.forEach(m => { if (!m.dead || m.dead < .6) shadowAt(c, m.x, gy, Math.min(34, monSpr(m.kind, 0).cv.width * .6)); });
     mons.slice().sort((a, b) => b.x - a.x).forEach(m => {
+      if (m.kind === 'cerberus') { if (!m.dead) { drawCerberus(c, m); const bw=Math.max(40,Math.floor(W*.45)), bx=Math.floor(W*.52), by=Math.max(4,gy-Math.floor(H*.9)); c.fillStyle=OL; c.fillRect(bx,by,bw,5); c.fillStyle='#5a1a2a'; c.fillRect(bx+1,by+1,bw-2,3); c.fillStyle='#ff4a3a'; c.fillRect(bx+1,by+1,bw-2,3); } return; }
       const fr = m.atkA >= 0 && m.atkA < .75 ? 2 : (Math.floor(T * 2.6 + m.ph) % 2), S_ = monSpr(m.kind, fr);
       const lunge = m.atkA >= 0 ? -Math.round(Math.sin(Math.min(1, m.atkA) * Math.PI) * (m.boss ? 6 : 4)) : 0, kb = m.hit > 0 ? 1 : 0;
       const fy = FLOAT[m.kind] ? -Math.round(4 + Math.sin(T * 3 + m.ph) * 2) : 0;
@@ -1028,6 +1076,7 @@ export function openDice(br) {
     const st = $('dst');
     if (mode.k === 'field') st.innerHTML = '<b>' + ST.region + '-' + String(ST.stage).padStart(2, '0') + '</b><small>' + regionOf(ST.region).n + (ST.stage === 10 ? ' · BOSS' : ' · ' + ST.kills + '/' + KILLS_PER_STAGE) + '</small>' + (ST.maxR > 1 ? '<button data-a="region">지역</button>' : '');
     else if (mode.k === 'tower') st.innerHTML = '<b>탑 ' + mode.floor + '층</b><small>최고 ' + (ST.tower.best | 0) + '층</small><button data-a="leave">나가기</button>';
+    else if (mode.k === 'raid') st.innerHTML = '<b>보스 레이드</b><small>' + Math.max(0,Math.ceil(30-mode.t)) + '초 · 피해 ' + fN(mode.damage||0) + '</small><button data-a="leave">포기</button>';
     else { const D = DUNGEONS.find(x => x.k === mode.k); st.innerHTML = '<b>' + D.n + '</b><small>' + (mode.need ? mode.kills + '/' + mode.need : '처치 ' + mode.kills) + '</small><button data-a="leave">포기</button>'; }
   }
   function hudHP() { $('dhpb').style.width = (100 * P.hp / P.mh) + '%'; $('dhpt').textContent = '❤ ' + fS(P.hp) + ' / ' + fS(P.mh) + ' · 전투력 ' + fS(S.power); }
@@ -1035,8 +1084,8 @@ export function openDice(br) {
   let mul = 1, rolling = false, diceAnim = null, logs = [];
   const dcv = () => root.querySelector('#ddice');
   function goldPerFace() { return Math.round(MON(Math.max(1, ST.maxR), 5).gold * 6); }
-  function roll() {
-    if (rolling) return; const n = mul; if (ST.dice < n) { toast('주사위가 부족합니다'); return; }
+  function roll(nOverride, isAuto = false) {
+    if (rolling) return; const n = Math.floor(Number(nOverride == null ? mul : nOverride)); if (!Number.isFinite(n) || n < 1 || (!isAuto && n > DICE_MAX)) { toast('직접 오픈은 한 번에 최대 5,000개까지 가능합니다'); return; } if (ST.dice < n) { if (isAuto) { autoRoll = false; renderPanel(); toast('주사위가 부족해 자동 굴리기를 중지했습니다'); } else toast('주사위가 부족합니다'); return; }
     rolling = true; sctx(); ST.dice -= n; ST.rolls = (ST.rolls | 0) + n;
     /* 1) 결과 계산·지급을 먼저 한 번에 처리 (원자적), 2) 애니메이션은 이 결과만 보여준다 */
     const faces = Array.from({ length: n }, () => ri(1, 6)), sum = { gold: 0, scroll: 0, shard: 0, gems: [], items: [] }, gpf = goldPerFace();
@@ -1044,12 +1093,12 @@ export function openDice(br) {
       if (f === 1 || f === 6) { const it = newItem(rollRarity(), Math.max(1, ST.maxR)); addItem(it); sum.items.push(it); }
       else if (f === 2) sum.gold += gpf;
       else if (f === 3) sum.scroll += 1;
-      else if (f === 4) { if (Math.random() < .3) { const g = { t: ri(0, 5), v: gemVal() }; addGem(g); sum.gems.push(g); } else sum.shard += ri(3, 6); }
+      else if (f === 4) { if (Math.random() < .3) { const g = { t: ri(0, 5), v: gemVal(), r: 0 }; addGem(g); sum.gems.push(g); } else sum.shard += ri(3, 6); }
       else if (f === 5) { sum.gold += Math.round(gpf * .5); if (Math.random() < .5) sum.scroll += 1; else sum.shard += 2; }
     });
     ST.gold += sum.gold; ST.scroll += sum.scroll; ST.shard += sum.shard; mark();
-    const showN = Math.min(n, 10), shown = n <= 10 ? faces : faces.slice(0, 10);
-    diceAnim = { t: 0, faces: shown, allFaces: faces, n, sum, rot: shown.map(() => rnd(-1, 1)), dur: n === 1 ? 1.1 : 1.3 };
+    const shown = n <= 10 ? faces : faces.slice(0, 10), faceCounts = [0,0,0,0,0,0,0]; faces.forEach(f => faceCounts[f]++);
+    diceAnim = { t: 0, faces: shown, allFaces: n <= 5000 ? faces : null, faceCounts, n, sum, rot: shown.map(() => rnd(-1, 1)), dur: n === 1 ? 1.1 : 1.3 };
     sfx('roll'); renderPanel();
   }
   function rollDone() {
@@ -1063,7 +1112,7 @@ export function openDice(br) {
     else if (best === 2) sfx('rare');
     diceAnim = null; hudCur(); renderPanel();
   }
-  function countFaces(A, f) { return A.allFaces ? A.allFaces.filter(x => x === f).length : '-'; }
+  function countFaces(A, f) { return A.faceCounts ? A.faceCounts[f] : A.allFaces ? A.allFaces.filter(x => x === f).length : '-'; }
   let FELT = null;
   function felt(w, h) { if (FELT && FELT.width === w && FELT.height === h) return FELT; const pb = new PB(w, h), G = ['#1e5a3a', '#256a44', '#2e7a4e']; for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const d = Math.hypot((x - w / 2) / w, (y - h / 2) / h * .8); pb.set(x, y, G[lvl(clamp(1 - d * 1.8, 0, 1), 3, x, y, .8)]); if (pr(x, y) > .985) pb.set(x, y, '#3a8a5a'); } FELT = pb.canvas(); return FELT; }
   function drawDice(dt) {
@@ -1084,14 +1133,17 @@ export function openDice(br) {
     if (A.t >= A.dur + .15) rollDone();
   }
   /* ---------- 패널 ---------- */
-  let tab = 'b', selItem = null;
+  let tab = 'b', selItem = null, selectedGems = [];
+  let autoRoll = false, autoMul = 10, autoAcc = 0, gameSpeed = 1;
   function renderPanel() {
     root.querySelectorAll('[data-a=tab]').forEach(b => b.classList.toggle('on', b.dataset.v === tab));
     const p = $('dpanel'); let h = '';
     if (tab === 'b') {
       h = '<div class="card dice"><h3><img class="hi" alt="" src="' + curIcon('dice', 24) + '">주사위 굴리기 <span class="sp"></span><small style="font-size:12px;color:#7a6a7e">보유 ' + fN(ST.dice) + '개</small></h3><canvas id="ddice"></canvas>'
-        + '<div class="mul">' + [1, 5, 100].map(m => '<button data-a="mul" data-v="' + m + '" class="' + (mul === m ? 'on' : '') + '">×' + m + '</button>').join('') + '</div>'
-        + '<button class="dbtn" data-a="roll" ' + (rolling || ST.dice < mul ? 'disabled' : '') + '>' + (rolling ? '굴리는 중…' : ST.dice < mul ? '주사위 부족' : '주사위 ' + mul + '개 굴리기') + '</button>'
+        + '<div class="mul">' + [1, 100, 1000, 5000].map(m => '<button data-a="mul" data-v="' + m + '" class="' + (mul === m ? 'on' : '') + '">×' + fN(m) + '</button>').join('') + '</div>'
+        + '<button class="dbtn" data-a="roll" ' + (rolling || ST.dice < mul ? 'disabled' : '') + '>' + (rolling ? '굴리는 중…' : ST.dice < mul ? '주사위 부족' : '직접 ' + fN(mul) + '개 오픈') + '</button>'
+        + '<div class="card" style="margin:0;padding:8px"><b>자동 굴리기</b><div class="mul" style="margin:7px 0">' + [10,100,1000,10000].map(m => '<button data-a="automul" data-v="' + m + '" class="' + (autoMul === m ? 'on' : '') + '">×' + fN(m) + '</button>').join('') + '</div><button class="dbtn ' + (autoRoll ? 'r' : 'g') + '" style="width:100%" data-a="autoroll">' + (autoRoll ? '■ 자동 굴리기 중지' : '▶ 자동 굴리기 시작') + ' · 1.5초마다</button><small style="display:block;margin-top:5px;color:#7a6a7e">직접 오픈은 한 번에 최대 5,000개, 자동 굴리기는 최대 10,000개씩 진행합니다.</small></div>'
+        + '<div class="row" style="margin:4px 0"><b style="font-size:12px">게임 배속</b>' + [1,3,5].map(m=>'<button class="dbtn s ' + (gameSpeed===m?'g':'w') + '" data-a="speed" data-v="'+m+'" style="flex:1">'+m+'배</button>').join('') + '</div>'
         + '<div style="font-size:11.5px;color:#7a6a7e;line-height:1.5">⚀/⚅ 장비 주머니 · ⚁ 골드 · ⚂ 강화 주문서 · ⚃ 보석/조각 · ⚄ 골드+주문서/조각 (각 눈 1/6)</div>'
         + '<div class="log">' + (logs.join('<hr style="border:0;border-top:1px dashed #e0c898;margin:6px 0">') || '<div style="color:#a89a80">아직 굴린 기록이 없습니다</div>') + '</div></div>';
     } else if (tab === 'i') {
@@ -1099,7 +1151,7 @@ export function openDice(br) {
         + '<div class="stats" style="margin-top:10px">' + [['공격력', fS(s.atk)], ['주문력', fS(s.mag)], ['방어력', fS(s.def)], ['체력', fS(s.hp)], ['회피', s.eva.toFixed(1) + '%'], ['공격 속도', s.aspd.toFixed(2) + '/초']].map(([a, b]) => '<div>' + a + '<b>' + b + '</b></div>').join('') + '</div>'
         + '<div class="row" style="margin-top:10px"><button class="dbtn s g" data-a="autoeq">⚡ 최강 장비 자동 장착</button><button class="dbtn s r" data-a="sellall">장비 일괄 판매</button></div></div>'
         + '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('i', 24) + '">가방 <small style="font-size:12px;color:#7a6a7e">' + ST.inv.length + '/120</small></h3><div class="invg">' + ST.inv.slice().sort((a, b) => b.r - a.r || b.l - a.l || itemPower(b) - itemPower(a)).map(it => '<button class="slot has" data-a="item" data-v="' + it.i + '" style="border-color:' + RAR[it.r].c + '"><img alt="" src="' + itemIcon(SLOTS[it.s].k, it.w >= 0 ? WEAPONS[it.w].k : null, it.r) + '">' + (it.e ? '<span class="e">+' + it.e + '</span>' : '') + (it.k ? '<span style="position:absolute;left:3px;top:2px;font-size:10px">🔒</span>' : '') + '</button>').join('') + '</div>' + (ST.inv.length ? '' : '<p style="color:#a89a80;font-size:12.5px">주사위 ⚀·⚅ 이 나오면 장비 주머니를 얻습니다</p>') + '</div>'
-        + '<div class="card"><h3><img class="hi" alt="" src="' + gemIcon(1, 24) + '">보석 가방 <small style="font-size:12px;color:#7a6a7e">' + ST.gems.length + '/80</small><span class="sp"></span><button class="dbtn s b" data-a="craft">조각 10 → 보석</button></h3><div class="invg">' + ST.gems.map((g, i) => '<button class="slot has" data-a="gemv" data-v="' + i + '" title="' + fmtGem(g) + '"><img alt="" src="' + gemIcon(g.t, 40) + '" style="width:60%;height:60%"><span style="font-size:10px;color:#2a1d2e">' + g.v.toFixed(1) + (GEMS[g.t].pp ? '%p' : '%') + '</span></button>').join('') + '</div>' + (ST.gems.length >= 3 ? '<button class="dbtn s w" style="margin-top:8px" data-a="fuse">같은 종류 3개 합성 (자동)</button>' : '') + '</div>';
+        + '<div class="card"><h3><img class="hi" alt="" src="' + gemIcon(1, 24) + '">보석 가방 <small style="font-size:12px;color:#7a6a7e">' + ST.gems.length + '/80</small><span class="sp"></span><button class="dbtn s b" data-a="craft">조각 10 → 보석</button></h3><div class="invg">' + ST.gems.map((g, i) => '<button class="slot has" data-a="gemv" data-v="' + i + '" title="' + GEM_RAR[gemR(g)].k + ' ' + GEMS[g.t].n + '" style="border-color:' + GEM_RAR[gemR(g)].c + (selectedGems.includes(i) ? ';box-shadow:0 0 0 3px #ffd24a' : '') + '"><img alt="" src="' + gemIcon(g.t, 40) + '" style="width:60%;height:60%"><span style="font-size:10px;color:' + GEM_RAR[gemR(g)].c + '">' + GEM_RAR[gemR(g)].k + ' · ' + g.v.toFixed(1) + '</span></button>').join('') + '</div><p style="font-size:11px;color:#7a6a7e">동일 등급 보석 2개를 선택해 합성하세요. 실패하면 두 보석 모두 사라집니다.</p><div class="row"><button class="dbtn s w" style="flex:1" data-a="fuse" ' + (selectedGems.length !== 2 ? 'disabled' : '') + '>선택 합성 (' + selectedGems.length + '/2)</button><button class="dbtn s b" style="flex:1" data-a="fuseall" ' + (ST.gems.length < 2 ? 'disabled' : '') + '>일괄 합성</button></div></div>';
     } else if (tab === 'e') {
       const eqd = SLOTS.map(sl => ST.eq[sl.k]).filter(Boolean); if (!selItem || !findItem(selItem.i)) selItem = eqd[0] || ST.inv[0] || null;
       h = '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('e', 24) + '">강화할 장비 선택</h3><div class="invg">' + eqd.concat(ST.inv.filter(x => x.r >= 1).sort((a, b) => b.r - a.r)).slice(0, 40).map(it => '<button class="slot has" data-a="esel" data-v="' + it.i + '" style="border-color:' + RAR[it.r].c + (selItem && selItem.i === it.i ? ';box-shadow:0 0 0 3px #ffd24a' : '') + '"><img alt="" src="' + itemIcon(SLOTS[it.s].k, it.w >= 0 ? WEAPONS[it.w].k : null, it.r) + '">' + (it.e ? '<span class="e">+' + it.e + '</span>' : '') + (isEq(it) ? '<span style="position:absolute;left:3px;top:2px;font-size:9px;background:#2a1d2e;color:#fff;border-radius:4px;padding:0 3px">E</span>' : '') + '</button>').join('') + '</div></div>';
@@ -1113,6 +1165,7 @@ export function openDice(br) {
       }
     } else if (tab === 'd') {
       h = '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('d', 24) + '">던전 <small style="font-size:11.5px;color:#7a6a7e">입장권은 매일 자정 ' + KEYS_PER_DAY + '장으로 충전</small></h3>' + DUNGEONS.map(D => '<div class="dl" style="margin:10px 0"><div class="ic"><img alt="" src="' + dunIcon(D.k) + '"></div><div class="tx"><b>' + D.n + ' <small style="display:inline;color:#c8302a">🔑 ' + (ST.keys[D.k] | 0) + '/' + KEYS_PER_DAY + '</small></b><small>' + D.d + '</small></div><button class="dbtn s" data-a="dun" data-v="' + D.k + '" ' + ((ST.keys[D.k] | 0) <= 0 || mode.k !== 'field' ? 'disabled' : '') + '>입장</button></div>').join('') + '</div>'
+        + '<div class="card"><div class="dl"><div class="ic">🐺</div><div class="tx"><b>보스 레이드</b><small>30초 피해량 경쟁 · 1,000,000 피해 이상이면 드래곤 슬레이어 레전더리 장비 1개 획득</small></div><button class="dbtn s r" data-a="dun" data-v="raid" ' + (mode.k !== 'field' ? 'disabled' : '') + '>도전</button></div><h4>레이드 피해 랭킹</h4>' + (ST.raidRank.length ? ST.raidRank.slice(0,10).map((x,i)=>'<div class="row" style="justify-content:space-between;font-size:12px;margin:4px 0"><b>'+(i+1)+'.</b><span>'+fN(x.damage)+' 피해</span><small>'+ (x.reward?'보상 획득':'') +'</small></div>').join('') : '<small>아직 기록이 없습니다.</small>') + '</div>'
         + '<div class="card"><div class="dl"><div class="ic"><img alt="" src="' + tabIcon('tower', 40) + '"></div><div class="tx"><b>무한의 탑 <small style="display:inline;color:#7a6a7e">최고 ' + (ST.tower.best | 0) + '층</small></b><small>올라갈수록 강해지는 적. 10층마다 보스 — 처음 처치 시 주사위 주머니 100~1000개!</small></div><button class="dbtn s b" data-a="dun" data-v="tower" ' + (mode.k !== 'field' ? 'disabled' : '') + '>도전</button></div></div>';
     } else if (tab === 's') {
       h = krwCard() + '<div class="card"><h3><img class="hi" alt="" src="' + curIcon('shard', 24) + '">코스튬 뽑기 <span class="sp"></span><small style="font-size:12px;color:#7a6a7e">보석 조각 ' + fN(ST.shard) + '</small></h3><p style="font-size:12px;color:#7a6a7e;margin:0 0 8px">탈것·의상·무기 스킨 중 하나가 나옵니다. 중복이면 조각 10개를 돌려받습니다. 등급이 높을수록 능력치 보너스가 커집니다.</p>'
@@ -1125,29 +1178,28 @@ export function openDice(br) {
   }
   const dunIcon = k => k === 'gem' ? gemIcon(2, 40) : curIcon(k, 40);
   const bal = () => Math.max(0, +(br.getBal ? br.getBal() : 0) || 0);
-  const krwCap = () => Math.max(0, Math.min(DICE_MAX - ST.dice, Math.floor(bal() / DICE_KRW)));
+  const krwCap = () => Math.max(0, Math.floor(bal() / DICE_KRW));
   const fW = v => (br.fmtBal ? br.fmtBal(v) : fN(v));
   let krwN = 1;
   function krwCard() {
-    krwN = clamp(krwN | 0, 1, DICE_MAX);
+    krwN = Math.max(1, Math.floor(Number(krwN) || 1));
     return '<div class="card krw"><h3><img class="hi" alt="" src="' + curIcon('dice', 24) + '">원화로 주사위 구매<span class="sp"></span><small style="font-size:12px;color:#7a6a7e">10만원당 1개</small></h3>'
-      + '<div class="kv"><span>내 잔고</span><b id="kbal">' + fW(bal()) + '원</b><span>보유 주사위</span><b>' + fN(ST.dice) + ' / ' + fN(DICE_MAX) + '개</b><span>구매 가능</span><b id="kcap">' + fN(krwCap()) + '개</b></div>'
-      + '<div class="krow"><input type="range" id="krng" min="1" max="' + DICE_MAX + '" step="1" value="' + krwN + '" aria-label="구매할 주사위 수"><b id="kn">' + fN(krwN) + '개</b></div>'
+      + '<div class="kv"><span>내 잔고</span><b id="kbal">' + fW(bal()) + '원</b><span>보유 주사위</span><b>' + fN(ST.dice) + '개 (보유 제한 없음)</b><span>구매 가능</span><b id="kcap">' + fN(krwCap()) + '개</b></div>'
+      + '<div class="krow"><input type="number" id="krng" min="1" step="1" value="' + krwN + '" aria-label="구매할 주사위 수" style="width:120px;max-width:45%;padding:8px;border:2px solid #2a1d2e;font-weight:900"><b id="kn">' + fN(krwN) + '개</b></div>
       + '<div class="row" style="margin:6px 0 8px"><button class="dbtn s w" style="flex:1" data-a="kq" data-v="-100">-100</button><button class="dbtn s w" style="flex:1" data-a="kq" data-v="-1">-1</button><button class="dbtn s w" style="flex:1" data-a="kq" data-v="1">+1</button><button class="dbtn s w" style="flex:1" data-a="kq" data-v="100">+100</button><button class="dbtn s w" style="flex:1" data-a="kq" data-v="max">최대</button></div>'
       + '<button class="dbtn" style="width:100%" id="kbuy" data-a="kbuy"></button><p id="kmsg" style="margin:6px 0 0;font-size:11.5px;color:#c8302a;min-height:15px"></p></div>';
   }
   function krwUpd() {
-    const el = root.querySelector('#krng'); if (!el) return; krwN = clamp(+el.value | 0, 1, DICE_MAX); const cost = krwN * DICE_KRW, cap = krwCap();
+    const el = root.querySelector('#krng'); if (!el) return; krwN = Math.max(1, Math.floor(Number(el.value) || 1)); const cost = krwN * DICE_KRW, cap = krwCap();
     root.querySelector('#kn').textContent = fN(krwN) + '개'; root.querySelector('#kcap').textContent = fN(cap) + '개'; root.querySelector('#kbal').textContent = fW(bal()) + '원';
-    el.style.setProperty('--p', ((krwN - 1) / (DICE_MAX - 1) * 100) + '%');
     const b = root.querySelector('#kbuy'), msg = root.querySelector('#kmsg');
-    const room = DICE_MAX - ST.dice, ok = krwN <= room && cost <= bal();
+    const ok = Number.isSafeInteger(krwN) && krwN > 0 && Number.isSafeInteger(cost) && cost <= bal();
     b.disabled = !ok; b.textContent = '주사위 ' + fN(krwN) + '개 구매 · ' + fW(cost) + '원';
-    msg.textContent = room <= 0 ? '주사위를 최대(' + fN(DICE_MAX) + '개)까지 보유 중입니다' : krwN > room ? '최대 보유량까지 ' + fN(room) + '개만 더 살 수 있습니다' : cost > bal() ? '잔고가 부족합니다 (' + fW(cost - bal()) + '원 부족)' : '';
+    msg.textContent = !Number.isSafeInteger(krwN) || !Number.isSafeInteger(cost) ? '구매 수량이 너무 큽니다' : cost > bal() ? '잔고가 부족합니다 (' + fW(cost - bal()) + '원 부족)' : '';
   }
   function krwBuy() {
-    const n = clamp(krwN | 0, 1, DICE_MAX), cost = n * DICE_KRW, b0 = bal();
-    if (n > DICE_MAX - ST.dice) return toast('주사위는 최대 ' + fN(DICE_MAX) + '개까지 보유할 수 있습니다');
+    const n = Math.max(1, Math.floor(Number(krwN) || 1)), cost = n * DICE_KRW, b0 = bal();
+    if (!Number.isSafeInteger(n) || !Number.isSafeInteger(cost)) return toast('구매 수량이 너무 큽니다');
     if (b0 < cost) return toast('잔고가 부족합니다');
     br.setBal(b0 - cost); addDice(n); mark(); save(); sfx('coin'); banner('주사위 +' + fN(n), fW(cost) + '원 결제'); hudCur(); renderPanel();
   }
@@ -1204,8 +1256,28 @@ export function openDice(br) {
     const ok = allowedGems(it);
     sheet('<h4>보석 장착</h4><p>' + itemName(it) + '에는 <b>' + ok.map(k => GEMS[GI[k]].n).join(', ') + '</b> 보석만 장착할 수 있습니다.<br>% 증가는 능력치에 곱해지고, 회피는 %p(퍼센트포인트)로 더해집니다.</p><div class="invg">' + ST.gems.map((x, j) => { const can = ok.includes(GEMS[x.t].k); return '<button class="slot has" data-s="g' + j + '" ' + (can ? '' : 'disabled style="opacity:.35" title="' + GEMS[x.t].n + ' 보석은 이 장비에 장착할 수 없습니다"') + '><img alt="" src="' + gemIcon(x.t, 40) + '" style="width:60%;height:60%"><span style="font-size:10px">' + x.v.toFixed(1) + (GEMS[x.t].pp ? '%p' : '%') + '</span></button>'; }).join('') + '</div>' + (ST.gems.length ? '' : '<p>보석이 없습니다. 주사위 ⚃ 또는 보석 던전에서 얻으세요.</p>') + '<button class="dbtn w s" style="width:100%;margin-top:10px" data-s="x">닫기</button>', s => { if (s === 'x') return closeSheet(); const j = +s.slice(1), x = ST.gems[j]; if (!x || !ok.includes(GEMS[x.t].k)) { toast('이 장비에 장착할 수 없는 보석입니다'); return; } ST.gems.splice(j, 1); it.g[i] = x; sfx('up'); refreshStats(); mark(); closeSheet(); renderPanel(); });
   }
-  function craftGem() { if (ST.shard < 10) return toast('보석 조각이 10개 필요합니다'); if (ST.gems.length >= 80) return toast('보석 가방이 가득 찼습니다'); ST.shard -= 10; const g = { t: ri(0, 5), v: gemVal() }; ST.gems.push(g); sfx('rare'); toast('보석 제작: ' + fmtGem(g)); mark(); hudCur(); renderPanel(); }
-  function fuseGems() { let n = 0; for (let t = 0; t < 6; t++) { let L = ST.gems.filter(g => g.t === t).sort((a, b) => a.v - b.v); while (L.length >= 3) { const three = L.splice(0, 3), v = Math.min(10, Math.round((Math.max(...three.map(g => g.v)) * 1.25 + .3) * 10) / 10); ST.gems = ST.gems.filter(g => !three.includes(g)); const ng = { t, v }; ST.gems.push(ng); L.push(ng); L.sort((a, b) => a.v - b.v); n++; if (v >= 10 && L.every(g => g.v >= 10)) break; } } toast(n ? '보석 ' + n + '회 합성 완료' : '같은 종류 보석이 3개 이상 필요합니다'); if (n) sfx('rare'); mark(); renderPanel(); }
+  function craftGem() { if (ST.shard < 10) return toast('보석 조각이 10개 필요합니다'); if (ST.gems.length >= 80) return toast('보석 가방이 가득 찼습니다'); ST.shard -= 10; const g = { t: ri(0, 5), v: gemVal(), r: 0 }; ST.gems.push(g); sfx('rare'); toast('보석 제작: ' + fmtGem(g)); mark(); hudCur(); renderPanel(); }
+  function fuseGems() {
+    if (selectedGems.length !== 2) return toast('합성할 보석 2개를 선택하세요');
+    const ids = selectedGems.slice().sort((a,b)=>b-a), a = ST.gems[ids[0]], b = ST.gems[ids[1]];
+    if (!a || !b || gemR(a) !== gemR(b)) return toast('동일 레어도 보석 2개만 합성할 수 있습니다');
+    const r = gemR(a); if (r >= 3) return toast('레전더리 보석은 더 합성할 수 없습니다');
+    ST.gems.splice(ids[0],1); ST.gems.splice(ids[1],1); selectedGems = [];
+    if (Math.random() < GEM_RAR[r].rate) { const ng = { t: Math.random() < .5 ? a.t : b.t, v: Math.min(10, Math.round((Math.max(a.v,b.v) * 1.15 + .2) * 10) / 10), r: r + 1 }; addGem(ng); toast('합성 성공! ' + GEM_RAR[r+1].k + ' 보석 획득'); sfx('rare'); }
+    else { toast('합성 실패! 재료 보석 2개가 사라졌습니다'); sfx('fail'); }
+    mark(); hudCur(); renderPanel();
+  }
+  function fuseAllGems() {
+    let attempts = 0, successes = 0, failures = 0; selectedGems = [];
+    for (let guard = 0; guard < 10000; guard++) {
+      let pair = -1, other = -1;
+      for (let r = 0; r < 3 && pair < 0; r++) { const ids = []; for (let i=0;i<ST.gems.length;i++) if (gemR(ST.gems[i])===r) ids.push(i); if (ids.length >= 2) { pair=ids[0]; other=ids[1]; } }
+      if (pair < 0) break;
+      const a=ST.gems[pair], b=ST.gems[other], r=gemR(a); ST.gems.splice(other,1); ST.gems.splice(pair,1); attempts++;
+      if (Math.random() < GEM_RAR[r].rate) { addGem({ t: Math.random()<.5?a.t:b.t, v: Math.min(10, Math.round((Math.max(a.v,b.v)*1.15+.2)*10)/10), r:r+1 }); successes++; } else failures++;
+    }
+    toast(attempts ? '일괄 합성 ' + attempts + '회 · 성공 ' + successes + '회 · 실패 ' + failures + '회' : '합성 가능한 동일 등급 보석 쌍이 없습니다'); if (successes) sfx('rare'); mark(); hudCur(); renderPanel();
+  }
   function gacha(n) {
     if (ST.shard < GACHA_COST * n) return; ST.shard -= GACHA_COST * n; const out = [];
     for (let i = 0; i < n; i++) { const r = wpick(C_RAR), cat = pick(['mount', 'outfit', 'skin']), idx = costumeRarityIdx(cat, r), key = cat + '_' + idx, dup = ST.cos.own[key] != null; if (dup) ST.shard += 10; else ST.cos.own[key] = r; out.push({ cat, idx, r, dup }); }
@@ -1216,7 +1288,7 @@ export function openDice(br) {
   function regionSheet() { sheet('<h4>지역 이동</h4><p>클리어한 지역으로 돌아가 사냥할 수 있습니다.</p>' + Array.from({ length: ST.maxR }, (_, i) => i + 1).map(r => '<button class="dbtn ' + (r === ST.region ? '' : 'w') + ' s" style="width:100%;margin:4px 0" data-s="' + r + '">' + r + '. ' + regionOf(r).n + (ST.bossC[r] ? ' ✓' : '') + '</button>').join(''), s => { const r = +s; ST.region = r; ST.stage = r === ST.maxR ? ST.stage : 1; ST.kills = 0; mons = []; closeSheet(); hudStage(); mark(); banner(r + '-' + String(ST.stage).padStart(2, '0'), regionOf(r).n); }); }
   function setSheet() { sheet('<h4>⚙ 설정</h4><div class="row" style="flex-direction:column;align-items:stretch;gap:8px"><button class="dbtn w" data-s="snd">효과음 ' + (SND.on ? 'ON' : 'OFF') + '</button><button class="dbtn w" data-s="shk">화면 흔들림 ' + (ST.shake !== 0 ? 'ON' : 'OFF') + '</button></div><p style="margin-top:10px">진행 상황은 자동 저장됩니다 (로그인 시 계정에 저장). 총 굴린 주사위 ' + fN(ST.rolls | 0) + '개.</p><button class="dbtn s" style="width:100%" data-s="x">닫기</button>', s => { if (s === 'snd') { SND.on = !SND.on; try { localStorage.setItem('dz_snd', SND.on ? '1' : '0'); } catch (e) { } } if (s === 'shk') { ST.shake = ST.shake === 0 ? 1 : 0; mark(); } closeSheet(); if (s !== 'x') setSheet(); }); }
   /* ---------- 입력 ---------- */
-  root.addEventListener('input', e => { if (e.target && e.target.id === 'krng') krwUpd(); });
+  root.addEventListener('input', e => { if (e.target && e.target.id === 'krng') { krwN = Math.max(1, Math.floor(Number(e.target.value) || 1)); krwUpd(); } });
   root.addEventListener('click', e => {
     const b = e.target.closest('[data-a]'); if (!b || (modal && modal.contains(b))) return; sctx(); const a = b.dataset.a, v = b.dataset.v;
     switch (a) {
@@ -1232,7 +1304,11 @@ export function openDice(br) {
       case 'sellall': return sellSheet();
       case 'craft': return craftGem();
       case 'fuse': return fuseGems();
-      case 'gemv': { const g = ST.gems[+v]; if (g) toast(fmtGem(g) + ' · 장착: 강화 탭에서 장비 선택 후 소켓'); return; }
+      case 'fuseall': return fuseAllGems();
+      case 'gemv': { const i = +v; if (selectedGems.includes(i)) selectedGems = selectedGems.filter(x => x !== i); else if (selectedGems.length < 2) selectedGems.push(i); else selectedGems = [selectedGems[1], i]; renderPanel(); return; }
+      case 'automul': autoMul = +v; sfx('click'); renderPanel(); return;
+      case 'speed': gameSpeed = +v; sfx('click'); renderPanel(); return;
+      case 'autoroll': autoRoll = !autoRoll; autoAcc = 0; sfx('click'); renderPanel(); return;
       case 'esel': selItem = findItem(+v); renderPanel(); return;
       case 'enh': return doEnh();
       case 'sock': return sockSheet(+v);
@@ -1241,9 +1317,9 @@ export function openDice(br) {
       case 'region': return regionSheet();
       case 'gacha': return gacha(+v);
       case 'cos': { const cat = b.dataset.c, i = +v; if (ST.cos.own[cat + '_' + i] == null) return toast('아직 보유하지 않은 코스튬입니다'); ST.cos.eq[cat] = ST.cos.eq[cat] === i ? -1 : i; refreshStats(); mark(); sfx('click'); renderPanel(); return; }
-      case 'kq': { const el = root.querySelector('#krng'); if (!el) return; el.value = v === 'max' ? Math.max(1, krwCap()) : clamp((+el.value | 0) + (+v), 1, DICE_MAX); krwUpd(); sfx('click'); return; }
+      case 'kq': { const el = root.querySelector('#krng'); if (!el) return; el.value = v === 'max' ? Math.max(1, krwCap()) : Math.max(1, (Number(el.value) || 1) + (+v)); krwUpd(); sfx('click'); return; }
       case 'kbuy': return krwBuy();
-      case 'buy': { if (v === 'dice') { const c = diceCost(); if (ST.dice + 10 > DICE_MAX) return toast('주사위는 최대 ' + fN(DICE_MAX) + '개까지 보유할 수 있습니다'); if (ST.gold < c) return toast('골드가 부족합니다'); ST.gold -= c; addDice(10); } else { const c = scrollCost(); if (ST.gold < c) return toast('골드가 부족합니다'); ST.gold -= c; ST.scroll += 3; } sfx('coin'); mark(); hudCur(); renderPanel(); return; }
+      case 'buy': { if (v === 'dice') { const c = diceCost(); if (ST.gold < c) return toast('골드가 부족합니다'); ST.gold -= c; addDice(10); } else { const c = scrollCost(); if (ST.gold < c) return toast('골드가 부족합니다'); ST.gold -= c; ST.scroll += 3; } sfx('coin'); mark(); hudCur(); renderPanel(); return; }
     }
   });
   const onResize = () => layoutCanvas(); window.addEventListener('resize', onResize);
@@ -1253,7 +1329,8 @@ export function openDice(br) {
   function loop(now) {
     if (!alive) return; raf = requestAnimationFrame(loop);
     const dt = clamp((now - last) / 1000, 0, .05); last = now;
-    if (!modal || mode.k === 'field') step(dt);
+    if (autoRoll) { autoAcc += dt; if (autoAcc >= 1.5) { autoAcc = 0; if (!rolling) roll(autoMul, true); } }
+    if (!modal || mode.k === 'field') step(Math.min(.25, dt * gameSpeed));
     draw(); drawDice(dt);
     hudAcc += dt; if (hudAcc > .2) { hudAcc = 0; hudHP(); if (mode.k !== 'field') hudStage(); else if (ST.kills !== hudStage.k) { hudStage.k = ST.kills; hudStage(); } }
     saveAcc += dt; if (saveAcc > 3) { saveAcc = 0; if (dirty) { save(); hudCur(); } }
