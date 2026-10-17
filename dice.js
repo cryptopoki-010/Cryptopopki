@@ -1020,21 +1020,47 @@ export function openDice(br) {
     for(let i=0;i<7;i++){ const x=Math.floor(W*(i/6)), base=gy-3, radius=Math.max(8,Math.floor(W*.09)); c.fillStyle='#8a4c12'; c.beginPath(); c.ellipse(x,base,radius,Math.max(5,radius*.42),0,0,Math.PI*2); c.fill(); c.fillStyle='#e9a92f'; c.beginPath(); c.ellipse(x,base-3,radius,Math.max(5,radius*.42),0,0,Math.PI*2); c.fill(); c.strokeStyle='#ffdf62'; c.lineWidth=2; c.stroke(); for(let j=0;j<9;j++){const cx=x+(((i*17+j*13)%19)/19-.5)*radius*1.6, cy=base-(((i*7+j*11)%13)/13)*radius*.4; c.fillStyle=['#ffe777','#f8c43a','#d9921f'][(i+j)%3]; c.beginPath(); c.ellipse(cx,cy,2.5,1.6,0,0,Math.PI*2); c.fill();} }
     c.fillStyle='rgba(255,218,90,.10)'; c.fillRect(0,0,W,H);
   }
-  function drawCerberus(c, m) {
-    const z=Math.max(.8,Math.min(W/85,H/70)), x=m.x, y=gy;
-    c.save(); c.translate(x,y);
-    // 거대한 검은 몸통과 세 갈래 목
-    c.fillStyle='#291722'; c.beginPath(); c.ellipse(-12*z,-20*z,38*z,24*z,0,0,Math.PI*2); c.fill();
-    c.fillStyle='#4b1d2b'; c.fillRect(-38*z,-22*z,48*z,22*z);
-    for (const dx of [-25,0,25]) { c.strokeStyle='#4b1d2b'; c.lineWidth=10*z; c.beginPath(); c.moveTo(-12*z,-24*z); c.lineTo(dx*z,-47*z); c.stroke(); }
-    for (const [i,dx] of [-25,0,25].entries()) {
-      const hy=(-47-(i===1?3:0))*z; c.fillStyle=i===1?'#6b2631':'#57202e'; c.beginPath(); c.ellipse(dx*z,hy,15*z,13*z,0,0,Math.PI*2); c.fill();
-      c.fillStyle='#d9c6a5'; c.beginPath(); c.moveTo((dx-10)*z,hy-7*z); c.lineTo((dx-17)*z,hy-20*z); c.lineTo((dx-5)*z,hy-12*z); c.fill(); c.beginPath(); c.moveTo((dx+7)*z,hy-8*z); c.lineTo((dx+15)*z,hy-20*z); c.lineTo((dx+12)*z,hy-5*z); c.fill();
-      c.fillStyle='#ffb52e'; c.fillRect((dx-7)*z,hy-2*z,4*z,3*z); c.fillRect((dx+3)*z,hy-2*z,4*z,3*z); c.fillStyle='#ff493f'; c.fillRect((dx-3)*z,hy+4*z,7*z,2*z);
+  const CERBERUS_PIXEL = (() => {
+    // 64x64 저해상도 픽셀 캔버스: 확대해도 도트가 유지되도록 smoothing을 끈다.
+    const b = document.createElement('canvas'); b.width = 64; b.height = 64;
+    const q = b.getContext('2d'); q.imageSmoothingEnabled = false;
+    const px = (x,y,w,h,col) => { q.fillStyle=col; q.fillRect(x,y,w,h); };
+    // 불타는 갈기와 거대한 몸통
+    px(15,27,37,25,'#170e18'); px(11,32,43,18,'#291522'); px(18,25,31,25,'#4b1d2b');
+    px(8,36,12,9,'#6b2631'); px(45,36,11,9,'#6b2631');
+    // 등과 불꽃 갈기
+    for(let i=0;i<9;i++){const x=13+i*4; px(x,20-(i%3)*2,4,10,i%2?'#ff4a24':'#ff9a2e');px(x+1,22-(i%3)*2,2,5,'#ffd45b');}
+    // 다리와 발톱
+    px(17,45,7,13,'#291522'); px(27,46,7,12,'#291522'); px(39,45,7,13,'#291522'); px(48,44,5,12,'#291522');
+    px(15,56,11,4,'#120b14'); px(26,56,10,4,'#120b14'); px(38,56,10,4,'#120b14'); px(47,55,8,4,'#120b14');
+    // 세 개의 목
+    px(15,17,8,16,'#4b1d2b'); px(28,14,8,19,'#57202e'); px(41,17,8,16,'#4b1d2b');
+    // 세 개의 머리, 귀, 주둥이, 불타는 눈
+    for(const h of [{x:7,y:8,c:'#57202e'},{x:23,y:4,c:'#6b2631'},{x:39,y:8,c:'#57202e'}]){
+      px(h.x+2,h.y+4,13,12,h.c); px(h.x,h.y+7,17,8,h.c); px(h.x+4,h.y+12,12,7,'#7c3036');
+      px(h.x+1,h.y+1,4,8,'#d9c6a5'); px(h.x+11,h.y+1,4,8,'#d9c6a5');
+      px(h.x+4,h.y+7,3,3,'#ffcf36'); px(h.x+10,h.y+7,3,3,'#ffcf36');
+      px(h.x+7,h.y+14,5,2,'#ff493f'); px(h.x+5,h.y+17,2,2,'#f6d8a8'); px(h.x+12,h.y+17,2,2,'#f6d8a8');
+      // 눈 하이라이트
+      px(h.x+5,h.y+7,1,1,'#fff6b0'); px(h.x+11,h.y+7,1,1,'#fff6b0');
     }
-    // claws and fire mane
-    c.fillStyle='#1b1119'; for(const dx of [-35,-14,8]) c.fillRect(dx*z,-4*z,9*z,10*z);
-    c.fillStyle='#e24a22'; for(let i=0;i<9;i++){const fx=(-40+i*7)*z;c.beginPath();c.moveTo(fx,-28*z);c.lineTo(fx+3*z,-42*z);c.lineTo(fx+7*z,-27*z);c.fill();}
+    // 픽셀 하이라이트
+    px(20,31,8,2,'#8d3440'); px(34,30,7,2,'#8d3440'); px(23,40,17,2,'#6b2631');
+    return b;
+  })();
+  function drawCerberus(c, m) {
+    // 레이드 보스는 화면 오른쪽을 크게 차지하는 도트 스프라이트로 표시
+    const dw = Math.max(64, Math.floor(W * .72));
+    const dh = Math.max(64, Math.floor(H * .94));
+    const x = Math.floor(Math.max(W * .48, Math.min(W * .78, m.x)) - dw * .48);
+    const y = Math.floor(gy - dh);
+    c.save(); c.imageSmoothingEnabled = false;
+    c.drawImage(CERBERUS_PIXEL, x, y, dw, dh);
+    // 블록형 불꽃 파티클
+    for(let i=0;i<7;i++){
+      const fx=x+Math.floor(dw*(.2+i*.09)), fy=y+Math.floor(dh*(.47+(i%3)*.06));
+      c.fillStyle=i%2?'#ff9a2e':'#ff4a24'; c.fillRect(fx,fy,Math.max(2,Math.floor(dw/32)),Math.max(3,Math.floor(dh/24)));
+    }
     c.restore();
   }
   function draw() {
@@ -1047,7 +1073,7 @@ export function openDice(br) {
     const px = Math.round(PX()), L = lookOf();
     shadowAt(c, px + 2, gy, L.mount ? 26 : 14); mons.forEach(m => { if (!m.dead || m.dead < .6) shadowAt(c, m.x, gy, Math.min(34, monSpr(m.kind, 0).cv.width * .6)); });
     mons.slice().sort((a, b) => b.x - a.x).forEach(m => {
-      if (m.kind === 'cerberus') { if (!m.dead) { drawCerberus(c, m); const bw=Math.max(40,Math.floor(W*.45)), bx=Math.floor(W*.52), by=Math.max(4,gy-Math.floor(H*.9)); c.fillStyle=OL; c.fillRect(bx,by,bw,5); c.fillStyle='#5a1a2a'; c.fillRect(bx+1,by+1,bw-2,3); c.fillStyle='#ff4a3a'; c.fillRect(bx+1,by+1,bw-2,3); } return; }
+      if (m.kind === 'cerberus') { if (!m.dead) { drawCerberus(c, m); const bw=Math.max(40,Math.floor(W*.48)), bx=Math.floor(W*.50), by=Math.max(4,gy-Math.floor(H*.97)); c.fillStyle=OL; c.fillRect(bx,by,bw,5); c.fillStyle='#5a1a2a'; c.fillRect(bx+1,by+1,bw-2,3); c.fillStyle='#ff4a3a'; c.fillRect(bx+1,by+1,bw-2,3); } return; }
       const fr = m.atkA >= 0 && m.atkA < .75 ? 2 : (Math.floor(T * 2.6 + m.ph) % 2), S_ = monSpr(m.kind, fr);
       const lunge = m.atkA >= 0 ? -Math.round(Math.sin(Math.min(1, m.atkA) * Math.PI) * (m.boss ? 6 : 4)) : 0, kb = m.hit > 0 ? 1 : 0;
       const fy = FLOAT[m.kind] ? -Math.round(4 + Math.sin(T * 3 + m.ph) * 2) : 0;
@@ -1143,7 +1169,7 @@ export function openDice(br) {
         + '<div class="mul">' + [1, 100, 1000, 5000].map(m => '<button data-a="mul" data-v="' + m + '" class="' + (mul === m ? 'on' : '') + '">×' + fN(m) + '</button>').join('') + '</div>'
         + '<button class="dbtn" data-a="roll" ' + (rolling || ST.dice < mul ? 'disabled' : '') + '>' + (rolling ? '굴리는 중…' : ST.dice < mul ? '주사위 부족' : '직접 ' + fN(mul) + '개 오픈') + '</button>'
         + '<div class="card" style="margin:0;padding:8px"><b>자동 굴리기</b><div class="mul" style="margin:7px 0">' + [10,100,1000,10000].map(m => '<button data-a="automul" data-v="' + m + '" class="' + (autoMul === m ? 'on' : '') + '">×' + fN(m) + '</button>').join('') + '</div><button class="dbtn ' + (autoRoll ? 'r' : 'g') + '" style="width:100%" data-a="autoroll">' + (autoRoll ? '■ 자동 굴리기 중지' : '▶ 자동 굴리기 시작') + ' · 1.5초마다</button><small style="display:block;margin-top:5px;color:#7a6a7e">직접 오픈은 한 번에 최대 5,000개, 자동 굴리기는 최대 10,000개씩 진행합니다.</small></div>'
-        + '<div class="row" style="margin:4px 0"><b style="font-size:12px">게임 배속</b>' + [1,3,5].map(m=>'<button class="dbtn s ' + (gameSpeed===m?'g':'w') + '" data-a="speed" data-v="'+m+'" style="flex:1">'+m+'배</button>').join('') + '</div>'
+        + '<div class="row" style="margin:8px 0;align-items:center"><b style="font-size:12px;white-space:nowrap">게임 배속</b>' + [1,3,5].map(m=>'<button class="dbtn s ' + (gameSpeed===m?'g':'w') + '" aria-pressed="'+(gameSpeed===m)+'" data-a="speed" data-v="'+m+'" style="flex:1">'+m+'배'+(gameSpeed===m?' ✓':'')+'</button>').join('') + '</div><small style="display:block;color:#7a6a7e;margin:-3px 0 6px">전투 진행 속도: '+gameSpeed+'배</small>'
         + '<div style="font-size:11.5px;color:#7a6a7e;line-height:1.5">⚀/⚅ 장비 주머니 · ⚁ 골드 · ⚂ 강화 주문서 · ⚃ 보석/조각 · ⚄ 골드+주문서/조각 (각 눈 1/6)</div>'
         + '<div class="log">' + (logs.join('<hr style="border:0;border-top:1px dashed #e0c898;margin:6px 0">') || '<div style="color:#a89a80">아직 굴린 기록이 없습니다</div>') + '</div></div>';
     } else if (tab === 'i') {
