@@ -1295,7 +1295,7 @@ export function openWar(br) {
       st: ST.st, et, mul, time: 0, over: null, overT: 0, kills: 0, gems: 0, goldGot: 0,
       A: { hp: BASE_HP(ST.t), mh: BASE_HP(ST.t), tur: ST.tur.map(t => ({ t, cd: 1 + Math.random(), fire: 0 })), q: [], qt: 0, hitT: 0 },
       E: { hp: Math.round(BASE_HP(et) * mul), mh: Math.round(BASE_HP(et) * mul), g: 6 * Math.pow(2.6, et - 1), tur: [0, 1, 2, 3, 4, 5].map(i => ({ t: 0, cd: 2 + i * .3, fire: 0 })), ns: ens, ai: 1.2, hitT: 0 },
-      U: [], P: [], X: [], N: [], D: [], FX: [], heroSpawned: false,
+      U: [], P: [], X: [], N: [], D: [], FX: [], heroSpawned: false, enemyHeroUsed: false,
     };
     if (pre >= 2) B.E.tur[0].t = et; if (pre >= 4) B.E.tur[3].t = et; if (ST.st > MAXST) { B.E.tur[1].t = et; B.E.tur[4].t = et; }
     ST.inb = 1; save();
@@ -1316,6 +1316,9 @@ export function openWar(br) {
   function livingHero(side) { return B && B.U.find(u => !u.dead && u.side === side && u.d.hero); }
   function spawnHero(side, type, enemyScale = 1) {
     if (!B || B.over) return null;
+    /* 아군은 영웅 종류별 최대 3명, 적군은 전체 영웅 최대 1명 */
+    if (side === 0 && B.U.filter(u => !u.dead && u.side === 0 && u.d.hero && u.heroType === type).length >= 3) { toast('해당 종류의 영웅은 최대 3명까지 출전할 수 있습니다.'); return null; }
+    if (side === 1 && (B.enemyHeroUsed || B.U.some(u => !u.dead && u.side === 1 && u.d.hero))) return null;
     const H = HEROES[type] || HEROES.berserker, tier = side ? B.et : ST.t;
     /* 영구 강화 적용. 적 영웅은 아군 영웅 대비 모든 주요 능력치가 50% */
     const tierScale = Math.pow(1.42, Math.max(0, ST.t - 1)), up = ST.heroUp;
@@ -1327,22 +1330,22 @@ export function openWar(br) {
     const d = { side, t: tier, li: 0, c: 0, n: H.n, key: side ? H.spriteE : H.spriteA,
       hp, dmg, cd, rng: H.rng, spd: speed, train: 0, size: H.size, fly: false, air: true,
       proj: null, splash: 0, hero: true, heroType: type, armor: type === 'siegeGolem' ? .72 : type === 'highPriest' ? .18 : .08 };
-    const heroLane = 0;
+    const heroLane = lane;
     const u = { id: uid++, side, d, li: 0, lane: heroLane, x: side ? EX + 6 : AX - 6, oy: 0,
       hp: d.hp, mh: d.hp, dmg: d.dmg, cd: d.cd, atk: 0, an: Math.random() * 3, hit: 0, dead: 0,
       spr: bakeUnit(d.key), dir: side ? -1 : 1, z: 0, bobP: Math.random() * 6, hero: true, heroType: type,
       supportT: .2, walk: 0 };
-    u.y = laneY(heroLane, u.x); B.U.push(u);
+    u.y = laneY(heroLane, u.x); B.U.push(u); if (side === 1) B.enemyHeroUsed = true;
     fx({ k: 'ring', x: u.x, y: u.y, r0: 4, r1: 22, l: .65, c: side ? '#ff4a3a' : '#ffd65a' });
     for (let i = 0; i < 22; i++) part({ x: u.x + rnd(-8, 8), y: u.y, z: rnd(0, 18), vz: rnd(15, 42), l: rnd(.4, .9), c: side ? ['#ff5a3a', '#b04aff', '#fff0c0'] : ['#fff6c0', '#ffd65a', '#7ff0ff'], add: 1 });
-    banner(H.n + (side ? ' · 적 영웅' : ' 출전!'), side ? '아군 영웅보다 능력치 50% 낮음' : '적 영웅과 교전 가능 · 한 번에 한 명만 출전');
+    banner(H.n + (side ? ' · 적 영웅' : ' 출전!'), side ? '적 영웅은 한 번에 한 명만 출전 가능' : '영웅 종류별 최대 3명까지 출전 가능');
     sfx('spawn'); return u;
   }
   function deployHero(type) {
     if (!B || B.over) return;
     heroChoice = HEROES[type] ? type : 'berserker';
     const own = spawnHero(0, heroChoice);
-    if (own) { B.heroSpawned = true; spawnHero(1, heroChoice, .5); }
+    if (own) { B.heroSpawned = true; if (!livingHero(1)) spawnHero(1, heroChoice, .5); }
     renderCards(); hud(true);
   }
   /* 파티클·효과 */
@@ -1734,10 +1737,10 @@ export function openWar(br) {
       for (let tt = t; tt >= 1; tt--) for (let li = 0; li < 3; li++) { const d = def(0, tt, li); h.push('<button class="wcd" data-a="buy" data-t="' + tt + '" data-v="' + li + '"><span class="tr">' + tt + '성</span>' + (d.fly ? '<span class="ag f">✈</span>' : d.air ? '<span class="ag">대공</span>' : '') + '<span class="bd" hidden></span><img alt="" src="' + port(d.key) + '"><b>' + d.n + '</b><s>💰' + fshort(d.c) + '</s></button>'); if (li === 2 && tt > 1) h.push('<span class="wsep"></span>'); }
     } else if (tab === 'h') {
       const active = livingHero(0);
-      h.push('<div class="whintro"><b>' + (active ? '⚔️ 영웅 출전 중' : '영웅 선택') + '</b><span>영웅을 선택하면 즉시 전장에 출전합니다 · 무료 · 소환 수 제한 없음</span></div>');
-      h.push('<div class="whintro"><b>⬆️ 영웅 강화 · 총 ' + ST.heroUp.total + '회</b><span>강화 시도당 10,000 골드 · 성공/실패 각 50% · 실패 시 단계 하락</span></div><div class="whupgrid">');
+      h.push('<div class="whintro"><b>' + (active ? '⚔️ 영웅 출전 중' : '영웅 선택') + '</b><span>영웅을 선택하면 즉시 전장에 출전합니다 · 무료 · 종류별 최대 3명 소환 가능 · 상단/하단 선택</span></div>');
+      h.push('<div class="whintro"><b>⬆️ 영웅 강화 · 총 ' + ST.heroUp.total + '회</b><span>강화 시도당 10,000 골드 · 성공 확률 80% · 실패 시 단계 하락</span></div><div class="whupgrid">');
       for (const k of ['atk','aspd','hp','spd']) { const I = HERO_UP_INFO[k], cost = heroUpCost(k); h.push('<button class="wcd sp" data-a="hup" data-v="' + k + '"><span class="ic">' + I.ic + '</span><b>' + I.n + ' Lv.' + ST.heroUp[k] + '</b><s>' + I.desc + '</s><small>강화 💰' + heroUpPrice(cost) + '</small></button>'); } h.push('</div>');
-      for (const key of HERO_KEYS) { const H = HEROES[key], selected = heroChoice === key, portraitKey = key === 'berserker' ? 'aberserker' : H.spriteA; h.push('<button class="wcd whcard' + (selected ? ' whsel' : '') + '" data-a="hero" data-v="' + key + '"><img alt="" src="' + port(portraitKey) + '"><span class="whinfo"><b>' + H.n + '</b><s>' + H.desc + '</s><small>' + (active ? '출전 중' : selected ? '선택됨 · 출전' : '눌러서 출전') + '</small></span><span class="wharrow">' + (selected ? '▶' : '＋') + '</span></button>'); }
+      for (const key of HERO_KEYS) { const H = HEROES[key], selected = heroChoice === key, portraitKey = key === 'berserker' ? 'aberserker' : H.spriteA; h.push('<button class="wcd whcard' + (selected ? ' whsel' : '') + '" data-a="hero" data-v="' + key + '"><img alt="" src="' + port(portraitKey) + '"><span class="whinfo"><b>' + H.n + '</b><s>' + H.desc + '</s><small>' + (B && B.U.filter(u => !u.dead && u.side === 0 && u.d.hero && u.heroType === key).length >= 3 ? '최대 3명 출전 중' : selected ? '선택됨 · ' + (lane === 0 ? '상단' : '하단') + ' 소환' : '눌러서 ' + (lane === 0 ? '상단' : '하단') + ' 소환') + '</small></span><span class="wharrow">' + (selected ? '▶' : '＋') + '</span></button>'); }
     } else if (tab === 't') {
       for (let k = 0; k < 2; k++) { const n = ST.slots[k]; h.push('<button class="wcd sp" data-a="xp" data-v="' + k + '"><span class="ic">' + (n >= 3 ? '✅' : '➕') + '</span><b>' + (k ? '하단' : '상단') + ' 칸 ' + n + '/3</b><s>' + (n >= 3 ? 'MAX' : '💰' + fshort(SLOT_COST[n])) + '</s></button>'); }
       h.push('<span class="wsep"></span>');
@@ -1756,7 +1759,7 @@ export function openWar(br) {
     const cost = 10000;
     if (ST.g < cost) { toast('영웅 강화 골드가 부족합니다 (10,000 골드 필요)'); sfx('up_no'); return; }
     ST.g -= cost;
-    const success = Math.random() < 0.5;
+    const success = Math.random() < 0.8;
     if (success) {
       ST.heroUp[k]++;
       ST.heroUp.total++;
@@ -1901,7 +1904,7 @@ export function openWar(br) {
     sheet(html, s => { if (s === 'x') return closeSheet(); if (s === 'up') { const c = SK_UP[ST.sk[k]]; if (ST.sk[k] >= SK_MAX || ST.g < c) { sfx('up_no'); return; } ST.g -= c; ST.sk[k]++; save(); sfx('up_ok'); banner(I.n + ' 강화!', 'Lv.' + ST.sk[k] + ' · ' + row(ST.sk[k])); skSheet(k); renderCards(); skHud(true); hud(true); } });
   }
   function helpSheet() {
-    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 중 나가면 패배로 처리됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>영웅 탭에서 버서커·대마법사·시즈골렘·대신관(사제) 중 한 명을 무료 출전시킬 수 있습니다. 영웅 소환 수 제한은 없으며 여러 영웅을 동시에 출전시킬 수 있습니다. 적 영웅은 아군 영웅보다 능력치가 50% 낮습니다. 영웅 탭에서 공격력(힐러 회복량 포함)·공격속도·체력·이동속도 네 항목을 강화할 수 있습니다. 강화 시도마다 10,000 골드가 들고 성공 확률은 50%이며, 실패하면 해당 항목의 강화 단계가 하락합니다. 영웅은 타워·포탑 피해를 받지 않습니다. 버서커는 느리지만 강한 대검 공격, 대마법사는 마법진 광역 공격, 시즈골렘은 높은 체력·방어력, 대신관은 회복·적 약화 역할입니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
+    sheet('<h4>전쟁시대 · 게임 방법</h4><ul class="whelp"><li>골드는 시간이 지나면 자동으로 쌓이고, 적을 처치할 때마다 추가로 얻습니다.</li><li>다리(▲상단 / ▼하단)를 먼저 고른 뒤 병사 카드를 눌러 소환하세요. 화면의 위·아래 절반을 눌러도 다리가 바뀝니다.</li><li>적군(악마 군단)도 같은 규칙으로 골드를 모아 무작위 병사를 내보냅니다.</li><li>적 처치 시 10% 확률로 💎젬이 떨어집니다. 1젬 + ' + fmtW(GEM_KRW) + '원 = ' + fK(GEM_GOLD) + ' 골드로 스왑할 수 있습니다.</li><li>기지 강화: 1회 ' + fmtW(UPG_KRW) + '원 · 성공 확률 50% · 최대 ' + MAXT + '성. 성공하면 새 시대의 병사와 포탑이 열리고, 이전 시대의 병사·포탑도 계속 구매할 수 있습니다.</li><li>✈ 비행 유닛은 지상·공중 모두 공격합니다. 대공 표시가 있는 원거리 유닛(활·마법·총)도 공중을 공격할 수 있습니다. 근접·기병 유닛은 공중 유닛을 공격하지 못하고 그 아래를 지나갑니다. 포탑은 모두 공중을 공격합니다.</li><li>포탑 탭에서 상단·하단 칸을 각각 2번(최대 3칸)까지 확장할 수 있습니다.</li><li>적 기지를 부수면 다음 스테이지가 열리고, 최전선 스테이지에서 패배하면 한 스테이지 뒤로 밀려납니다. 전투 포기 후 나가면 스테이지 단계는 유지됩니다.</li><li>5스테이지마다 악마 기지가 한 단계 진화합니다 (총 ' + MAXST + ' 스테이지, 이후 무한).</li><li>지도는 좌우로 끌어서 볼 수 있고, 🔍로 확대할 수 있습니다.</li><li>영웅 탭에서 버서커·대마법사·시즈골렘·대신관(사제) 중 한 명을 무료 출전시킬 수 있습니다. 아군은 영웅 종류별로 최대 3명까지 동시에 출전시킬 수 있습니다. 적군은 전투당 영웅을 종류와 관계없이 한 명만 소환합니다. 적 영웅은 아군 영웅보다 능력치가 50% 낮습니다. 영웅 탭에서 공격력(힐러 회복량 포함)·공격속도·체력·이동속도 네 항목을 강화할 수 있습니다. 강화 시도마다 10,000 골드가 들고 성공 확률은 80%이며, 실패하면 해당 항목의 강화 단계가 하락합니다. 영웅은 타워·포탑 피해를 받지 않습니다. 버서커는 느리지만 강한 대검 공격, 대마법사는 마법진 광역 공격, 시즈골렘은 높은 체력·방어력, 대신관은 회복·적 약화 역할입니다.</li><li>스킬 🛡️철벽(받는 피해 감소)·👟질주(이동 속도 증가)는 오른쪽 아래 버튼(키보드 Q/E)으로 쓰며 10초마다 다시 쓸 수 있습니다. 쿨다운·지속 시간은 배속과 무관하게 실제 시간으로 흐르고, 기지 탭에서 골드로 Lv.10까지 강화합니다.</li></ul><div class="row"><button data-s="x">닫기</button></div>', s => closeSheet());
   }
   function resultSheet() {
     const win = B.over === 'win';
@@ -1910,7 +1913,7 @@ export function openWar(br) {
   function exitAsk() {
     if (!B) return close(true);
     if (B.over) return lobby();
-    sheet('<h4>전투를 포기할까요?</h4><p>지금 나가면 <b style="color:#ff6a5a">패배</b>로 처리됩니다' + (B.st >= ST.best ? ' (최전선 스테이지 ' + Math.max(1, B.st - 1) + ' 로 후퇴)' : '') + '. 모은 골드와 젬은 유지됩니다.</p><div class="row"><button data-s="x">계속 싸우기</button><button class="go" data-s="quit" style="background:linear-gradient(#c84a3a,#8a2a1a);border-color:#ff6a5a;color:#fff">포기하고 나가기</button></div>', s => { if (s === 'x') return closeSheet(); applyLose(B.st); save(); lobby(); });
+    sheet('<h4>전투를 포기할까요?</h4><p>전투를 종료하고 나가도 <b>현재 스테이지 단계는 하락하지 않습니다.</b> 모은 골드와 젬도 유지됩니다.</p><div class="row"><button data-s="x">계속 싸우기</button><button class="go" data-s="quit" style="background:linear-gradient(#c84a3a,#8a2a1a);border-color:#ff6a5a;color:#fff">포기하고 나가기</button></div>', s => { if (s === 'x') return closeSheet(); ST.inb = 0; save(); lobby(); });
   }
   /* ---------- 클릭 ---------- */
   root.addEventListener('click', e => {
