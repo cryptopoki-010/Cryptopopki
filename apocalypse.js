@@ -62,7 +62,7 @@ export function openApocalypse(br) {
   const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
 
-  const MAP = 64, TW = 22, TH = 11, BH = 7;
+  const MAP = 64, TW = 28, TH = 14, BH = 9;
   const Hmap = new Int8Array(MAP * MAP);
   const Surf = new Uint8Array(MAP * MAP);
   const hi = (x, y) => { x |= 0; y |= 0; return (x < 0 || y < 0 || x >= MAP || y >= MAP) ? 0 : Hmap[y * MAP + x]; };
@@ -174,6 +174,7 @@ export function openApocalypse(br) {
     canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
   }
   window.addEventListener('resize', layout); layout();
   function onKeyDown(e) { keys[e.code] = true; if (e.code === 'Space') { e.preventDefault(); tryAttack(); } if (e.code === 'KeyA' && running) toggleAuto(); }
@@ -553,7 +554,7 @@ export function openApocalypse(br) {
     ctx.ellipse(p.sx, p.sy + 4, 10, 4, 0, 0, TAU);
     ctx.fill();
     const S = getHeroCanvas(player.job, face, frame, attacking);
-    blit(ctx, S, p.sx, p.sy, 2.0, flash);
+    blit(ctx, S, p.sx, p.sy, 2.5, flash);
   }
 
 
@@ -569,7 +570,7 @@ export function openApocalypse(br) {
       ctx.ellipse(p.sx, p.sy + 4, kind === 'sphinx' ? 22 : 12, 5, 0, 0, TAU);
       ctx.fill();
       const S = getMonsterCanvas(kind, frame);
-      const sc = kind === 'sphinx' ? 2.6 : kind === 'jackal' ? 2.2 : 2.0;
+      const sc = kind === 'sphinx' ? 3.0 : kind === 'jackal' ? 2.6 : 2.4;
       blit(ctx, S, p.sx, p.sy, sc, hurt);
       if (e.boss) {
         ctx.fillStyle = '#000';
@@ -589,6 +590,7 @@ export function openApocalypse(br) {
   }
 
   function draw() {
+    ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, W, H);
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, '#080414');
@@ -610,7 +612,7 @@ export function openApocalypse(br) {
     // camera centers on player; vertical bias so character stays on screen
     const originX = W * 0.5;
     const originY = H * 0.42;
-    const view = 18;
+    const view = 14;
     const cx = Math.floor(cam.x), cy = Math.floor(cam.y);
 
     // ---- PASS 1: terrain only (dense stacks) ----
