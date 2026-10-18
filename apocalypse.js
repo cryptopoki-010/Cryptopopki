@@ -1,8 +1,9 @@
 /* apocalypse.js — 현대 아포칼립스 생존
- * 커스터마이징 · 맨손 · 조합 · 건물 내부 · 폐허 맵
+ * 커스터마이징 · 맨손 · 조합 · 건물 내부 · 폐허 맵 · 자동저장
  */
 export function openApocalypse(br) {
   const TAU = Math.PI * 2;
+  const SAVE_KEY = 'cg_apoc_v1';
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const rnd = (a, b) => a + Math.random() * (b - a);
   const ri = (a, b) => (a + Math.random() * (b - a + 1)) | 0;
@@ -94,6 +95,7 @@ export function openApocalypse(br) {
 <div id="title" class="overlay"><div class="card">
   <h1>7대 불가사의 생존</h1>
   <p>현대 아포칼립스 · 폐허 시가지 · 맨손 생존<br><b style="color:#ffd27a">사막에 버려진 도시</b></p>
+  <button class="btn" id="continue" type="button" style="display:none;background:linear-gradient(180deg,#3aaa6a,#2a7a4a);color:#0b0e14;margin-bottom:8px">이어서 하기</button>
   <h2>닉네임</h2><div class="row"><input id="nick" type="text" maxlength="12" value="생존자"/></div>
   <h2>성별</h2><div class="genders"><button type="button" class="on" data-g="m">남자</button><button type="button" data-g="f">여자</button></div>
   <h2>외형</h2><canvas id="preview" width="320" height="140"></canvas>
@@ -104,7 +106,7 @@ export function openApocalypse(br) {
   <div class="row"><label>키</label><input id="cHgt" type="range" min="0" max="2" value="1"/></div>
   <div class="row"><label>체격</label><input id="cBld" type="range" min="0" max="2" value="1"/></div>
   <div class="row"><label>옷</label><select id="cCloth"><option value="#6a7a8a">회색</option><option value="#4a6a4a">카키</option><option value="#5a4a3a">갈색</option><option value="#3a4a6a">남색</option></select></div>
-  <button class="btn" id="start" type="button">생존 시작 (맨손)</button>
+  <button class="btn" id="start" type="button">새로 시작 (맨손)</button>
 </div></div>
 <div id="dead" class="overlay hidden"><div class="card" style="text-align:center"><h1>사망</h1><p id="deadmsg"></p><button class="btn" id="retry" type="button">다시</button></div></div>`;
   document.body.appendChild(root);
@@ -157,6 +159,23 @@ export function openApocalypse(br) {
   };
   const su = (x, y) => { x |= 0; y |= 0; if (x < 0 || y < 0 || x >= MAP || y >= MAP) return 0; return Surf[y * MAP + x]; };
 
+  function paveRoad(x0, y0, x1, y1, half) {
+    half = half == null ? 1 : half;
+    const dx = Math.sign(x1 - x0) || 0, dy = Math.sign(y1 - y0) || 0;
+    let x = x0, y = y0;
+    for (let step = 0; step < MAP * 2; step++) {
+      for (let t = -half; t <= half; t++) {
+        const px = x + (dy ? t : 0), py = y + (dx ? t : 0);
+        if (px >= 0 && py >= 0 && px < MAP && py < MAP) {
+          Surf[py * MAP + px] = 1;
+          Hmap[py * MAP + px] = 1.0;
+        }
+      }
+      if (x === x1 && y === y1) break;
+      if (dx) x += dx; if (dy) y += dy;
+    }
+  }
+
   function genOverworld() {
     Hmap = new Float32Array(MAP * MAP);
     Surf = new Uint8Array(MAP * MAP);
@@ -166,20 +185,19 @@ export function openApocalypse(br) {
       Hmap[y * MAP + x] = Math.max(0, (n + 1.1) * 1.4);
       Surf[y * MAP + x] = 0;
     }
-    // road grid
-    for (let x = 0; x < MAP; x++) {
-      for (let t = -1; t <= 1; t++) {
-        if (MAP / 2 + t >= 0 && MAP / 2 + t < MAP) { Surf[(MAP / 2 + t | 0) * MAP + x] = 1; Hmap[(MAP / 2 + t | 0) * MAP + x] = 1.0; }
-        if (MAP / 3 + t >= 0 && MAP / 3 + t < MAP) { Surf[x * MAP + (MAP / 3 + t | 0)] = 1; Hmap[x * MAP + (MAP / 3 + t | 0)] = 1.0; }
-      }
-    }
-    for (let y = 0; y < MAP; y++) for (let t = -1; t <= 1; t++) {
-      const xx = (MAP * 0.55 | 0) + t;
-      if (xx >= 0 && xx < MAP) { Surf[y * MAP + xx] = 1; Hmap[y * MAP + xx] = 1.0; }
-    }
-    // oasis
+    // 넓은 도로망 (교차로·간선)
+    paveRoad(0, 36, MAP - 1, 36, 2);
+    paveRoad(0, 18, MAP - 1, 18, 1);
+    paveRoad(0, 52, MAP - 1, 52, 1);
+    paveRoad(24, 0, 24, MAP - 1, 2);
+    paveRoad(48, 0, 48, MAP - 1, 1);
+    paveRoad(12, 0, 12, MAP - 1, 1);
+    paveRoad(60, 0, 60, 40, 1);
+    paveRoad(24, 36, 48, 18, 1);
+    // 오아시스
     for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
-      if (Math.hypot(x - 8, y - 50) < 4) { Hmap[y * MAP + x] = 0.1; Surf[y * MAP + x] = 3; }
+      if (Math.hypot(x - 8, y - 50) < 4.5) { Hmap[y * MAP + x] = 0.1; Surf[y * MAP + x] = 3; }
+      if (Math.hypot(x - 62, y - 10) < 3) { Hmap[y * MAP + x] = 0.15; Surf[y * MAP + x] = 3; }
     }
     // smooth
     for (let p = 0; p < 2; p++) {
@@ -189,37 +207,51 @@ export function openApocalypse(br) {
         Hmap[i] = (t[i] * 4 + t[i - 1] + t[i + 1] + t[i - MAP] + t[i + MAP]) / 8;
       }
     }
-    // buildings: mart, house, warehouse, clinic
+    // 대형·소형 폐허 건물
     const specs = [
-      { x: 18, y: 20, w: 6, h: 5, type: 'mart', name: '폐허 마트' },
-      { x: 28, y: 18, w: 5, h: 4, type: 'house', name: '버려진 주택' },
-      { x: 40, y: 22, w: 7, h: 5, type: 'warehouse', name: '창고' },
-      { x: 22, y: 32, w: 5, h: 4, type: 'clinic', name: '진료소' },
-      { x: 48, y: 30, w: 6, h: 5, type: 'house', name: '아파트 잔해' },
-      { x: 12, y: 28, w: 4, h: 4, type: 'house', name: '가옥' },
+      { x: 16, y: 20, w: 8, h: 6, type: 'mart', name: '폐허 마트', stories: 2 },
+      { x: 28, y: 14, w: 6, h: 5, type: 'house', name: '버려진 주택', stories: 1 },
+      { x: 38, y: 22, w: 10, h: 7, type: 'warehouse', name: '대형 창고', stories: 2 },
+      { x: 20, y: 40, w: 6, h: 5, type: 'clinic', name: '진료소', stories: 1 },
+      { x: 50, y: 28, w: 9, h: 7, type: 'house', name: '아파트 잔해', stories: 3 },
+      { x: 8, y: 26, w: 5, h: 4, type: 'house', name: '가옥', stories: 1 },
+      { x: 54, y: 42, w: 8, h: 6, type: 'warehouse', name: '공장 폐허', stories: 2 },
+      { x: 32, y: 48, w: 7, h: 5, type: 'mart', name: '편의점 잔해', stories: 1 },
+      { x: 4, y: 8, w: 6, h: 5, type: 'house', name: '빌라 잔해', stories: 2 },
+      { x: 42, y: 6, w: 11, h: 8, type: 'warehouse', name: '상업 단지', stories: 3 },
     ];
     specs.forEach((b, i) => {
       b.interiorId = 'in_' + i;
+      b.ruin = 0.35 + (i % 5) * 0.1;
       buildings.push(b);
       for (let yy = b.y; yy < b.y + b.h; yy++) for (let xx = b.x; xx < b.x + b.w; xx++) {
         if (xx >= 0 && yy >= 0 && xx < MAP && yy < MAP) {
           Surf[yy * MAP + xx] = 2;
-          Hmap[yy * MAP + xx] = 1.3;
+          Hmap[yy * MAP + xx] = 1.15 + (b.stories || 1) * 0.12;
         }
       }
-      // door on south edge center
       b.doorX = b.x + (b.w / 2 | 0);
       b.doorY = b.y + b.h - 1;
       genInterior(b);
     });
-    // wrecked modern props
-    const pk = ['car', 'car', 'truck', 'heli', 'sign', 'dumpster', 'pole', 'rubble'];
-    for (let i = 0; i < 45; i++) {
+    // 나무 (야자·고목) + 폐차·잔해
+    const treeSpots = [
+      [6, 14], [10, 42], [14, 55], [20, 10], [26, 28], [30, 58], [34, 8],
+      [40, 40], [46, 14], [52, 50], [56, 20], [64, 34], [66, 55], [8, 32],
+      [18, 48], [36, 34], [44, 56], [58, 8], [62, 48], [28, 42], [50, 18],
+      [12, 6], [22, 54], [48, 46], [68, 22]
+    ];
+    treeSpots.forEach(([tx, ty], i) => {
+      if (su(tx, ty) === 3 || su(tx, ty) === 2) return;
+      props.push({ x: tx + 0.3, y: ty + 0.2, kind: i % 3 === 0 ? 'palm' : (i % 3 === 1 ? 'deadtree' : 'tree'), hp: 999, loot: false });
+    });
+    const pk = ['car', 'car', 'truck', 'heli', 'sign', 'dumpster', 'pole', 'rubble', 'rubble'];
+    for (let i = 0; i < 55; i++) {
       const x = rnd(4, MAP - 4), y = rnd(4, MAP - 4);
-      if (su(x, y) === 3) continue;
+      if (su(x, y) === 3 || su(x, y) === 2) continue;
       props.push({ x, y, kind: pk[ri(0, pk.length - 1)], hp: 30, loot: true });
     }
-    // spawn plateau
+    // 스폰 광장
     for (let y = 14; y <= 18; y++) for (let x = 14; x <= 18; x++) {
       Hmap[y * MAP + x] = 1.1; Surf[y * MAP + x] = 1;
     }
@@ -448,11 +480,40 @@ export function openApocalypse(br) {
   }
   function drawProp(c, p, sx, sy) {
     c.save(); c.translate(sx, sy);
-    if (p.kind === 'car' || p.kind === 'truck') {
+    if (p.kind === 'tree' || p.kind === 'deadtree' || p.kind === 'palm') {
+      // 그림자
+      c.fillStyle = 'rgba(0,0,0,0.25)';
+      c.beginPath(); c.ellipse(0, 2, 7, 2.5, 0, 0, TAU); c.fill();
+      if (p.kind === 'palm') {
+        c.fillStyle = '#5a4030'; c.fillRect(-1.5, -22, 3, 24);
+        c.fillStyle = '#3a7a38';
+        for (let i = 0; i < 5; i++) {
+          const a = -1.2 + i * 0.55;
+          c.beginPath();
+          c.moveTo(0, -20);
+          c.quadraticCurveTo(Math.cos(a) * 14, -22 + Math.sin(a) * 6, Math.cos(a) * 16, -14 + Math.sin(a) * 4);
+          c.lineTo(0, -18); c.fill();
+        }
+      } else if (p.kind === 'deadtree') {
+        c.strokeStyle = '#4a3828'; c.lineWidth = 2.5;
+        c.beginPath(); c.moveTo(0, 2); c.lineTo(0, -18); c.stroke();
+        c.lineWidth = 1.6;
+        c.beginPath(); c.moveTo(0, -10); c.lineTo(-8, -16); c.moveTo(0, -12); c.lineTo(7, -18); c.moveTo(0, -6); c.lineTo(5, -4); c.stroke();
+      } else {
+        c.fillStyle = '#4a3020'; c.fillRect(-2, -16, 4, 18);
+        c.fillStyle = '#2a5a28';
+        c.beginPath(); c.arc(0, -18, 9, 0, TAU); c.fill();
+        c.fillStyle = '#3a6a30';
+        c.beginPath(); c.arc(-4, -14, 6, 0, TAU); c.fill();
+        c.beginPath(); c.arc(5, -15, 5.5, 0, TAU); c.fill();
+      }
+    } else if (p.kind === 'car' || p.kind === 'truck') {
       c.fillStyle = '#4a5560'; c.fillRect(-10, -8, 20, 10);
       c.fillStyle = '#2a3038'; c.fillRect(-7, -14, 12, 7);
       c.fillStyle = '#1a1e24'; c.fillRect(-9, 0, 5, 3); c.fillRect(4, 0, 5, 3);
       c.fillStyle = '#6a3030'; c.fillRect(-10, -8, 20, 2);
+      // 녹·깨진 느낌
+      c.fillStyle = '#3a4048'; c.fillRect(-4, -12, 5, 3);
     } else if (p.kind === 'heli') {
       c.fillStyle = '#5a6570'; c.fillRect(-12, -10, 24, 10);
       c.fillStyle = '#3a4048'; c.fillRect(-4, -16, 8, 6);
@@ -466,31 +527,78 @@ export function openApocalypse(br) {
       c.fillStyle = '#c04040'; c.fillRect(-8, -22, 16, 8);
     } else if (p.kind === 'pole') {
       c.fillStyle = '#6a7080'; c.fillRect(-1, -20, 2, 20);
+      c.fillStyle = '#4a5058'; c.fillRect(-6, -22, 12, 3);
     } else {
       c.fillStyle = '#7a6a58'; c.fillRect(-6, -6, 12, 8);
+      c.fillStyle = '#5a4a40'; c.fillRect(-3, -9, 5, 4);
     }
     c.restore();
   }
   function drawBuilding(c, b, camx, camy) {
-    // iso footprint extruded
+    const baseCol = b.type === 'mart' ? [106, 80, 80] : b.type === 'clinic' ? [80, 106, 112] : b.type === 'warehouse' ? [90, 88, 72] : [90, 88, 72];
+    const stories = b.stories || 1;
+    const ruin = b.ruin || 0.4;
     for (let yy = 0; yy < b.h; yy++) for (let xx = 0; xx < b.w; xx++) {
       const wx = b.x + xx - camx, wy = b.y + yy - camy;
-      const z = 1.3;
+      // 모서리·일부 셀 붕괴
+      const edge = (xx === 0 || yy === 0 || xx === b.w - 1 || yy === b.h - 1);
+      const collapse = ((xx * 7 + yy * 13 + (b.x | 0)) % 11) < ruin * 8;
+      if (collapse && edge && (xx + yy) % 3 === 0) continue;
+      const hMul = collapse ? 0.45 + ((xx + yy) % 5) * 0.08 : 1;
+      const z = 1.0 + stories * 0.55 * hMul;
       const p = w2s(wx, wy, z);
       const isDoor = xx === (b.w / 2 | 0) && yy === b.h - 1;
-      c.fillStyle = isDoor ? '#1a1010' : (b.type === 'mart' ? '#6a5050' : b.type === 'clinic' ? '#506a70' : '#5a5848');
-      // simple top diamond
+      const shade = 0.75 + ((xx + yy) % 3) * 0.08;
+      const r = (baseCol[0] * shade) | 0, g = (baseCol[1] * shade) | 0, bl = (baseCol[2] * shade) | 0;
+      c.fillStyle = isDoor ? '#1a1010' : `rgb(${r},${g},${bl})`;
+      const topH = 10 + stories * 6 * hMul;
       c.beginPath();
-      c.moveTo(p.sx, p.sy - 14);
-      c.lineTo(p.sx + TW * 0.4, p.sy - 7);
+      c.moveTo(p.sx, p.sy - topH);
+      c.lineTo(p.sx + TW * 0.42, p.sy - topH * 0.45);
       c.lineTo(p.sx, p.sy);
-      c.lineTo(p.sx - TW * 0.4, p.sy - 7);
+      c.lineTo(p.sx - TW * 0.42, p.sy - topH * 0.45);
       c.closePath(); c.fill();
+      // 벽 측면 (낡은 질감)
+      if (!collapse) {
+        c.fillStyle = `rgb(${(r * 0.7) | 0},${(g * 0.7) | 0},${(bl * 0.7) | 0})`;
+        c.beginPath();
+        c.moveTo(p.sx - TW * 0.42, p.sy - topH * 0.45);
+        c.lineTo(p.sx, p.sy);
+        c.lineTo(p.sx, p.sy + 4);
+        c.lineTo(p.sx - TW * 0.42, p.sy - topH * 0.45 + 4);
+        c.closePath(); c.fill();
+      }
+      // 깨진 창문
+      if (!isDoor && !collapse && (xx + yy) % 2 === 0 && hMul > 0.7) {
+        c.fillStyle = ((xx * 3 + yy) % 5 === 0) ? '#1a1510' : 'rgba(40,60,80,0.55)';
+        c.fillRect(p.sx - 3, p.sy - topH * 0.55, 5, 4);
+        if ((xx + yy) % 5 === 1) {
+          c.strokeStyle = '#2a2018'; c.lineWidth = 1;
+          c.beginPath(); c.moveTo(p.sx - 3, p.sy - topH * 0.55); c.lineTo(p.sx + 2, p.sy - topH * 0.55 + 4); c.stroke();
+        }
+      }
       if (isDoor) {
         c.fillStyle = '#c8a040';
-        c.fillRect(p.sx - 3, p.sy - 12, 6, 10);
+        c.fillRect(p.sx - 4, p.sy - 14, 8, 12);
+        c.fillStyle = '#1a1010';
+        c.fillRect(p.sx - 2, p.sy - 12, 4, 9);
+      }
+      // 잔해 더미
+      if (collapse) {
+        c.fillStyle = '#5a4a38';
+        c.fillRect(p.sx - 5, p.sy - 3, 10, 5);
+        c.fillStyle = '#3a3028';
+        c.fillRect(p.sx - 2, p.sy - 5, 4, 3);
       }
     }
+    // 건물 이름 살짝
+    const cx = b.x + b.w / 2 - camx, cy = b.y + b.h / 2 - camy;
+    const lp = w2s(cx, cy, 1.0 + stories * 0.55);
+    c.fillStyle = 'rgba(0,0,0,0.45)';
+    c.font = 'bold 9px sans-serif'; c.textAlign = 'center';
+    c.fillText(b.name, lp.sx, lp.sy - 22 - stories * 4);
+    c.fillStyle = '#c8b090';
+    c.fillText(b.name, lp.sx, lp.sy - 23 - stories * 4);
   }
 
   function spawnAnimals() {
@@ -505,20 +613,147 @@ export function openApocalypse(br) {
     }
   }
 
-  function startGame() {
-    readCustom();
+  function saveGame() {
+    if (!running) return false;
+    try {
+      const lootTaken = {};
+      Object.keys(interiorMaps).forEach(id => {
+        lootTaken[id] = (interiorMaps[id].lootSpots || []).map(L => !!L.taken);
+      });
+      const data = {
+        v: 1, t: Date.now(),
+        look: Object.assign({}, look),
+        player: {
+          x: player.x, y: player.y, overX: player.overX, overY: player.overY,
+          hp: player.hp, mhp: player.mhp, thirst: player.thirst, fatigue: player.fatigue,
+          kills: player.kills, lv: player.lv, exp: player.exp, expMax: player.expMax, face: player.face
+        },
+        inv: Object.assign({}, inv),
+        weapon: weapon,
+        worldMode: worldMode,
+        interiorId: currentInterior ? currentInterior.building.interiorId : null,
+        props: props.map(p => ({ x: p.x, y: p.y, kind: p.kind, hp: p.hp, loot: p.loot })),
+        lootTaken: lootTaken
+      };
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+      return true;
+    } catch (e) {
+      try { console.warn('[apoc save]', e); } catch (x) {}
+      return false;
+    }
+  }
+
+  function loadSaveRaw() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || data.v !== 1) return null;
+      return data;
+    } catch (e) { return null; }
+  }
+
+  function applySave(data) {
+    if (!data) return false;
+    Object.assign(look, data.look || {});
     Object.keys(inv).forEach(k => inv[k] = 0);
-    weapon = null;
+    if (data.inv) Object.keys(data.inv).forEach(k => { if (k in inv) inv[k] = data.inv[k] | 0; });
+    weapon = data.weapon || null;
     genOverworld();
+    if (data.props && data.props.length) {
+      props = data.props.map(p => ({ x: p.x, y: p.y, kind: p.kind, hp: p.hp, loot: !!p.loot }));
+    }
+    if (data.lootTaken) {
+      Object.keys(data.lootTaken).forEach(id => {
+        const m = interiorMaps[id];
+        if (!m || !m.lootSpots) return;
+        const arr = data.lootTaken[id];
+        m.lootSpots.forEach((L, i) => { if (arr[i]) L.taken = true; });
+      });
+    }
     spawnAnimals();
+    const p = data.player || {};
+    player.x = p.x != null ? p.x : 16;
+    player.y = p.y != null ? p.y : 16;
+    player.overX = p.overX != null ? p.overX : player.x;
+    player.overY = p.overY != null ? p.overY : player.y;
+    player.hp = p.hp != null ? p.hp : 100;
+    player.mhp = p.mhp != null ? p.mhp : 100;
+    player.thirst = p.thirst != null ? p.thirst : 100;
+    player.fatigue = p.fatigue != null ? p.fatigue : 100;
+    player.kills = p.kills | 0;
+    player.lv = p.lv || 1;
+    player.exp = p.exp | 0;
+    player.expMax = p.expMax || 40;
+    player.face = p.face != null ? p.face : 2;
+    player.walkT = 0;
     worldMode = 'over'; currentInterior = null;
-    player.x = 16; player.y = 16; player.hp = 100; player.mhp = 100; player.thirst = 100; player.fatigue = 100;
-    player.kills = 0; player.lv = 1; player.exp = 0; player.expMax = 40; player.walkT = 0; player.face = 2;
-    cam = { x: 16, y: 16 }; drops = []; running = true;
+    if (data.worldMode === 'interior' && data.interiorId && interiorMaps[data.interiorId]) {
+      currentInterior = interiorMaps[data.interiorId];
+      worldMode = 'interior';
+      $('zone').textContent = currentInterior.name + ' · 내부';
+    } else {
+      $('zone').textContent = '폐허 외곽 · 사막 시가지';
+    }
+    cam = { x: player.x, y: player.y };
+    drops = [];
+    // UI에 커스텀 반영
+    try {
+      $('nick').value = look.nick || '생존자';
+      $('cHead').value = String(look.head | 0);
+      $('cHairC').value = look.hairC || '#3a2818';
+      $('cHairS').value = String(look.hairS | 0);
+      $('cSkin').value = look.skin || '#f0d2b0';
+      $('cHgt').value = String(look.hgt != null ? look.hgt : 1);
+      $('cBld').value = String(look.bld != null ? look.bld : 1);
+      $('cCloth').value = look.cloth || '#6a7a8a';
+      root.querySelectorAll('.genders button').forEach(b => {
+        b.classList.toggle('on', b.getAttribute('data-g') === look.gender);
+      });
+    } catch (e) {}
+    return true;
+  }
+
+  function startGame(fromSave) {
+    if (fromSave) {
+      const data = loadSaveRaw();
+      if (!data || !applySave(data)) {
+        toast('저장 데이터를 불러올 수 없습니다');
+        return;
+      }
+    } else {
+      readCustom();
+      Object.keys(inv).forEach(k => inv[k] = 0);
+      weapon = null;
+      genOverworld();
+      spawnAnimals();
+      worldMode = 'over'; currentInterior = null;
+      player.x = 16; player.y = 16; player.hp = 100; player.mhp = 100; player.thirst = 100; player.fatigue = 100;
+      player.kills = 0; player.lv = 1; player.exp = 0; player.expMax = 40; player.walkT = 0; player.face = 2;
+      player.overX = 16; player.overY = 16;
+      cam = { x: 16, y: 16 }; drops = [];
+      $('zone').textContent = '폐허 외곽 · 사막 시가지';
+      try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    }
+    running = true;
     $('title').classList.add('hidden'); $('dead').classList.add('hidden');
     ['hud', 'zone', 'topr', 'inv', 'pad', 'atk', 'auto', 'bag'].forEach(id => $(id).classList.remove('hidden'));
-    $('zone').textContent = '폐허 외곽 · 사막 시가지';
-    updHUD(); toast(look.nick + ' · 맨손 생존');
+    updHUD();
+    toast(fromSave ? (look.nick + ' · 이어서 생존') : (look.nick + ' · 맨손 생존'));
+  }
+
+  function refreshContinueBtn() {
+    const btn = $('continue');
+    if (!btn) return;
+    const data = loadSaveRaw();
+    if (data && data.player) {
+      btn.style.display = 'block';
+      const lv = data.player.lv || 1;
+      const nick = (data.look && data.look.nick) || '생존자';
+      btn.textContent = '이어서 하기 · ' + nick + ' Lv.' + lv;
+    } else {
+      btn.style.display = 'none';
+    }
   }
 
   function atkDmg() {
@@ -865,18 +1100,27 @@ export function openApocalypse(br) {
   ['cHead', 'cHairC', 'cHairS', 'cSkin', 'cHgt', 'cBld', 'cCloth', 'nick'].forEach(id => {
     $(id).addEventListener('input', refreshPreview); $(id).addEventListener('change', refreshPreview);
   });
-  $('start').onclick = startGame;
-  $('retry').onclick = () => { $('dead').classList.add('hidden'); $('title').classList.remove('hidden'); };
+  $('start').onclick = () => startGame(false);
+  $('continue').onclick = () => startGame(true);
+  $('retry').onclick = () => {
+    $('dead').classList.add('hidden');
+    $('title').classList.remove('hidden');
+    refreshContinueBtn();
+  };
 
   function close() {
-    if (!alive) return; alive = false;
+    if (!alive) return;
+    if (running) {
+      if (saveGame()) toast('진행 상황 저장됨');
+    }
+    alive = false;
     try { cancelAnimationFrame(raf); } catch (e) {}
     window.removeEventListener('resize', layout);
     root.remove(); document.body.style.overflow = prevOv;
     if (br && br.onClose) br.onClose();
   }
   root.querySelector('.apx').onclick = close;
-  layout(); refreshPreview();
+  layout(); refreshPreview(); refreshContinueBtn();
   last = performance.now() / 1000;
   raf = requestAnimationFrame(frame);
   return { close };
