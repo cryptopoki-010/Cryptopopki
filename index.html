@@ -619,7 +619,7 @@ COV.trade='data:image/webp;base64,UklGRpiEAABXRUJQVlA4IIyEAABw2wGdASogA4EBPnk2lk
 var SF={c:'all',s:'rec'};
 var CATS=[['all','전체'],['trade','트레이딩'],['gacha','뽑기'],['game','게임'],['mine','채굴']];
 var DCm=null;function openDice(){if(DCm&&(DCm.busy||DCm.g))return;DCm={busy:true};toast('던져던져 다이스 불러오는 중…');import('./dice.js').then(function(m){DCm.busy=false;DCm.g=m.openDice({fmtBal:kbal,getBal:function(){return bal},setBal:function(v){bal=Math.max(0,Math.round(v))},getState:function(){return window.dicest||null},setState:function(s){window.dicest=s},toast:toast,onClose:function(){DCm.g=null}})}).catch(function(e){DCm={};toast('던져던져 다이스를 불러오지 못했습니다');console.error('[dice]',e)})}
-var APm=null;function openApocalypse(){if(APm&&(APm.busy||APm.g))return;APm={busy:true};toast('7대 불가사의 생존 불러오는 중…');import('./apocalypse.js').then(function(m){APm.busy=false;APm.g=m.openApocalypse({toast:toast,onClose:function(){APm.g=null}})}).catch(function(e){APm={};toast('생존 게임을 불러오지 못했습니다');console.error('[apocalypse]',e)})}
+var APm=null;function openApocalypse(){if(APm&&(APm.busy||APm.g))return;APm={busy:true};toast('7대 불가사의 생존 불러오는 중…');import('./apocalypse.js').then(function(m){APm.busy=false;APm.g=m.openApocalypse({toast:toast,onClose:function(){APm.g=null}})}).catch(function(e){APm={};toast('생존 게임을 불러오지 못했습니다 · apocalypse.js / apocalypse-sprites.js 확인');console.error('[apocalypse]',e)})}
 var SORTS=[['rec','추천순'],['lo','낮은 가격순'],['hi','높은 가격순']];
 function prods(){return [
  {k:'mine',c:'mine',wide:1,t:'채굴장',img:COV.mine,tl:[['무료','g']],d:'채굴 쥐를 고용하고 업그레이드하세요. 접속하지 않아도 24시간 자동으로 채굴됩니다.',pr:0,pt:'무료',pu:'',btn:[['채굴장 입장',"view('mine')",'k']]},
