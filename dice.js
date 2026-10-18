@@ -1149,27 +1149,43 @@ export function openDice(br) {
   let autoRoll = false, autoMul = 10, autoAcc = 0, gameSpeed = ST.speed || 1;
   const AUTO_SELL = { item: [1,1,0,0,0], gem: [1,0,0,0] };
   function autoSellSheet() {
-    const toggle = (arr, i, label, color, prefix) => {
-      const on = !!arr[i];
-      return '<button type="button" class="dbtn s ' + (on ? 'g' : 'w') + '" style="flex:1;min-width:65px;padding:7px 4px;border-color:' + color + '" data-s="' + prefix + i + '" data-on="' + (on ? '1' : '0') + '" data-label="' + label + '"><span class="chk">' + (on ? '☑' : '☐') + '</span> ' + label + '</button>';
-    };
-    sheet('<h4>⚙ 자동 판매 설정</h4><p>체크(ON)한 등급은 자동 굴리기 중 즉시 판매되어 골드로 바뀝니다. 해제(OFF)한 등급은 보관됩니다.</p><b>장비 등급</b><div class="row" style="flex-wrap:wrap;gap:5px;margin:7px 0 12px">' + RAR.map((r,i)=>toggle(AUTO_SELL.item,i,r.k,r.c,'i')).join('') + '</div><b>보석 등급</b><div class="row" style="flex-wrap:wrap;gap:5px;margin:7px 0 12px">' + GEM_RAR.map((r,i)=>toggle(AUTO_SELL.gem,i,r.k,r.c,'g')).join('') + '</div><p style="font-size:12px;color:#7a6a7e">등급: 장비 N / R / SR / UR / L · 보석 R / SR / UR / L</p><div class="row"><button type="button" class="dbtn w" style="flex:1" data-s="cancel">취소</button><button type="button" class="dbtn g" style="flex:2" data-s="start">▶ 자동 굴리기 시작</button></div>', (k, btn) => {
+    /* 등급 버튼은 항상 렌더 · OFF여도 제거하지 않음. 토글 시 DOM만 갱신해 시트가 깜빡이지 않음 */
+    function mkBtn(prefix, i, label, color, on) {
+      const bg = on ? color : '#fff';
+      const fg = on ? '#fff' : '#2a1d2e';
+      const mark = on ? '☑' : '☐';
+      const state = on ? 'ON' : 'OFF';
+      return '<button type="button" class="asell" data-s="' + prefix + i + '" data-prefix="' + prefix + '" data-i="' + i + '" data-label="' + label + '" data-color="' + color + '" data-on="' + (on ? '1' : '0') + '" style="flex:1 1 56px;min-width:56px;height:40px;padding:0 6px;border:2.5px solid ' + color + ';background:' + bg + ';color:' + fg + ';font-weight:900;font-size:13px;box-shadow:0 2px 0 #2a1d2e;border-radius:0;cursor:pointer">'
+        + '<span class="chk">' + mark + '</span> ' + label + ' <small style="opacity:.85">' + state + '</small></button>';
+    }
+    const itemRow = RAR.map((r, i) => mkBtn('i', i, r.k, r.c, !!AUTO_SELL.item[i])).join('');
+    const gemRow = GEM_RAR.map((r, i) => mkBtn('g', i, r.k, r.c, !!AUTO_SELL.gem[i])).join('');
+    const html = '<h4>⚙ 자동 판매 설정</h4>'
+      + '<p>체크(ON)한 등급은 자동 굴리기 중 즉시 판매되어 골드로 바뀝니다. 해제(OFF)한 등급은 보관됩니다.</p>'
+      + '<b>장비 등급</b><div class="row" style="flex-wrap:wrap;gap:6px;margin:8px 0 14px">' + itemRow + '</div>'
+      + '<b>보석 등급</b><div class="row" style="flex-wrap:wrap;gap:6px;margin:8px 0 14px">' + gemRow + '</div>'
+      + '<p style="font-size:12px;color:#7a6a7e">등급: 장비 N / R / SR / UR / L · 보석 R / SR / UR / L</p>'
+      + '<div class="row" style="gap:8px;margin-top:4px">'
+      + '<button type="button" class="dbtn w" style="flex:1" data-s="cancel">취소</button>'
+      + '<button type="button" class="dbtn g" style="flex:2" data-s="start">▶ 자동 굴리기 시작</button>'
+      + '</div>';
+    sheet(html, (k, btn) => {
       if (k === 'cancel') return closeSheet();
       if (k === 'start') { autoRoll = true; autoAcc = 0; closeSheet(); sfx('click'); renderPanel(); return; }
-      const kind = k[0], i = +k.slice(1);
-      let arr = null;
-      if (kind === 'i' && i >= 0 && i < AUTO_SELL.item.length) arr = AUTO_SELL.item;
-      else if (kind === 'g' && i >= 0 && i < AUTO_SELL.gem.length) arr = AUTO_SELL.gem;
-      if (!arr || !btn) return;
+      if (!btn || !btn.classList.contains('asell')) return;
+      const prefix = btn.dataset.prefix;
+      const i = +btn.dataset.i;
+      const arr = prefix === 'i' ? AUTO_SELL.item : prefix === 'g' ? AUTO_SELL.gem : null;
+      if (!arr || i < 0 || i >= arr.length) return;
       arr[i] = arr[i] ? 0 : 1;
       const on = !!arr[i];
+      const color = btn.dataset.color || '#2a1d2e';
       const label = btn.dataset.label || '';
       btn.dataset.on = on ? '1' : '0';
-      btn.classList.toggle('g', on);
-      btn.classList.toggle('w', !on);
-      const chk = btn.querySelector('.chk');
-      if (chk) chk.textContent = on ? '☑' : '☐';
-      else btn.innerHTML = '<span class="chk">' + (on ? '☑' : '☐') + '</span> ' + label;
+      btn.style.background = on ? color : '#fff';
+      btn.style.color = on ? '#fff' : '#2a1d2e';
+      btn.style.borderColor = color;
+      btn.innerHTML = '<span class="chk">' + (on ? '☑' : '☐') + '</span> ' + label + ' <small style="opacity:.85">' + (on ? 'ON' : 'OFF') + '</small>';
       sfx('click');
     });
   }
