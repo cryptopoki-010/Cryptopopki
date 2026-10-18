@@ -153,7 +153,7 @@ export function openApocalypse(br) {
     warrior: { name: '워리어', color: '#ff7a6a', speed: 2.5, range: 1.9, rate: 0.42, dmg: 22, melee: true, arc: 2.0, pierce: 0, knock: 2.2, gatherBonus: 1.3 }
   };
 
-  let W = 0, H = 0, dpr = 1, cam = { x: 12, y: 16 }, selectedJob = 'archer', running = false, autoHunt = false, last = 0, raf = 0;
+  let W = 0, H = 0, dpr = 1, cam = { x: 11, y: 17 }, selectedJob = 'archer', running = false, autoHunt = false, last = 0, raf = 0;
   const player = { x: 10, y: 16, hp: 100, mhp: 100, thirst: 100, fatigue: 100, dirX: 1, dirY: 0, atkCd: 0, invuln: 0, job: 'archer', kills: 0 };
   const inv = { meat: 0, hide: 0, bone: 0, iron: 0, wire: 0, concrete: 0, sand: 0, water: 0, can: 0 };
   const INV_LABEL = { meat: '고기', hide: '가죽', bone: '뼈', iron: '철', wire: '전선', concrete: '콘크리트', sand: '모래', water: '물', can: '통조림' };
@@ -206,7 +206,10 @@ export function openApocalypse(br) {
   $('retry').addEventListener('click', () => { $('dead').classList.add('hidden'); $('title').classList.remove('hidden'); running = false; });
 
   function spawnWorld() {
-    genTerrain(); buildStructures();
+    genTerrain();
+    // flatten spawn plateau so player is never buried
+    for (let y = 15; y <= 19; y++) for (let x = 9; x <= 13; x++) { Hmap[y * MAP + x] = 2; Surf[y * MAP + x] = 0; }
+    buildStructures();
     ents = []; drops = []; fx = []; particles = [];
     for (let i = 0; i < 40; i++) { const x = rnd(2, MAP - 3), y = rnd(2, MAP - 3); if (su(x, y) === 4) continue; ents.push({ type: 'prop', kind: 'rock', x, y, hp: 40, mhp: 40, r: 0.5, drops: { sand: [1, 3], concrete: [0, 1] } }); }
     for (let i = 0; i < 10; i++) ents.push({ type: 'prop', kind: 'wreck', x: rnd(14, 38), y: rnd(3, 16), hp: 55, mhp: 55, r: 0.7, drops: { iron: [1, 2], wire: [0, 2] } });
@@ -216,7 +219,7 @@ export function openApocalypse(br) {
     ents.push({ type: 'monster', kind: 'sphinx', x: 31, y: 31, hp: 280, mhp: 280, r: 1.25, speed: 1.0, dmg: 16, drops: { iron: [3, 5], wire: [2, 4], bone: [2, 3], can: [1, 2] }, hurtT: 0, atkCd: 0, boss: true });
   }
   function startGame() {
-    player.job = selectedJob; player.x = 10; player.y = 16; player.hp = player.mhp = 100; player.thirst = 100; player.fatigue = 100;
+    player.job = selectedJob; player.x = 11; player.y = 17; player.hp = player.mhp = 100; player.thirst = 100; player.fatigue = 100;
     player.kills = 0; player.atkCd = 0; player.invuln = 0; player.dirX = 1; player.dirY = 0;
     Object.keys(inv).forEach(k => inv[k] = 0); spawnWorld(); autoHunt = false; $('auto').classList.remove('on');
     $('title').classList.add('hidden'); $('dead').classList.add('hidden');
@@ -435,21 +438,92 @@ export function openApocalypse(br) {
     if (f >= 0) { r += (255 - r) * f; g += (255 - g) * f; b += (255 - b) * f; } else { r *= 1 + f; g *= 1 + f; b *= 1 + f; }
     return '#' + [r, g, b].map(v => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0')).join('');
   }
+
   function drawChar(px, py, pz, color, weapon) {
     const p = w2s(px, py, pz), x = p.sx, y = p.sy;
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y + 6, 14, 6, 0, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#1e2430'; ctx.fillRect(x - 6, y - 4, 5, 10); ctx.fillRect(x + 1, y - 4, 5, 10);
-    ctx.fillStyle = color; ctx.fillRect(x - 8, y - 20, 16, 16);
-    ctx.fillStyle = shade(color, 0.25); ctx.fillRect(x - 8, y - 20, 16, 4);
-    ctx.fillStyle = '#f0d2b0'; ctx.fillRect(x - 6, y - 30, 12, 10);
-    ctx.fillStyle = '#2a1a10'; ctx.fillRect(x - 6, y - 30, 12, 3);
-    ctx.fillStyle = '#1a1018'; ctx.fillRect(x - 3, y - 26, 2, 2); ctx.fillRect(x + 2, y - 26, 2, 2);
-    ctx.fillStyle = '#c8d0d8';
-    if (weapon === 'bow') { ctx.strokeStyle = '#8a5a28'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + 12, y - 14, 10, -1, 1); ctx.stroke(); }
-    else if (weapon === 'gun') ctx.fillRect(x + 8, y - 16, 12, 5);
-    else if (weapon === 'knife') ctx.fillRect(x + 8, y - 18, 3, 12);
-    else { ctx.fillRect(x + 9, y - 32, 4, 24); ctx.fillStyle = '#c8a040'; ctx.fillRect(x + 7, y - 12, 8, 3); }
+    // soft ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 8, 16, 7, 0, 0, TAU);
+    ctx.fill();
+    // outline body (black behind)
+    const O = '#120a08';
+    ctx.fillStyle = O;
+    ctx.fillRect(x - 9, y - 6, 8, 14);
+    ctx.fillRect(x + 1, y - 6, 8, 14);
+    ctx.fillRect(x - 11, y - 24, 22, 20);
+    ctx.fillRect(x - 9, y - 36, 18, 14);
+    // legs
+    ctx.fillStyle = '#1a2030';
+    ctx.fillRect(x - 8, y - 5, 6, 12);
+    ctx.fillRect(x + 2, y - 5, 6, 12);
+    // boots
+    ctx.fillStyle = '#0a0c10';
+    ctx.fillRect(x - 8, y + 5, 6, 4);
+    ctx.fillRect(x + 2, y + 5, 6, 4);
+    // torso
+    ctx.fillStyle = color;
+    ctx.fillRect(x - 10, y - 22, 20, 18);
+    ctx.fillStyle = shade(color, 0.3);
+    ctx.fillRect(x - 10, y - 22, 20, 5);
+    ctx.fillStyle = shade(color, -0.25);
+    ctx.fillRect(x - 10, y - 8, 20, 4);
+    // belt
+    ctx.fillStyle = '#c8a040';
+    ctx.fillRect(x - 10, y - 6, 20, 3);
+    ctx.fillStyle = '#ffe080';
+    ctx.fillRect(x - 2, y - 6, 4, 3);
+    // arms
+    ctx.fillStyle = '#f0d2b0';
+    ctx.fillRect(x - 14, y - 20, 5, 12);
+    ctx.fillRect(x + 9, y - 20, 5, 12);
+    // head
+    ctx.fillStyle = '#f0d2b0';
+    ctx.fillRect(x - 8, y - 34, 16, 12);
+    ctx.fillStyle = '#2a1a12';
+    ctx.fillRect(x - 8, y - 34, 16, 4);
+    // eyes
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x - 5, y - 28, 4, 4);
+    ctx.fillRect(x + 2, y - 28, 4, 4);
+    ctx.fillStyle = '#1a1018';
+    ctx.fillRect(x - 4, y - 27, 2, 2);
+    ctx.fillRect(x + 3, y - 27, 2, 2);
+    // weapon
+    if (weapon === 'bow') {
+      ctx.strokeStyle = '#8a5a28';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x + 16, y - 16, 12, -1.2, 1.2);
+      ctx.stroke();
+      ctx.strokeStyle = '#e8d8b0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + 16, y - 28);
+      ctx.lineTo(x + 16, y - 4);
+      ctx.stroke();
+    } else if (weapon === 'gun') {
+      ctx.fillStyle = '#3a4048';
+      ctx.fillRect(x + 10, y - 18, 16, 6);
+      ctx.fillStyle = '#1a1e24';
+      ctx.fillRect(x + 24, y - 17, 6, 4);
+    } else if (weapon === 'knife') {
+      ctx.fillStyle = '#d0d8e0';
+      ctx.fillRect(x + 10, y - 22, 4, 16);
+      ctx.fillStyle = '#8a6030';
+      ctx.fillRect(x + 10, y - 8, 4, 5);
+    } else {
+      ctx.fillStyle = '#c8d0d8';
+      ctx.fillRect(x + 12, y - 38, 5, 28);
+      ctx.fillStyle = '#e8eef4';
+      ctx.fillRect(x + 13, y - 38, 2, 28);
+      ctx.fillStyle = '#c8a040';
+      ctx.fillRect(x + 10, y - 14, 9, 4);
+      ctx.fillStyle = '#6a4020';
+      ctx.fillRect(x + 13, y - 10, 3, 6);
+    }
   }
+
   function drawMonster(e, ox, oy) {
     const zh = groundH(e.x, e.y); const p = w2s(ox, oy, zh); const hurt = e.hurtT > 0;
     if (e.kind === 'sandling') {
@@ -478,73 +552,133 @@ export function openApocalypse(br) {
     }
   }
 
+
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#080414'); g.addColorStop(0.38, '#281440'); g.addColorStop(0.62, '#8a3828'); g.addColorStop(1, '#e89038');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-    ctx.beginPath(); ctx.arc(W * 0.84, H * 0.16, 42, 0, TAU); ctx.fillStyle = '#ffb84a'; ctx.fill();
-    ctx.beginPath(); ctx.arc(W * 0.84, H * 0.16, 28, 0, TAU); ctx.fillStyle = '#ffe0a0'; ctx.fill();
+    g.addColorStop(0, '#080414');
+    g.addColorStop(0.35, '#241038');
+    g.addColorStop(0.6, '#8a3828');
+    g.addColorStop(1, '#e89038');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    // sun
+    ctx.beginPath();
+    ctx.arc(W * 0.82, H * 0.14, 40, 0, TAU);
+    ctx.fillStyle = '#ffb84a';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(W * 0.82, H * 0.14, 26, 0, TAU);
+    ctx.fillStyle = '#ffe0a0';
+    ctx.fill();
 
-    const originX = W / 2, originY = H * 0.16;
-    const view = 13, cx = Math.floor(cam.x), cy = Math.floor(cam.y);
+    // camera centers on player; vertical bias so character stays on screen
+    const originX = W * 0.5;
+    const originY = H * 0.42;
+    const view = 11;
+    const cx = Math.floor(cam.x), cy = Math.floor(cam.y);
+
+    // ---- PASS 1: terrain only (dense stacks) ----
     const cells = [];
-    for (let iy = cy - view; iy <= cy + view; iy++) for (let ix = cx - view; ix <= cx + view; ix++) {
-      if (ix < 0 || iy < 0 || ix >= MAP || iy >= MAP) continue;
-      cells.push({ x: ix, y: iy, depth: ix + iy });
+    for (let iy = cy - view; iy <= cy + view; iy++) {
+      for (let ix = cx - view; ix <= cx + view; ix++) {
+        if (ix < 0 || iy < 0 || ix >= MAP || iy >= MAP) continue;
+        cells.push({ x: ix, y: iy, depth: ix + iy });
+      }
     }
     cells.sort((a, b) => a.depth - b.depth || a.x - b.x);
 
-    const dyn = [];
-    for (const e of ents) if (e.hp > 0) dyn.push({ depth: e.x + e.y + 0.02, e });
-    dyn.push({ depth: player.x + player.y + 0.03, player: true });
-    for (const d of drops) dyn.push({ depth: d.x + d.y + 0.04, drop: d });
-    for (const f of fx) dyn.push({ depth: f.x + f.y + 0.05, f });
-    for (const p of particles) dyn.push({ depth: p.x + p.y + 0.06, p });
-    for (const s of structures) dyn.push({ depth: s.x + s.y + 0.01, s });
-    dyn.sort((a, b) => a.depth - b.depth);
-    let di = 0;
-    function flushDyn(until) {
-      while (di < dyn.length && dyn[di].depth <= until) {
-        const item = dyn[di++];
-        ctx.save(); ctx.translate(originX, originY);
-        if (item.s) drawStruct(item.s, item.s.x - cam.x, item.s.y - cam.y);
-        else if (item.player) {
-          const zh = groundH(player.x, player.y);
-          const wpn = player.job === 'archer' ? 'bow' : player.job === 'shooter' ? 'gun' : player.job === 'rogue' ? 'knife' : 'sword';
-          const flash = player.invuln > 0 && ((player.invuln * 20) | 0) % 2 === 0;
-          drawChar(player.x - cam.x, player.y - cam.y, zh, flash ? '#ffffff' : JOBS[player.job].color, wpn);
-        } else if (item.e) drawMonster(item.e, item.e.x - cam.x, item.e.y - cam.y);
-        else if (item.drop) {
-          const p = w2s(item.drop.x - cam.x, item.drop.y - cam.y, groundH(item.drop.x, item.drop.y) + 0.5 + Math.sin(item.drop.t * 10) * 0.12);
-          ctx.fillStyle = item.drop.k === 'water' ? '#3db4ff' : item.drop.k === 'iron' ? '#a0b0c0' : '#ffd27a';
-          ctx.fillRect(p.sx - 4, p.sy - 4, 8, 8); ctx.fillStyle = '#fff8'; ctx.fillRect(p.sx - 2, p.sy - 2, 3, 3);
-        } else if (item.f) {
-          const p = w2s(item.f.x - cam.x, item.f.y - cam.y, groundH(item.f.x, item.f.y) + 0.7);
-          if (item.f.type === 'proj') { ctx.fillStyle = item.f.color; ctx.fillRect(p.sx - 3, p.sy - 3, 6, 6); ctx.fillStyle = '#fff'; ctx.fillRect(p.sx - 1, p.sy - 1, 2, 2); }
-          else { ctx.globalAlpha = item.f.life / item.f.max; ctx.strokeStyle = item.f.color; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(p.sx, p.sy - 8, item.f.range * TW * 0.35, item.f.ang - 1, item.f.ang + 1); ctx.stroke(); ctx.globalAlpha = 1; }
-        } else if (item.p) {
-          const p = w2s(item.p.x - cam.x, item.p.y - cam.y, item.p.z);
-          ctx.globalAlpha = clamp(item.p.life * 2, 0, 1); ctx.fillStyle = item.p.c; ctx.fillRect(p.sx - 2, p.sy - 2, 4, 4); ctx.globalAlpha = 1;
-        }
-        ctx.restore();
+    ctx.save();
+    ctx.translate(originX, originY);
+    for (const c of cells) {
+      const h = hi(c.x, c.y);
+      const s = su(c.x, c.y);
+      const maxStack = Math.min(Math.max(h, 0), 12);
+      // always draw at least ground slab
+      for (let z = 0; z <= maxStack; z++) {
+        const isTop = z === maxStack;
+        let st = s;
+        if (s === 4) st = 4;
+        else if (!isTop) st = (s === 3 ? 3 : 2);
+        const topC = isTop ? palOf(s)[0] : palOf(st)[1];
+        drawBlock(c.x - cam.x, c.y - cam.y, z, st, topC);
       }
     }
 
-    ctx.save(); ctx.translate(originX, originY);
-    for (const c of cells) {
-      const h = hi(c.x, c.y), s = su(c.x, c.y);
-      const maxStack = Math.min(h, 10);
-      for (let z = 0; z <= maxStack; z++) {
-        const isTop = z === maxStack;
-        const st = (s === 4 && z === 0) ? 4 : (isTop ? s : (s === 3 ? 3 : 2));
-        drawBlock(c.x - cam.x, c.y - cam.y, z, st, isTop ? palOf(s)[0] : palOf(st)[1]);
+    // ---- PASS 2: structures (live height) ----
+    const stList = structures.slice().sort((a, b) => (a.x + a.y) - (b.x + b.y));
+    for (const s of stList) {
+      if (Math.abs(s.x - cam.x) > view + 2 || Math.abs(s.y - cam.y) > view + 2) continue;
+      s.h = hi(s.x, s.y); // live ground
+      drawStruct(s, s.x - cam.x, s.y - cam.y);
+    }
+
+    // ---- PASS 3: entities by depth ----
+    const dyn = [];
+    for (const e of ents) {
+      if (e.hp <= 0 || e.dead) continue;
+      dyn.push({ depth: e.x + e.y, e });
+    }
+    for (const d of drops) dyn.push({ depth: d.x + d.y + 0.01, drop: d });
+    for (const f of fx) dyn.push({ depth: f.x + f.y + 0.02, f });
+    for (const p of particles) dyn.push({ depth: p.x + p.y + 0.03, p });
+    dyn.sort((a, b) => a.depth - b.depth);
+
+    for (const item of dyn) {
+      if (item.e) drawMonster(item.e, item.e.x - cam.x, item.e.y - cam.y);
+      else if (item.drop) {
+        const d = item.drop;
+        const zh = groundH(d.x, d.y) + 0.55 + Math.sin(d.t * 10) * 0.12;
+        const p = w2s(d.x - cam.x, d.y - cam.y, zh);
+        ctx.fillStyle = d.k === 'water' ? '#3db4ff' : d.k === 'iron' ? '#a0b0c0' : '#ffd27a';
+        ctx.fillRect(p.sx - 5, p.sy - 5, 10, 10);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(p.sx - 2, p.sy - 2, 4, 4);
+      } else if (item.f) {
+        const f = item.f;
+        const p = w2s(f.x - cam.x, f.y - cam.y, groundH(f.x, f.y) + 0.8);
+        if (f.type === 'proj') {
+          ctx.fillStyle = f.color;
+          ctx.fillRect(p.sx - 4, p.sy - 4, 8, 8);
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(p.sx - 2, p.sy - 2, 4, 4);
+        } else {
+          ctx.globalAlpha = f.life / f.max;
+          ctx.strokeStyle = f.color;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.arc(p.sx, p.sy - 10, f.range * TW * 0.35, f.ang - 1.1, f.ang + 1.1);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      } else if (item.p) {
+        const p = item.p;
+        const s = w2s(p.x - cam.x, p.y - cam.y, p.z + groundH(p.x, p.y));
+        ctx.globalAlpha = clamp(p.life * 2, 0, 1);
+        ctx.fillStyle = p.c;
+        ctx.fillRect(s.sx - 3, s.sy - 3, 6, 6);
+        ctx.globalAlpha = 1;
       }
-      if (h === 0) drawBlock(c.x - cam.x, c.y - cam.y, 0, s, palOf(s)[0]);
-      flushDyn(c.x + c.y);
+    }
+
+    // ---- PASS 4: PLAYER always on top, oversized, outlined ----
+    {
+      const zh = groundH(player.x, player.y);
+      const wpn = player.job === 'archer' ? 'bow' : player.job === 'shooter' ? 'gun' : player.job === 'rogue' ? 'knife' : 'sword';
+      const flash = player.invuln > 0 && ((player.invuln * 20) | 0) % 2 === 0;
+      const col = flash ? '#ffffff' : JOBS[player.job].color;
+      // slight lift so feet sit on top face
+      drawChar(player.x - cam.x, player.y - cam.y, zh + 0.15, col, wpn);
+      // name plate so never "invisible"
+      const pp = w2s(player.x - cam.x, player.y - cam.y, zh + 0.15);
+      ctx.font = 'bold 11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(pp.sx - 22, pp.sy - 48, 44, 14);
+      ctx.fillStyle = '#ffe8a0';
+      ctx.fillText(JOBS[player.job].name, pp.sx, pp.sy - 37);
     }
     ctx.restore();
-    flushDyn(1e9);
   }
 
   function frame(t) {
