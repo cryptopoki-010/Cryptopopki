@@ -55,7 +55,7 @@ export function openApocalypse(br) {
   const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
 
-  const MAP = 42, TW = 34, TH = 17, BH = 11;
+  const MAP = 56, TW = 30, TH = 15, BH = 10;
   const Hmap = new Int8Array(MAP * MAP);
   const Surf = new Uint8Array(MAP * MAP);
   const hi = (x, y) => { x |= 0; y |= 0; return (x < 0 || y < 0 || x >= MAP || y >= MAP) ? 0 : Hmap[y * MAP + x]; };
@@ -81,14 +81,14 @@ export function openApocalypse(br) {
       Surf[y * MAP + x] = ((x * 3 + y * 7) % 5 === 0) ? 1 : 0;
     }
     // pyramid hill
-    for (let y = 24; y < 38; y++) for (let x = 24; x < 38; x++) {
-      const r = Math.hypot(x - 31, y - 31);
+    for (let y = 32; y < 50; y++) for (let x = 32; x < 50; x++) {
+      const r = Math.hypot(x - 40, y - 40);
       if (r < 8) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], Math.floor(6 - r * 0.6)); Surf[y * MAP + x] = 3; }
       else if (r < 10) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], 2); Surf[y * MAP + x] = 2; }
     }
     for (let s = 0; s < 6; s++) {
       const r = 5 - s;
-      for (let y = 31 - r; y <= 31 + r; y++) for (let x = 31 - r; x <= 31 + r; x++) {
+      for (let y = 40 - r; y <= 40 + r; y++) for (let x = 40 - r; x <= 40 + r; x++) {
         if (x >= 0 && y >= 0 && x < MAP && y < MAP) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], 4 + s); Surf[y * MAP + x] = 3; }
       }
     }
@@ -112,7 +112,7 @@ export function openApocalypse(br) {
     // rocky outcrops
     for (let i = 0; i < 32; i++) {
       const x = ri(2, MAP - 3), y = ri(2, MAP - 3);
-      if (Math.hypot(x - 31, y - 31) < 9) continue;
+      if (Math.hypot(x - 40, y - 40) < 9) continue;
       const h = ri(2, 5);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const xx = x + dx, yy = y + dy;
@@ -132,7 +132,7 @@ export function openApocalypse(br) {
   function buildStructures() {
     structures = [];
     const add = (x, y, kind, extra) => structures.push(Object.assign({ x, y, kind, h: hi(x, y) }, extra || {}));
-    [[26, 26], [36, 26], [26, 36], [36, 36], [28, 24], [34, 24], [28, 38], [34, 38]].forEach(([x, y]) => add(x, y, 'pillar', { tall: ri(4, 7) }));
+    [[34, 34], [46, 34], [34, 46], [46, 46], [36, 32], [44, 32], [36, 48], [44, 48], [30, 40], [50, 40]].forEach(([x, y]) => add(x, y, 'pillar', { tall: ri(4, 7) }));
     for (let i = 0; i < 14; i++) add(ri(22, 38), ri(22, 38), 'rubble', { n: ri(2, 5) });
     add(15, 28, 'obelisk', { tall: 7 }); add(33, 15, 'obelisk', { tall: 6 }); add(20, 20, 'obelisk', { tall: 5 });
     add(5, 20, 'tent'); add(6, 22, 'crate'); add(4, 21, 'crate'); add(7, 20, 'crate');
@@ -143,7 +143,7 @@ export function openApocalypse(br) {
     add(13, 14, 'gate'); add(17, 14, 'gate');
     for (let x = 3; x < 14; x++) if (x % 2 === 0) add(x, 19, 'wall', { tall: ri(2, 3) });
     // stairs up to pyramid
-    for (let i = 0; i < 6; i++) add(31 - 6 + i, 31 + 6, 'rubble', { n: 1 });
+    for (let i = 0; i < 8; i++) add(40 - 7 + i, 40 + 7, 'rubble', { n: 1 });
   }
 
   const JOBS = {
@@ -153,8 +153,8 @@ export function openApocalypse(br) {
     warrior: { name: '워리어', color: '#ff7a6a', speed: 2.5, range: 1.9, rate: 0.42, dmg: 22, melee: true, arc: 2.0, pierce: 0, knock: 2.2, gatherBonus: 1.3 }
   };
 
-  let W = 0, H = 0, dpr = 1, cam = { x: 11, y: 17 }, selectedJob = 'archer', running = false, autoHunt = false, last = 0, raf = 0;
-  const player = { x: 10, y: 16, hp: 100, mhp: 100, thirst: 100, fatigue: 100, dirX: 1, dirY: 0, atkCd: 0, invuln: 0, job: 'archer', kills: 0 };
+  let W = 0, H = 0, dpr = 1, cam = { x: 14, y: 20 }, selectedJob = 'archer', running = false, autoHunt = false, last = 0, raf = 0;
+  const player = { x: 10, y: 16, hp: 100, mhp: 100, thirst: 100, fatigue: 100, dirX: 1, dirY: 0, face: 2, atkCd: 0, atkAnim: 0, invuln: 0, job: 'archer', kills: 0, walkT: 0 };
   const inv = { meat: 0, hide: 0, bone: 0, iron: 0, wire: 0, concrete: 0, sand: 0, water: 0, can: 0 };
   const INV_LABEL = { meat: '고기', hide: '가죽', bone: '뼈', iron: '철', wire: '전선', concrete: '콘크리트', sand: '모래', water: '물', can: '통조림' };
   let ents = [], drops = [], fx = [], particles = [];
@@ -208,7 +208,7 @@ export function openApocalypse(br) {
   function spawnWorld() {
     genTerrain();
     // flatten spawn plateau so player is never buried
-    for (let y = 15; y <= 19; y++) for (let x = 9; x <= 13; x++) { Hmap[y * MAP + x] = 2; Surf[y * MAP + x] = 0; }
+    for (let y = 17; y <= 23; y++) for (let x = 11; x <= 17; x++) { Hmap[y * MAP + x] = 2; Surf[y * MAP + x] = 0; }
     buildStructures();
     ents = []; drops = []; fx = []; particles = [];
     for (let i = 0; i < 40; i++) { const x = rnd(2, MAP - 3), y = rnd(2, MAP - 3); if (su(x, y) === 4) continue; ents.push({ type: 'prop', kind: 'rock', x, y, hp: 40, mhp: 40, r: 0.5, drops: { sand: [1, 3], concrete: [0, 1] } }); }
@@ -216,11 +216,11 @@ export function openApocalypse(br) {
     for (let i = 0; i < 16; i++) { const x = rnd(2, 22), y = rnd(14, 38); if (su(x, y) === 4) continue; ents.push({ type: 'prop', kind: 'cactus', x, y, hp: 25, mhp: 25, r: 0.4, drops: { water: [0, 1], sand: [1, 1] } }); }
     for (let i = 0; i < 12; i++) ents.push({ type: 'animal', kind: 'jackal', x: rnd(4, 36), y: rnd(4, 36), hp: 28, mhp: 28, r: 0.4, speed: 1.6, drops: { meat: [1, 2], hide: [0, 1], bone: [0, 1] }, hurtT: 0 });
     for (let i = 0; i < 18; i++) ents.push({ type: 'monster', kind: 'sandling', x: rnd(5, 36), y: rnd(5, 36), hp: 36, mhp: 36, r: 0.45, speed: 1.4, dmg: 8, drops: { bone: [0, 1], sand: [1, 2], iron: [0, 1] }, hurtT: 0, atkCd: 0 });
-    ents.push({ type: 'monster', kind: 'sphinx', x: 31, y: 31, hp: 280, mhp: 280, r: 1.25, speed: 1.0, dmg: 16, drops: { iron: [3, 5], wire: [2, 4], bone: [2, 3], can: [1, 2] }, hurtT: 0, atkCd: 0, boss: true });
+    ents.push({ type: 'monster', kind: 'sphinx', x: 40, y: 40, hp: 280, mhp: 280, r: 1.25, speed: 1.0, dmg: 16, drops: { iron: [3, 5], wire: [2, 4], bone: [2, 3], can: [1, 2] }, hurtT: 0, atkCd: 0, boss: true });
   }
   function startGame() {
-    player.job = selectedJob; player.x = 11; player.y = 17; player.hp = player.mhp = 100; player.thirst = 100; player.fatigue = 100;
-    player.kills = 0; player.atkCd = 0; player.invuln = 0; player.dirX = 1; player.dirY = 0;
+    player.job = selectedJob; player.x = 14; player.y = 20; player.hp = player.mhp = 100; player.thirst = 100; player.fatigue = 100;
+    player.kills = 0; player.atkCd = 0; player.atkAnim = 0; player.invuln = 0; player.dirX = 1; player.dirY = 0; player.face = 2; player.walkT = 0;
     Object.keys(inv).forEach(k => inv[k] = 0); spawnWorld(); autoHunt = false; $('auto').classList.remove('on');
     $('title').classList.add('hidden'); $('dead').classList.add('hidden');
     ['hud', 'zone', 'topr', 'inv', 'pad', 'atk', 'auto'].forEach(id => $(id).classList.remove('hidden'));
@@ -229,7 +229,7 @@ export function openApocalypse(br) {
   }
   function tryAttack() {
     if (!running) return; const job = JOBS[player.job]; if (player.atkCd > 0) return;
-    player.atkCd = job.rate; player.fatigue = Math.max(0, player.fatigue - 1.2);
+    player.atkCd = job.rate; player.atkAnim = 0.28; player.fatigue = Math.max(0, player.fatigue - 1.2);
     const ang = Math.atan2(player.dirY, player.dirX);
     if (!job.melee) {
       const pellets = job.pellets || 1;
@@ -289,20 +289,27 @@ export function openApocalypse(br) {
       const nx = wx / ml, ny = wy / ml;
       const nx2 = player.x + nx * spd * dt, ny2 = player.y + ny * spd * dt;
       if (groundH(nx2, ny2) - groundH(player.x, player.y) <= 1.15) { player.x = nx2; player.y = ny2; }
-      player.dirX = nx; player.dirY = ny; player.fatigue = Math.max(0, player.fatigue - dt * 1.5);
-    } else player.fatigue = Math.min(100, player.fatigue + dt * 3.5);
+      player.dirX = nx; player.dirY = ny;
+      // iso face from movement
+      if (Math.abs(nx) > Math.abs(ny)) player.face = nx > 0 ? 1 : 3;
+      else player.face = ny > 0 ? 2 : 0;
+      player.walkT += dt * 8;
+      player.fatigue = Math.max(0, player.fatigue - dt * 1.5);
+    } else { player.fatigue = Math.min(100, player.fatigue + dt * 3.5); player.walkT = 0; }
     player.x = clamp(player.x, 1, MAP - 2); player.y = clamp(player.y, 1, MAP - 2);
-    player.atkCd = Math.max(0, player.atkCd - dt); player.invuln = Math.max(0, player.invuln - dt);
+    player.atkCd = Math.max(0, player.atkCd - dt); player.atkAnim = Math.max(0, (player.atkAnim || 0) - dt); player.invuln = Math.max(0, player.invuln - dt);
     if (atkHeld) tryAttack();
     player.thirst = Math.max(0, player.thirst - dt * 1.5);
     if (player.thirst <= 0) player.hp -= dt * 4;
-    if (Math.hypot(player.x - 31, player.y - 31) < 5) player.thirst = Math.max(0, player.thirst - dt);
+    if (Math.hypot(player.x - 40, player.y - 40) < 5) player.thirst = Math.max(0, player.thirst - dt);
     if (autoHunt) {
       let best = null, bd = 1e9;
       for (const e of ents) { if (e.dead || e.hp <= 0) continue; if (e.type === 'prop' && player.kills < 3) continue; const d = dist(player.x, player.y, e.x, e.y); if (d < bd) { bd = d; best = e; } }
       if (best) {
         const dx = best.x - player.x, dy = best.y - player.y, d = Math.hypot(dx, dy) || 1;
         player.dirX = dx / d; player.dirY = dy / d;
+        if (Math.abs(player.dirX) > Math.abs(player.dirY)) player.face = player.dirX > 0 ? 1 : 3;
+        else player.face = player.dirY > 0 ? 2 : 0;
         if (d > job.range * 0.85) {
           const nx = player.x + player.dirX * spd * dt, ny = player.y + player.dirY * spd * dt;
           if (groundH(nx, ny) - groundH(player.x, player.y) <= 1.15) { player.x = nx; player.y = ny; }
@@ -439,89 +446,143 @@ export function openApocalypse(br) {
     return '#' + [r, g, b].map(v => Math.round(clamp(v, 0, 255)).toString(16).padStart(2, '0')).join('');
   }
 
+
   function drawChar(px, py, pz, color, weapon) {
     const p = w2s(px, py, pz), x = p.sx, y = p.sy;
-    // soft ground shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    const face = player.face | 0; // 0 N, 1 E, 2 S, 3 W
+    const walking = player.walkT > 0 && (Math.hypot(moveX, moveY) > 0.08 || keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight || autoHunt);
+    const step = walking ? Math.floor(player.walkT) % 4 : 0;
+    const legA = [0, 1, 0, -1][step];
+    const legB = [0, -1, 0, 1][step];
+    const atk = player.atkAnim || 0;
+    const atkP = atk > 0 ? (1 - atk / 0.28) : 0; // 0→1 during swing
+    const sc = 0.72; // smaller character
+
+    // shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
-    ctx.ellipse(x, y + 8, 16, 7, 0, 0, TAU);
+    ctx.ellipse(x, y + 5 * sc, 11 * sc, 5 * sc, 0, 0, TAU);
     ctx.fill();
-    // outline body (black behind)
-    const O = '#120a08';
-    ctx.fillStyle = O;
-    ctx.fillRect(x - 9, y - 6, 8, 14);
-    ctx.fillRect(x + 1, y - 6, 8, 14);
-    ctx.fillRect(x - 11, y - 24, 22, 20);
-    ctx.fillRect(x - 9, y - 36, 18, 14);
-    // legs
-    ctx.fillStyle = '#1a2030';
-    ctx.fillRect(x - 8, y - 5, 6, 12);
-    ctx.fillRect(x + 2, y - 5, 6, 12);
-    // boots
-    ctx.fillStyle = '#0a0c10';
-    ctx.fillRect(x - 8, y + 5, 6, 4);
-    ctx.fillRect(x + 2, y + 5, 6, 4);
-    // torso
+
+    const flip = (face === 3); // face west → mirror
+    ctx.save();
+    ctx.translate(x, y);
+    if (flip) ctx.scale(-1, 1);
+
+    const skin = '#f0d2b0', hair = '#2a1a12', pants = '#1a2030', boot = '#0a0c10';
+    const ox = 0, oy = 0;
+
+    // legs (small)
+    ctx.fillStyle = pants;
+    ctx.fillRect((-5 + (flip ? 0 : 0)) * sc, (-2 + legA) * sc, 4 * sc, 8 * sc);
+    ctx.fillRect(1 * sc, (-2 + legB) * sc, 4 * sc, 8 * sc);
+    ctx.fillStyle = boot;
+    ctx.fillRect(-5 * sc, (5 + legA) * sc, 4 * sc, 3 * sc);
+    ctx.fillRect(1 * sc, (5 + legB) * sc, 4 * sc, 3 * sc);
+
+    // body
     ctx.fillStyle = color;
-    ctx.fillRect(x - 10, y - 22, 20, 18);
-    ctx.fillStyle = shade(color, 0.3);
-    ctx.fillRect(x - 10, y - 22, 20, 5);
-    ctx.fillStyle = shade(color, -0.25);
-    ctx.fillRect(x - 10, y - 8, 20, 4);
-    // belt
+    ctx.fillRect(-7 * sc, -16 * sc, 14 * sc, 14 * sc);
+    ctx.fillStyle = shade(color, 0.28);
+    ctx.fillRect(-7 * sc, -16 * sc, 14 * sc, 4 * sc);
     ctx.fillStyle = '#c8a040';
-    ctx.fillRect(x - 10, y - 6, 20, 3);
-    ctx.fillStyle = '#ffe080';
-    ctx.fillRect(x - 2, y - 6, 4, 3);
-    // arms
-    ctx.fillStyle = '#f0d2b0';
-    ctx.fillRect(x - 14, y - 20, 5, 12);
-    ctx.fillRect(x + 9, y - 20, 5, 12);
+    ctx.fillRect(-7 * sc, -4 * sc, 14 * sc, 2 * sc);
+
+    // arms — attack extends weapon arm
+    const armSwing = atk > 0 ? (-8 * Math.sin(atkP * Math.PI)) : 0;
+    ctx.fillStyle = skin;
+    // back arm
+    if (face === 0) {
+      // facing away — both arms thin
+      ctx.fillRect(-9 * sc, -14 * sc, 3 * sc, 9 * sc);
+      ctx.fillRect(6 * sc, -14 * sc, 3 * sc, 9 * sc);
+    } else {
+      ctx.fillRect(-10 * sc, (-14 + armSwing * 0.3) * sc, 4 * sc, 9 * sc);
+      ctx.fillRect(6 * sc, (-14 - armSwing) * sc, 4 * sc, 9 * sc);
+    }
+
     // head
-    ctx.fillStyle = '#f0d2b0';
-    ctx.fillRect(x - 8, y - 34, 16, 12);
-    ctx.fillStyle = '#2a1a12';
-    ctx.fillRect(x - 8, y - 34, 16, 4);
-    // eyes
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(x - 5, y - 28, 4, 4);
-    ctx.fillRect(x + 2, y - 28, 4, 4);
-    ctx.fillStyle = '#1a1018';
-    ctx.fillRect(x - 4, y - 27, 2, 2);
-    ctx.fillRect(x + 3, y - 27, 2, 2);
-    // weapon
+    if (face === 0) {
+      // back of head
+      ctx.fillStyle = hair;
+      ctx.fillRect(-6 * sc, -26 * sc, 12 * sc, 10 * sc);
+      ctx.fillStyle = skin;
+      ctx.fillRect(-5 * sc, -22 * sc, 10 * sc, 6 * sc);
+    } else {
+      ctx.fillStyle = skin;
+      ctx.fillRect(-6 * sc, -26 * sc, 12 * sc, 10 * sc);
+      ctx.fillStyle = hair;
+      ctx.fillRect(-6 * sc, -26 * sc, 12 * sc, 3 * sc);
+      // eyes toward face dir
+      ctx.fillStyle = '#fff';
+      const eyeShift = face === 1 ? 1 : face === 3 ? -1 : 0;
+      ctx.fillRect((-4 + eyeShift) * sc, -21 * sc, 3 * sc, 3 * sc);
+      ctx.fillRect((2 + eyeShift) * sc, -21 * sc, 3 * sc, 3 * sc);
+      ctx.fillStyle = '#1a1018';
+      ctx.fillRect((-3 + eyeShift) * sc, -20 * sc, 2 * sc, 2 * sc);
+      ctx.fillRect((3 + eyeShift) * sc, -20 * sc, 2 * sc, 2 * sc);
+    }
+
+    // weapons with attack motion
+    const wExt = atk > 0 ? 6 * Math.sin(atkP * Math.PI) : 0;
     if (weapon === 'bow') {
       ctx.strokeStyle = '#8a5a28';
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2 * sc;
       ctx.beginPath();
-      ctx.arc(x + 16, y - 16, 12, -1.2, 1.2);
+      ctx.arc(10 * sc, -12 * sc, 8 * sc, -1.1, 1.1);
       ctx.stroke();
-      ctx.strokeStyle = '#e8d8b0';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x + 16, y - 28);
-      ctx.lineTo(x + 16, y - 4);
-      ctx.stroke();
+      if (atk > 0) {
+        // arrow flight
+        ctx.strokeStyle = '#d0d0d0';
+        ctx.beginPath();
+        ctx.moveTo(4 * sc, -12 * sc);
+        ctx.lineTo((14 + wExt * 2) * sc, -12 * sc);
+        ctx.stroke();
+      }
     } else if (weapon === 'gun') {
       ctx.fillStyle = '#3a4048';
-      ctx.fillRect(x + 10, y - 18, 16, 6);
-      ctx.fillStyle = '#1a1e24';
-      ctx.fillRect(x + 24, y - 17, 6, 4);
+      const gx = (8 + wExt) * sc;
+      ctx.fillRect(gx, -14 * sc, 12 * sc, 4 * sc);
+      if (atk > 0) {
+        ctx.fillStyle = '#ffcc66';
+        ctx.fillRect((20 + wExt) * sc, -15 * sc, 5 * sc, 5 * sc);
+      }
     } else if (weapon === 'knife') {
       ctx.fillStyle = '#d0d8e0';
-      ctx.fillRect(x + 10, y - 22, 4, 16);
+      const ky = (-18 - wExt) * sc;
+      ctx.fillRect(8 * sc, ky, 3 * sc, 12 * sc);
       ctx.fillStyle = '#8a6030';
-      ctx.fillRect(x + 10, y - 8, 4, 5);
+      ctx.fillRect(8 * sc, ky + 10 * sc, 3 * sc, 4 * sc);
+      // slash arc
+      if (atk > 0) {
+        ctx.strokeStyle = 'rgba(200,240,255,0.7)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(4 * sc, -10 * sc, (10 + wExt) * sc, -0.8 + atkP, 0.8 + atkP);
+        ctx.stroke();
+      }
     } else {
+      // sword
+      const ang = atk > 0 ? -1.2 + atkP * 2.4 : -0.3;
+      ctx.save();
+      ctx.translate(8 * sc, -10 * sc);
+      ctx.rotate(ang);
       ctx.fillStyle = '#c8d0d8';
-      ctx.fillRect(x + 12, y - 38, 5, 28);
+      ctx.fillRect(-2 * sc, -22 * sc, 4 * sc, 24 * sc);
       ctx.fillStyle = '#e8eef4';
-      ctx.fillRect(x + 13, y - 38, 2, 28);
+      ctx.fillRect(-1 * sc, -22 * sc, 2 * sc, 24 * sc);
       ctx.fillStyle = '#c8a040';
-      ctx.fillRect(x + 10, y - 14, 9, 4);
-      ctx.fillStyle = '#6a4020';
-      ctx.fillRect(x + 13, y - 10, 3, 6);
+      ctx.fillRect(-4 * sc, 0, 8 * sc, 3 * sc);
+      ctx.restore();
+      if (atk > 0) {
+        ctx.strokeStyle = 'rgba(255,220,150,0.55)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(4 * sc, -12 * sc, 18 * sc, ang - 0.5, ang + 0.5);
+        ctx.stroke();
+      }
     }
+    ctx.restore();
   }
 
   function drawMonster(e, ox, oy) {
@@ -575,7 +636,7 @@ export function openApocalypse(br) {
     // camera centers on player; vertical bias so character stays on screen
     const originX = W * 0.5;
     const originY = H * 0.42;
-    const view = 11;
+    const view = 15;
     const cx = Math.floor(cam.x), cy = Math.floor(cam.y);
 
     // ---- PASS 1: terrain only (dense stacks) ----
