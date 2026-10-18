@@ -62,7 +62,7 @@ export function openApocalypse(br) {
   const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
 
-  const MAP = 64, TW = 28, TH = 14, BH = 9;
+  const MAP = 72, TW = 18, TH = 9, BH = 5;
   const Hmap = new Int8Array(MAP * MAP);
   const Surf = new Uint8Array(MAP * MAP);
   const hi = (x, y) => { x |= 0; y |= 0; return (x < 0 || y < 0 || x >= MAP || y >= MAP) ? 0 : Hmap[y * MAP + x]; };
@@ -80,22 +80,22 @@ export function openApocalypse(br) {
 
   function genTerrain() {
     for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
-      const n = Math.sin(x * 0.45) * Math.cos(y * 0.4) + Math.sin((x + y) * 0.28) * 0.7 + Math.sin(x * 1.1 + y * 0.7) * 0.35 + Math.sin(x * 2.3) * Math.cos(y * 1.9) * 0.2;
-      let h = Math.max(0, Math.floor((n + 1.4) * 2.1));
+      const n = Math.sin(x * 0.55) * Math.cos(y * 0.5) + Math.sin((x + y) * 0.35) * 0.65 + Math.sin(x * 1.4 + y * 0.9) * 0.3 + Math.sin(x * 2.8) * Math.cos(y * 2.2) * 0.18 + Math.sin(x * 4.1 + y * 3.3) * 0.08;
+      let h = Math.max(0, Math.floor((n + 1.45) * 3.2));
       const edge = Math.min(x, y, MAP - 1 - x, MAP - 1 - y);
       if (edge < 3) h = Math.max(0, h - (3 - edge));
       Hmap[y * MAP + x] = h;
       Surf[y * MAP + x] = ((x * 3 + y * 7) % 4 === 0) ? 1 : ((x + y * 2) % 11 === 0) ? 2 : 0;
     }
     // pyramid hill
-    for (let y = 38; y < 58; y++) for (let x = 38; x < 58; x++) {
-      const r = Math.hypot(x - 48, y - 48);
+    for (let y = 44; y < 64; y++) for (let x = 44; x < 64; x++) {
+      const r = Math.hypot(x - 54, y - 54);
       if (r < 8) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], Math.floor(6 - r * 0.6)); Surf[y * MAP + x] = 3; }
       else if (r < 10) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], 2); Surf[y * MAP + x] = 2; }
     }
     for (let s = 0; s < 6; s++) {
       const r = 5 - s;
-      for (let y = 48 - r; y <= 48 + r; y++) for (let x = 48 - r; x <= 48 + r; x++) {
+      for (let y = 54 - r; y <= 54 + r; y++) for (let x = 54 - r; x <= 54 + r; x++) {
         if (x >= 0 && y >= 0 && x < MAP && y < MAP) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], 4 + s); Surf[y * MAP + x] = 3; }
       }
     }
@@ -119,7 +119,7 @@ export function openApocalypse(br) {
     // rocky outcrops
     for (let i = 0; i < 32; i++) {
       const x = ri(2, MAP - 3), y = ri(2, MAP - 3);
-      if (Math.hypot(x - 48, y - 48) < 9) continue;
+      if (Math.hypot(x - 54, y - 54) < 9) continue;
       const h = ri(2, 5);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const xx = x + dx, yy = y + dy;
@@ -136,6 +136,17 @@ export function openApocalypse(br) {
   }
 
   let structures = [];
+      // smooth pass — gentler slopes (half-block feel with small BH)
+    const tmpH = new Int8Array(Hmap);
+    for (let y = 1; y < MAP - 1; y++) {
+      for (let x = 1; x < MAP - 1; x++) {
+        const i = y * MAP + x;
+        const a = tmpH[i] + tmpH[i - 1] + tmpH[i + 1] + tmpH[i - MAP] + tmpH[i + MAP];
+        Hmap[i] = Math.round(a / 5);
+      }
+    }
+  }
+
   function buildStructures() {
     structures = [];
     const add = (x, y, kind, extra) => structures.push(Object.assign({ x, y, kind, h: hi(x, y) }, extra || {}));
@@ -150,7 +161,7 @@ export function openApocalypse(br) {
     add(13, 14, 'gate'); add(17, 14, 'gate');
     for (let x = 3; x < 14; x++) if (x % 2 === 0) add(x, 19, 'wall', { tall: ri(2, 3) });
     // stairs up to pyramid
-    for (let i = 0; i < 8; i++) add(48 - 7 + i, 48 + 7, 'rubble', { n: 1 });
+    for (let i = 0; i < 8; i++) add(54 - 7 + i, 54 + 7, 'rubble', { n: 1 });
   }
 
   const JOBS = {
@@ -264,7 +275,7 @@ export function openApocalypse(br) {
     for (let i = 0; i < 16; i++) { const x = rnd(2, 22), y = rnd(14, 38); if (su(x, y) === 4) continue; ents.push({ type: 'prop', kind: 'cactus', x, y, hp: 25, mhp: 25, r: 0.4, drops: { water: [0, 1], sand: [1, 1] } }); }
     for (let i = 0; i < 12; i++) ents.push({ type: 'animal', kind: 'jackal', x: rnd(4, 36), y: rnd(4, 36), hp: 28, mhp: 28, r: 0.4, speed: 1.6, drops: { meat: [1, 2], hide: [0, 1], bone: [0, 1] }, hurtT: 0 });
     for (let i = 0; i < 18; i++) ents.push({ type: 'monster', kind: 'sandling', x: rnd(5, 36), y: rnd(5, 36), hp: 36, mhp: 36, r: 0.45, speed: 1.4, dmg: 8, drops: { bone: [0, 1], sand: [1, 2], iron: [0, 1] }, hurtT: 0, atkCd: 0 });
-    ents.push({ type: 'monster', kind: 'sphinx', x: 48, y: 48, hp: 280, mhp: 280, r: 1.25, speed: 1.0, dmg: 16, drops: { iron: [3, 5], wire: [2, 4], bone: [2, 3], can: [1, 2] }, hurtT: 0, atkCd: 0, boss: true });
+    ents.push({ type: 'monster', kind: 'sphinx', x: 54, y: 54, hp: 280, mhp: 280, r: 1.25, speed: 1.0, dmg: 16, drops: { iron: [3, 5], wire: [2, 4], bone: [2, 3], can: [1, 2] }, hurtT: 0, atkCd: 0, boss: true });
   }
   function startGame() {
     player.job = selectedJob; player.x = 14; player.y = 20; player.hp = player.mhp = 100; player.thirst = 100; player.fatigue = 100;
@@ -360,13 +371,15 @@ export function openApocalypse(br) {
       else player.face = 3; // W
       player.walkT += dt * 12;
       player.fatigue = Math.max(0, player.fatigue - dt * 1.5);
-    } else { player.fatigue = Math.min(100, player.fatigue + dt * 3.5); player.walkT = 0; }
+    } else if (!autoHunt) { player.fatigue = Math.min(100, player.fatigue + dt * 3.5); player.walkT = 0; } else { player.fatigue = Math.min(100, player.fatigue + dt * 1.5); }
     player.x = clamp(player.x, 1, MAP - 2); player.y = clamp(player.y, 1, MAP - 2);
     player.atkCd = Math.max(0, player.atkCd - dt); player.atkAnim = Math.max(0, (player.atkAnim || 0) - dt); player.invuln = Math.max(0, player.invuln - dt);
+    // auto-walk-tick: keep leg cycle while AUTO chasing
+    if (autoHunt) player.walkT += dt * 12;
     if (atkHeld) tryAttack();
     player.thirst = Math.max(0, player.thirst - dt * 1.5);
     if (player.thirst <= 0) player.hp -= dt * 4;
-    if (Math.hypot(player.x - 48, player.y - 48) < 5) player.thirst = Math.max(0, player.thirst - dt);
+    if (Math.hypot(player.x - 54, player.y - 54) < 5) player.thirst = Math.max(0, player.thirst - dt);
     if (autoHunt) {
       let best = null, bd = 1e9;
       for (const e of ents) { if (e.dead || e.hp <= 0) continue; if (e.type === 'prop' && player.kills < 3) continue; const d = dist(player.x, player.y, e.x, e.y); if (d < bd) { bd = d; best = e; } }
@@ -375,6 +388,7 @@ export function openApocalypse(br) {
         player.dirX = dx / d; player.dirY = dy / d;
         if (Math.abs(player.dirX) > Math.abs(player.dirY)) player.face = player.dirX > 0 ? 1 : 3;
         else player.face = player.dirY > 0 ? 2 : 0;
+        player.walkT += 0.2; // anim tick; real dt added below
         if (d > job.range * 0.85) {
           const nx = player.x + player.dirX * spd * dt, ny = player.y + player.dirY * spd * dt;
           if (groundH(nx, ny) - groundH(player.x, player.y) <= 1.15) { player.x = nx; player.y = ny; }
@@ -544,10 +558,9 @@ export function openApocalypse(br) {
   function drawChar(px, py, pz, color, weapon) {
     const p = w2s(px, py, pz);
     const face = player.face | 0;
-    const moving = Math.hypot(player.dirX, player.dirY) > 0.01 && (
-      Math.hypot(moveX, moveY) > 0.05 || keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD ||
-      keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight || autoHunt
-    );
+    const stickMove = Math.hypot(moveX, moveY) > 0.05 || keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD ||
+      keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight;
+    const moving = stickMove || autoHunt || player.walkT > 0.05;
     const frame = moving ? Math.floor(player.walkT) % 4 : 0;
     const attacking = (player.atkAnim || 0) > 0;
     const flash = false; // no white flash
@@ -613,7 +626,7 @@ export function openApocalypse(br) {
 
     const originX = W * 0.5;
     const originY = H * 0.42;
-    const view = 14;
+    const view = 20;
     const cx = Math.floor(cam.x), cy = Math.floor(cam.y);
 
     const cells = [];
@@ -630,7 +643,7 @@ export function openApocalypse(br) {
     for (const c of cells) {
       const h = hi(c.x, c.y);
       const s = su(c.x, c.y);
-      const maxStack = Math.min(Math.max(h, 0), 12);
+      const maxStack = Math.min(Math.max(h, 0), 18);
       for (let z = 0; z <= maxStack; z++) {
         const isTop = z === maxStack;
         let st = s;
