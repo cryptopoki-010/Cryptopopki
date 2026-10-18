@@ -9,6 +9,12 @@ const APCSS = `.apoc{position:fixed;inset:0;z-index:9000;background:#0b0e14;colo
 .apoc .bar.hp i{background:linear-gradient(90deg,#a01a14,#e8453c)}
 .apoc .bar.th i{background:linear-gradient(90deg,#156a9a,#3db4ff)}
 .apoc .bar.ft i{background:linear-gradient(90deg,#9a7010,#f0b429)}
+.apoc .bar.xp i{background:linear-gradient(90deg,#3a6a20,#7dff6a)}
+.apoc #bag{position:absolute;right:28px;bottom:calc(168px + env(safe-area-inset-bottom,0));width:52px;height:52px;border-radius:14px;border:2px solid #c8a040;background:rgba(20,26,36,.92);color:#ffd27a;font-weight:800;font-size:20px;z-index:6}
+.apoc #bagpanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(340px,92vw);max-height:70dvh;overflow:auto;background:#141a24;border:1px solid #243044;border-radius:16px;padding:16px;z-index:25}
+.apoc #bagpanel h3{margin:0 0 10px;font-size:16px;color:#ffd27a}
+.apoc #bagpanel .row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #243044;font-size:13px}
+.apoc #bagpanel .closeb{width:100%;margin-top:12px;height:40px;border:0;border-radius:10px;background:#243044;color:#e8edf5;font-weight:700}
 .apoc .bar span{position:absolute;inset:0;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;text-shadow:0 1px 2px #000}
 .apoc #topr{position:absolute;right:48px;top:calc(8px + env(safe-area-inset-top,0));text-align:right;font-size:11px;font-weight:600;pointer-events:none;text-shadow:0 1px 3px #000}
 .apoc #topr b{display:block;font-size:13px;color:#ffd27a}
@@ -42,7 +48,7 @@ export function openApocalypse(br) {
   const prevOv = document.body.style.overflow;
   const root = document.createElement('div');
   root.className = 'apoc';
-  root.innerHTML = '<button type="button" class="apx" aria-label="닫기">✕</button><canvas id="g"></canvas><div id="hud" class="hidden"><div class="bars"><div class="bar hp"><i id="bhp" style="width:100%"></i><span>HP</span></div><div class="bar th"><i id="bth" style="width:100%"></i><span>목마름</span></div><div class="bar ft"><i id="bft" style="width:100%"></i><span>피로</span></div></div></div><div id="zone" class="hidden">제1구역 · 이집트 피라미드</div><div id="topr" class="hidden"><b id="kills">처치 0</b><span id="lootn">재료 0</span></div><div id="inv" class="hidden"></div><div id="pad" class="hidden"><div id="stick"><div id="knob"></div></div></div><button id="atk" class="hidden" type="button">공격</button><button id="auto" class="hidden" type="button">AUTO</button><div id="toast"></div><div id="title" class="overlay"><div class="card"><h1>7대 불가사의 생존</h1><p>높이맵 아이소 블록 · 오아시스·유적·피라미드<br><b style="color:#ffd27a">제1구역 이집트</b></p><h2>직업</h2><div class="jobs"><button class="job" type="button" data-job="archer"><b>궁수</b><small>원거리 관통</small></button><button class="job" type="button" data-job="rogue"><b>로그</b><small>초근접 연타</small></button><button class="job" type="button" data-job="warrior"><b>워리어</b><small>광역 베기</small></button><button class="job" type="button" data-job="shooter"><b>슈터</b><small>산탄</small></button></div><button class="btn" id="start" type="button">생존 시작</button></div></div><div id="dead" class="overlay hidden"><div class="card" style="text-align:center"><h1>사망</h1><p id="deadmsg"></p><button class="btn" id="retry" type="button">다시 도전</button></div></div>';
+  root.innerHTML = '<button type="button" class="apx" aria-label="닫기">✕</button><canvas id="g"></canvas><div id="hud" class="hidden"><div class="bars"><div class="bar hp"><i id="bhp" style="width:100%"></i><span>HP</span></div><div class="bar th"><i id="bth" style="width:100%"></i><span>목마름</span></div><div class="bar ft"><i id="bft" style="width:100%"></i><span>피로</span></div><div class="bar xp"><i id="bxp" style="width:0%"></i><span id="blv">Lv.1</span></div></div></div><div id="zone" class="hidden">제1구역 · 이집트 피라미드</div><div id="topr" class="hidden"><b id="kills">처치 0</b><span id="lootn">재료 0</span></div><div id="inv" class="hidden"></div><div id="pad" class="hidden"><div id="stick"><div id="knob"></div></div></div><button id="atk" class="hidden" type="button">공격</button><button id="auto" class="hidden" type="button">AUTO</button><button id="bag" class="hidden" type="button" aria-label="배낭">🎒</button><div id="bagpanel" class="hidden"><h3>배낭</h3><div id="baglist"></div><div style="margin-top:10px;font-size:12px;color:#8b95a8">탭해서 사용 · 물/고기/통조림 회복</div><button type="button" class="closeb" id="bagclose">닫기</button></div><div id="toast"></div><div id="title" class="overlay"><div class="card"><h1>7대 불가사의 생존</h1><p>높이맵 아이소 블록 · 오아시스·유적·피라미드<br><b style="color:#ffd27a">제1구역 이집트</b></p><h2>직업</h2><div class="jobs"><button class="job" type="button" data-job="archer"><b>궁수</b><small>원거리 관통</small></button><button class="job" type="button" data-job="rogue"><b>로그</b><small>초근접 연타</small></button><button class="job" type="button" data-job="warrior"><b>워리어</b><small>광역 베기</small></button><button class="job" type="button" data-job="shooter"><b>슈터</b><small>산탄</small></button></div><button class="btn" id="start" type="button">생존 시작</button></div></div><div id="dead" class="overlay hidden"><div class="card" style="text-align:center"><h1>사망</h1><p id="deadmsg"></p><button class="btn" id="retry" type="button">다시 도전</button></div></div>';
   document.body.appendChild(root);
   document.body.style.overflow = 'hidden';
   let alive = true;
@@ -55,7 +61,7 @@ export function openApocalypse(br) {
   const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const dist = (ax, ay, bx, by) => Math.hypot(bx - ax, by - ay);
 
-  const MAP = 56, TW = 30, TH = 15, BH = 10;
+  const MAP = 64, TW = 22, TH = 11, BH = 7;
   const Hmap = new Int8Array(MAP * MAP);
   const Surf = new Uint8Array(MAP * MAP);
   const hi = (x, y) => { x |= 0; y |= 0; return (x < 0 || y < 0 || x >= MAP || y >= MAP) ? 0 : Hmap[y * MAP + x]; };
@@ -73,22 +79,22 @@ export function openApocalypse(br) {
 
   function genTerrain() {
     for (let y = 0; y < MAP; y++) for (let x = 0; x < MAP; x++) {
-      const n = Math.sin(x * 0.31) * Math.cos(y * 0.28) + Math.sin((x + y) * 0.18) * 0.8 + Math.sin(x * 0.7 + y * 0.45) * 0.45;
-      let h = Math.max(0, Math.floor((n + 1.35) * 1.55));
+      const n = Math.sin(x * 0.45) * Math.cos(y * 0.4) + Math.sin((x + y) * 0.28) * 0.7 + Math.sin(x * 1.1 + y * 0.7) * 0.35 + Math.sin(x * 2.3) * Math.cos(y * 1.9) * 0.2;
+      let h = Math.max(0, Math.floor((n + 1.4) * 2.1));
       const edge = Math.min(x, y, MAP - 1 - x, MAP - 1 - y);
       if (edge < 3) h = Math.max(0, h - (3 - edge));
       Hmap[y * MAP + x] = h;
-      Surf[y * MAP + x] = ((x * 3 + y * 7) % 5 === 0) ? 1 : 0;
+      Surf[y * MAP + x] = ((x * 3 + y * 7) % 4 === 0) ? 1 : ((x + y * 2) % 11 === 0) ? 2 : 0;
     }
     // pyramid hill
-    for (let y = 32; y < 50; y++) for (let x = 32; x < 50; x++) {
-      const r = Math.hypot(x - 40, y - 40);
+    for (let y = 38; y < 58; y++) for (let x = 38; x < 58; x++) {
+      const r = Math.hypot(x - 48, y - 48);
       if (r < 8) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], Math.floor(6 - r * 0.6)); Surf[y * MAP + x] = 3; }
       else if (r < 10) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], 2); Surf[y * MAP + x] = 2; }
     }
     for (let s = 0; s < 6; s++) {
       const r = 5 - s;
-      for (let y = 40 - r; y <= 40 + r; y++) for (let x = 40 - r; x <= 40 + r; x++) {
+      for (let y = 48 - r; y <= 48 + r; y++) for (let x = 48 - r; x <= 48 + r; x++) {
         if (x >= 0 && y >= 0 && x < MAP && y < MAP) { Hmap[y * MAP + x] = Math.max(Hmap[y * MAP + x], 4 + s); Surf[y * MAP + x] = 3; }
       }
     }
@@ -112,7 +118,7 @@ export function openApocalypse(br) {
     // rocky outcrops
     for (let i = 0; i < 32; i++) {
       const x = ri(2, MAP - 3), y = ri(2, MAP - 3);
-      if (Math.hypot(x - 40, y - 40) < 9) continue;
+      if (Math.hypot(x - 48, y - 48) < 9) continue;
       const h = ri(2, 5);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
         const xx = x + dx, yy = y + dy;
@@ -132,7 +138,7 @@ export function openApocalypse(br) {
   function buildStructures() {
     structures = [];
     const add = (x, y, kind, extra) => structures.push(Object.assign({ x, y, kind, h: hi(x, y) }, extra || {}));
-    [[34, 34], [46, 34], [34, 46], [46, 46], [36, 32], [44, 32], [36, 48], [44, 48], [30, 40], [50, 40]].forEach(([x, y]) => add(x, y, 'pillar', { tall: ri(4, 7) }));
+    [[42, 42], [54, 42], [42, 54], [54, 54], [44, 40], [52, 40], [44, 56], [52, 56], [38, 48], [58, 48], [48, 38], [48, 58]].forEach(([x, y]) => add(x, y, 'pillar', { tall: ri(4, 7) }));
     for (let i = 0; i < 14; i++) add(ri(22, 38), ri(22, 38), 'rubble', { n: ri(2, 5) });
     add(15, 28, 'obelisk', { tall: 7 }); add(33, 15, 'obelisk', { tall: 6 }); add(20, 20, 'obelisk', { tall: 5 });
     add(5, 20, 'tent'); add(6, 22, 'crate'); add(4, 21, 'crate'); add(7, 20, 'crate');
@@ -143,7 +149,7 @@ export function openApocalypse(br) {
     add(13, 14, 'gate'); add(17, 14, 'gate');
     for (let x = 3; x < 14; x++) if (x % 2 === 0) add(x, 19, 'wall', { tall: ri(2, 3) });
     // stairs up to pyramid
-    for (let i = 0; i < 8; i++) add(40 - 7 + i, 40 + 7, 'rubble', { n: 1 });
+    for (let i = 0; i < 8; i++) add(48 - 7 + i, 48 + 7, 'rubble', { n: 1 });
   }
 
   const JOBS = {
@@ -154,7 +160,7 @@ export function openApocalypse(br) {
   };
 
   let W = 0, H = 0, dpr = 1, cam = { x: 14, y: 20 }, selectedJob = 'archer', running = false, autoHunt = false, last = 0, raf = 0;
-  const player = { x: 10, y: 16, hp: 100, mhp: 100, thirst: 100, fatigue: 100, dirX: 1, dirY: 0, face: 2, atkCd: 0, atkAnim: 0, invuln: 0, job: 'archer', kills: 0, walkT: 0 };
+  const player = { x: 10, y: 16, hp: 100, mhp: 100, thirst: 100, fatigue: 100, dirX: 1, dirY: 0, face: 2, atkCd: 0, atkAnim: 0, invuln: 0, job: 'archer', kills: 0, walkT: 0, lv: 1, exp: 0, expMax: 40 };
   const inv = { meat: 0, hide: 0, bone: 0, iron: 0, wire: 0, concrete: 0, sand: 0, water: 0, can: 0 };
   const INV_LABEL = { meat: '고기', hide: '가죽', bone: '뼈', iron: '철', wire: '전선', concrete: '콘크리트', sand: '모래', water: '물', can: '통조림' };
   let ents = [], drops = [], fx = [], particles = [];
@@ -186,6 +192,9 @@ export function openApocalypse(br) {
   $('atk').addEventListener('pointerup', () => { atkHeld = false; });
   $('atk').addEventListener('pointerleave', () => { atkHeld = false; });
   $('auto').addEventListener('click', toggleAuto);
+  $('bag').addEventListener('click', openBag);
+  $('bagclose').addEventListener('click', closeBag);
+
   function toggleAuto() { autoHunt = !autoHunt; $('auto').classList.toggle('on', autoHunt); toast(autoHunt ? '자동사냥 ON' : '자동사냥 OFF'); }
   let toastT = 0;
   function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 1500); }
@@ -193,11 +202,48 @@ export function openApocalypse(br) {
     $('bhp').style.width = (100 * player.hp / player.mhp) + '%';
     $('bth').style.width = player.thirst + '%';
     $('bft').style.width = player.fatigue + '%';
+    const xpEl = $('bxp'); if (xpEl) xpEl.style.width = (100 * player.exp / player.expMax) + '%';
+    const lvEl = $('blv'); if (lvEl) lvEl.textContent = 'Lv.' + player.lv;
     $('kills').textContent = '처치 ' + player.kills;
     $('lootn').textContent = '재료 ' + Object.values(inv).reduce((a, b) => a + b, 0);
     const lines = Object.keys(inv).filter(k => inv[k] > 0).map(k => INV_LABEL[k] + ' ' + inv[k]);
     $('inv').textContent = lines.length ? lines.join(' · ') : '인벤토리 비움';
   }
+  function gainExp(n) {
+    player.exp += n;
+    while (player.exp >= player.expMax) {
+      player.exp -= player.expMax;
+      player.lv++;
+      player.expMax = Math.floor(40 * Math.pow(1.35, player.lv - 1));
+      player.mhp = 100 + (player.lv - 1) * 12;
+      player.hp = Math.min(player.mhp, player.hp + 20);
+      toast('레벨 업! Lv.' + player.lv);
+    }
+    updHUD();
+  }
+  function openBag() {
+    const list = $('baglist');
+    const keys = Object.keys(inv).filter(k => inv[k] > 0);
+    if (!keys.length) list.innerHTML = '<div class="row"><span>비어 있음</span></div>';
+    else list.innerHTML = keys.map(k => {
+      const usable = (k === 'water' || k === 'meat' || k === 'can');
+      return '<div class="row" data-item="' + k + '" style="cursor:' + (usable ? 'pointer' : 'default') + '"><span>' + INV_LABEL[k] + (usable ? ' · 탭하여 사용' : '') + '</span><b>×' + inv[k] + '</b></div>';
+    }).join('');
+    list.querySelectorAll('[data-item]').forEach(row => {
+      row.onclick = () => {
+        const k = row.getAttribute('data-item');
+        if (!inv[k]) return;
+        if (k === 'water') { inv[k]--; player.thirst = Math.min(100, player.thirst + 25); toast('물을 마셨다'); }
+        else if (k === 'meat') { inv[k]--; player.hp = Math.min(player.mhp, player.hp + 18); player.thirst = Math.min(100, player.thirst + 5); toast('고기를 먹었다'); }
+        else if (k === 'can') { inv[k]--; player.hp = Math.min(player.mhp, player.hp + 30); player.thirst = Math.min(100, player.thirst + 15); toast('통조림을 먹었다'); }
+        else return;
+        updHUD(); openBag();
+      };
+    });
+    $('bagpanel').classList.remove('hidden');
+  }
+  function closeBag() { $('bagpanel').classList.add('hidden'); }
+
   root.querySelectorAll('.job').forEach(btn => {
     btn.addEventListener('click', () => { selectedJob = btn.dataset.job; root.querySelectorAll('.job').forEach(b => b.style.borderColor = ''); btn.style.borderColor = JOBS[selectedJob].color; });
   });
@@ -216,14 +262,14 @@ export function openApocalypse(br) {
     for (let i = 0; i < 16; i++) { const x = rnd(2, 22), y = rnd(14, 38); if (su(x, y) === 4) continue; ents.push({ type: 'prop', kind: 'cactus', x, y, hp: 25, mhp: 25, r: 0.4, drops: { water: [0, 1], sand: [1, 1] } }); }
     for (let i = 0; i < 12; i++) ents.push({ type: 'animal', kind: 'jackal', x: rnd(4, 36), y: rnd(4, 36), hp: 28, mhp: 28, r: 0.4, speed: 1.6, drops: { meat: [1, 2], hide: [0, 1], bone: [0, 1] }, hurtT: 0 });
     for (let i = 0; i < 18; i++) ents.push({ type: 'monster', kind: 'sandling', x: rnd(5, 36), y: rnd(5, 36), hp: 36, mhp: 36, r: 0.45, speed: 1.4, dmg: 8, drops: { bone: [0, 1], sand: [1, 2], iron: [0, 1] }, hurtT: 0, atkCd: 0 });
-    ents.push({ type: 'monster', kind: 'sphinx', x: 40, y: 40, hp: 280, mhp: 280, r: 1.25, speed: 1.0, dmg: 16, drops: { iron: [3, 5], wire: [2, 4], bone: [2, 3], can: [1, 2] }, hurtT: 0, atkCd: 0, boss: true });
+    ents.push({ type: 'monster', kind: 'sphinx', x: 48, y: 48, hp: 280, mhp: 280, r: 1.25, speed: 1.0, dmg: 16, drops: { iron: [3, 5], wire: [2, 4], bone: [2, 3], can: [1, 2] }, hurtT: 0, atkCd: 0, boss: true });
   }
   function startGame() {
     player.job = selectedJob; player.x = 14; player.y = 20; player.hp = player.mhp = 100; player.thirst = 100; player.fatigue = 100;
-    player.kills = 0; player.atkCd = 0; player.atkAnim = 0; player.invuln = 0; player.dirX = 1; player.dirY = 0; player.face = 2; player.walkT = 0;
+    player.kills = 0; player.atkCd = 0; player.atkAnim = 0; player.invuln = 0; player.dirX = 1; player.dirY = 0; player.face = 2; player.walkT = 0; player.lv = 1; player.exp = 0; player.expMax = 40; player.mhp = 100; player.hp = 100;
     Object.keys(inv).forEach(k => inv[k] = 0); spawnWorld(); autoHunt = false; $('auto').classList.remove('on');
     $('title').classList.add('hidden'); $('dead').classList.add('hidden');
-    ['hud', 'zone', 'topr', 'inv', 'pad', 'atk', 'auto'].forEach(id => $(id).classList.remove('hidden'));
+    ['hud', 'zone', 'topr', 'inv', 'pad', 'atk', 'auto', 'bag'].forEach(id => $(id).classList.remove('hidden'));
     running = true; last = performance.now() / 1000; cam.x = player.x; cam.y = player.y; updHUD();
     toast(JOBS[player.job].name + ' · 입체 사막을 돌파하라');
   }
@@ -258,7 +304,11 @@ export function openApocalypse(br) {
   }
   function killEnt(e, gatherMul) {
     e.hp = 0; e.dead = true;
-    if (e.type === 'monster' || e.type === 'animal') player.kills++;
+    if (e.type === 'monster' || e.type === 'animal') {
+      player.kills++;
+      const xp = e.boss ? 80 : e.type === 'monster' ? 12 : 8;
+      gainExp(xp);
+    }
     if (e.boss) toast('스핑크스 수호자 격파!');
     if (e.drops) for (const [k, range] of Object.entries(e.drops)) {
       let n = ri(range[0], range[1]); if (e.type === 'prop') n = Math.round(n * gatherMul);
@@ -285,15 +335,28 @@ export function openApocalypse(br) {
     if (player.fatigue <= 15) spd *= 0.7;
     if (su(Math.round(player.x), Math.round(player.y)) === 4) spd *= 0.5;
     const ml = Math.hypot(wx, wy);
+    // stick-face-live: update facing from input even before step
+    if (ml > 0.05) {
+      const ang0 = Math.atan2(wy / ml, wx / ml);
+      if (ang0 >= -Math.PI * 0.25 && ang0 < Math.PI * 0.25) player.face = 1;
+      else if (ang0 >= Math.PI * 0.25 && ang0 < Math.PI * 0.75) player.face = 2;
+      else if (ang0 >= -Math.PI * 0.75 && ang0 < -Math.PI * 0.25) player.face = 0;
+      else player.face = 3;
+    }
     if (ml > 0.05) {
       const nx = wx / ml, ny = wy / ml;
       const nx2 = player.x + nx * spd * dt, ny2 = player.y + ny * spd * dt;
       if (groundH(nx2, ny2) - groundH(player.x, player.y) <= 1.15) { player.x = nx2; player.y = ny2; }
       player.dirX = nx; player.dirY = ny;
       // iso face from movement
-      if (Math.abs(nx) > Math.abs(ny)) player.face = nx > 0 ? 1 : 3;
-      else player.face = ny > 0 ? 2 : 0;
-      player.walkT += dt * 8;
+      // face from world dir (iso)
+      const ang = Math.atan2(ny, nx);
+      // map to 4 iso dirs
+      if (ang >= -Math.PI * 0.25 && ang < Math.PI * 0.25) player.face = 1; // E
+      else if (ang >= Math.PI * 0.25 && ang < Math.PI * 0.75) player.face = 2; // S
+      else if (ang >= -Math.PI * 0.75 && ang < -Math.PI * 0.25) player.face = 0; // N
+      else player.face = 3; // W
+      player.walkT += dt * 10;
       player.fatigue = Math.max(0, player.fatigue - dt * 1.5);
     } else { player.fatigue = Math.min(100, player.fatigue + dt * 3.5); player.walkT = 0; }
     player.x = clamp(player.x, 1, MAP - 2); player.y = clamp(player.y, 1, MAP - 2);
@@ -301,7 +364,7 @@ export function openApocalypse(br) {
     if (atkHeld) tryAttack();
     player.thirst = Math.max(0, player.thirst - dt * 1.5);
     if (player.thirst <= 0) player.hp -= dt * 4;
-    if (Math.hypot(player.x - 40, player.y - 40) < 5) player.thirst = Math.max(0, player.thirst - dt);
+    if (Math.hypot(player.x - 48, player.y - 48) < 5) player.thirst = Math.max(0, player.thirst - dt);
     if (autoHunt) {
       let best = null, bd = 1e9;
       for (const e of ents) { if (e.dead || e.hp <= 0) continue; if (e.type === 'prop' && player.kills < 3) continue; const d = dist(player.x, player.y, e.x, e.y); if (d < bd) { bd = d; best = e; } }
@@ -386,11 +449,39 @@ export function openApocalypse(br) {
     ctx.fillStyle = right; ctx.fill();
     ctx.strokeStyle = edge + '66'; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + TW * 0.5, y + TH * 0.5); ctx.lineTo(x, y + TH); ctx.lineTo(x - TW * 0.5, y + TH * 0.5); ctx.closePath(); ctx.stroke();
-    if (sType === 4) { ctx.fillStyle = 'rgba(180,230,255,0.28)'; ctx.fillRect(x - 5, y + TH * 0.35, 10, 3); }
-    // brick mortar lines on tops
-    if (sType === 3 && (Math.abs(ox * 10) + Math.abs(oy * 7) + z) % 2 === 0) {
-      ctx.strokeStyle = 'rgba(60,40,15,0.25)';
-      ctx.beginPath(); ctx.moveTo(x - 8, y + TH * 0.4); ctx.lineTo(x + 8, y + TH * 0.6); ctx.stroke();
+    if (sType === 4) {
+      ctx.fillStyle = 'rgba(180,230,255,0.3)';
+      ctx.fillRect(x - 4, y + TH * 0.3, 3, 2);
+      ctx.fillRect(x + 1, y + TH * 0.5, 4, 2);
+    }
+    // fine top detail: dots / cracks / gravel
+    const seed = ((Math.abs(ox * 17) | 0) + (Math.abs(oy * 13) | 0) + z * 3) | 0;
+    if (sType !== 4) {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      if (seed % 3 === 0) ctx.fillRect(x - 3, y + TH * 0.35, 2, 2);
+      if (seed % 5 === 0) ctx.fillRect(x + 2, y + TH * 0.55, 2, 1);
+      if (seed % 7 === 0) {
+        ctx.strokeStyle = 'rgba(40,25,10,0.2)';
+        ctx.beginPath();
+        ctx.moveTo(x - 5, y + TH * 0.4);
+        ctx.lineTo(x + 4, y + TH * 0.65);
+        ctx.stroke();
+      }
+    }
+    if (sType === 3) {
+      ctx.strokeStyle = 'rgba(60,40,15,0.3)';
+      ctx.beginPath();
+      ctx.moveTo(x - TW * 0.25, y + TH * 0.35);
+      ctx.lineTo(x + TW * 0.2, y + TH * 0.55);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - 2, y + TH * 0.2);
+      ctx.lineTo(x - 2, y + TH * 0.7);
+      ctx.stroke();
+    }
+    if (sType === 5) {
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.fillRect(x - 2, y + TH * 0.4, 3, 2);
     }
   }
 
@@ -636,7 +727,7 @@ export function openApocalypse(br) {
     // camera centers on player; vertical bias so character stays on screen
     const originX = W * 0.5;
     const originY = H * 0.42;
-    const view = 15;
+    const view = 18;
     const cx = Math.floor(cam.x), cy = Math.floor(cam.y);
 
     // ---- PASS 1: terrain only (dense stacks) ----
