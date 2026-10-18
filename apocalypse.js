@@ -584,10 +584,7 @@ export function openApocalypse(br) {
       Hmap[y * MAP + x] = Math.max(0, Hmap[y * MAP + x] - 2);
       if ((x + y) % 3 === 0) Surf[y * MAP + x] = 2;
     }
-  }
-
-  let structures = [];
-      // smooth pass — gentler slopes (half-block feel with small BH)
+    // smooth pass — gentler slopes
     const tmpH = new Int8Array(Hmap);
     for (let y = 1; y < MAP - 1; y++) {
       for (let x = 1; x < MAP - 1; x++) {
@@ -598,6 +595,7 @@ export function openApocalypse(br) {
     }
   }
 
+  let structures = [];
   function buildStructures() {
     structures = [];
     const add = (x, y, kind, extra) => structures.push(Object.assign({ x, y, kind, h: hi(x, y) }, extra || {}));
