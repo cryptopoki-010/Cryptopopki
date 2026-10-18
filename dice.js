@@ -803,6 +803,7 @@ export function openDice(br) {
   const GEM_RAR = [{ k: 'R', n: '레어', c: '#46a6ff', rate: .90 }, { k: 'SR', n: '슈퍼 레어', c: '#b65cff', rate: .70 }, { k: 'UR', n: '울트라 레어', c: '#ffae2b', rate: .02 }, { k: 'L', n: '레전더리', c: '#ff4a72', rate: 0 }];
   const gemR = g => clamp(Number.isInteger(g.r) ? g.r : 0, 0, 3);
   const fmtGem = g => GEM_RAR[gemR(g)].k + ' ' + GEMS[g.t].n + ' +' + g.v.toFixed(1) + (GEMS[g.t].pp ? '%p' : '%');
+  const gemSellValue = g => Math.round(5 * (1 + g.v) * [1, 3, 8, 25][gemR(g)]);
   function costumeBonus() { const b = { all: 0, hpdef: 0, atkmag: 0 }; const e = ST.cos.eq; ['mount', 'outfit', 'skin'].forEach(cat => { const id = e[cat]; if (id == null || id < 0) return; const r = ST.cos.own[cat + '_' + id]; if (r == null) return; const v = C_BONUS[r]; if (cat === 'mount') b.all += v; if (cat === 'outfit') b.hpdef += v; if (cat === 'skin') b.atkmag += v; }); return b; }
   function stats() {
     const s = Object.assign({}, BASE), pct = { atk: 0, mag: 0, def: 0, hp: 0, aspd: 0 }; let eva = 0;
@@ -1098,12 +1099,12 @@ export function openDice(br) {
     if (rolling) return; const n = Math.floor(Number(nOverride == null ? mul : nOverride)); if (!Number.isFinite(n) || n < 1 || (!isAuto && n > DICE_MAX)) { toast('직접 오픈은 한 번에 최대 5,000개까지 가능합니다'); return; } if (ST.dice < n) { if (isAuto) { autoRoll = false; renderPanel(); toast('주사위가 부족해 자동 굴리기를 중지했습니다'); } else toast('주사위가 부족합니다'); return; }
     rolling = true; sctx(); ST.dice -= n; ST.rolls = (ST.rolls | 0) + n;
     /* 1) 결과 계산·지급을 먼저 한 번에 처리 (원자적), 2) 애니메이션은 이 결과만 보여준다 */
-    const faces = Array.from({ length: n }, () => ri(1, 6)), sum = { gold: 0, scroll: 0, shard: 0, gems: [], items: [] }, gpf = goldPerFace();
+    const faces = Array.from({ length: n }, () => ri(1, 6)), sum = { gold: 0, scroll: 0, shard: 0, gems: [], items: [], soldItems: [0,0,0,0,0], soldGems: [0,0,0,0] }, gpf = goldPerFace();
     faces.forEach(f => {
-      if (f === 1 || f === 6) { const it = newItem(rollRarity(), Math.max(1, ST.maxR)); addItem(it); sum.items.push(it); }
+      if (f === 1 || f === 6) { const it = newItem(rollRarity(), Math.max(1, ST.maxR)); if (isAuto && AUTO_SELL.item[it.r]) { sum.gold += sellValue(it); sum.soldItems[it.r]++; } else { addItem(it); sum.items.push(it); } }
       else if (f === 2) sum.gold += gpf;
       else if (f === 3) sum.scroll += 1;
-      else if (f === 4) { if (Math.random() < .3) { const g = { t: ri(0, 5), v: gemVal(), r: 0 }; addGem(g); sum.gems.push(g); } else sum.shard += ri(3, 6); }
+      else if (f === 4) { if (Math.random() < .3) { const g = { t: ri(0, 5), v: gemVal(), r: 0 }; if (isAuto && AUTO_SELL.gem[gemR(g)]) { sum.gold += gemSellValue(g); sum.soldGems[gemR(g)]++; } else { addGem(g); sum.gems.push(g); } } else sum.shard += ri(3, 6); }
       else if (f === 5) { sum.gold += Math.round(gpf * .5); if (Math.random() < .5) sum.scroll += 1; else sum.shard += 2; }
     });
     ST.gold += sum.gold; ST.scroll += sum.scroll; ST.shard += sum.shard; mark();
@@ -1114,7 +1115,7 @@ export function openDice(br) {
   function rollDone() {
     const A = diceAnim, sm = A.sum; rolling = false; sfx('land');
     const best = sm.items.reduce((m, it) => Math.max(m, it.r), -1);
-    const parts = []; if (sm.items.length) parts.push('<img alt="" src="' + curIcon('bag') + '">장비 주머니 ' + sm.items.length + '개 → ' + RAR.map((r, i) => { const c = sm.items.filter(x => x.r === i).length; return c ? '<span class="tag" style="background:' + r.c + '">' + r.k + '×' + c + '</span>' : ''; }).join(' '));
+    const parts = []; if (sm.soldItems && sm.soldItems.some(Boolean)) parts.push('<span style="color:#c07824">자동 판매 장비 ' + sm.soldItems.reduce((a,n)=>a+n,0) + '개</span>'); if (sm.soldGems && sm.soldGems.some(Boolean)) parts.push('<span style="color:#c07824">자동 판매 보석 ' + sm.soldGems.reduce((a,n)=>a+n,0) + '개</span>'); if (sm.items.length) parts.push('<img alt="" src="' + curIcon('bag') + '">장비 주머니 ' + sm.items.length + '개 → ' + RAR.map((r, i) => { const c = sm.items.filter(x => x.r === i).length; return c ? '<span class="tag" style="background:' + r.c + '">' + r.k + '×' + c + '</span>' : ''; }).join(' '));
     if (sm.gold) parts.push('<img alt="" src="' + curIcon('gold') + '">골드 +' + fN(sm.gold)); if (sm.scroll) parts.push('<img alt="" src="' + curIcon('scroll') + '">주문서 +' + sm.scroll); if (sm.shard) parts.push('<img alt="" src="' + curIcon('shard') + '">보석 조각 +' + sm.shard); if (sm.gems.length) parts.push('<img alt="" src="' + gemIcon(sm.gems[0].t, 22) + '">보석 ' + sm.gems.length + '개 (' + sm.gems.map(fmtGem).slice(0, 3).join(', ') + (sm.gems.length > 3 ? ' …' : '') + ')');
     logs.unshift('<div style="font-weight:900">🎲 ×' + A.n + (A.n <= 10 ? ' [' + A.faces.join(', ') + ']' : ' · 1~6 분포 ' + [1, 2, 3, 4, 5, 6].map(f => f + ':' + countFaces(A, f)).join(' ')) + '</div>' + parts.map(p => '<div>' + p + '</div>').join(''));
     logs = logs.slice(0, 12);
@@ -1145,6 +1146,11 @@ export function openDice(br) {
   /* ---------- 패널 ---------- */
   let tab = 'b', selItem = null, selectedGems = [];
   let autoRoll = false, autoMul = 10, autoAcc = 0, gameSpeed = 1;
+  const AUTO_SELL = { item: [1,1,0,0,0], gem: [1,0,0,0] };
+  function autoSellSheet() {
+    const toggle = (arr, i, label, color) => '<button class="dbtn s ' + (arr[i] ? 'g' : 'w') + '" style="flex:1;min-width:65px;padding:7px 4px;border-color:' + color + '" data-s="' + (arr === AUTO_SELL.item ? 'i' : 'g') + i + '">' + (arr[i] ? '☑ ' : '☐ ') + label + '</button>';
+    sheet('<h4>⚙ 자동 판매 설정</h4><p>선택한 등급은 자동 굴리기 중 인벤토리에 쌓이지 않고 즉시 골드로 바뀝니다. 체크하지 않은 등급은 보관됩니다.</p><b>장비 등급</b><div class="row" style="flex-wrap:wrap;gap:5px;margin:7px 0 12px">' + RAR.map((r,i)=>toggle(AUTO_SELL.item,i,r.k,r.c)).join('') + '</div><b>보석 등급</b><div class="row" style="flex-wrap:wrap;gap:5px;margin:7px 0 12px">' + GEM_RAR.map((r,i)=>toggle(AUTO_SELL.gem,i,r.k,r.c)).join('') + '</div><p style="font-size:12px;color:#7a6a7e">기본값: N·R 장비와 R 보석 자동 판매</p><div class="row"><button class="dbtn w" style="flex:1" data-s="cancel">취소</button><button class="dbtn g" style="flex:2" data-s="start">▶ 자동 굴리기 시작</button></div>', k => { if (k === 'cancel') return closeSheet(); if (k === 'start') { autoRoll = true; autoAcc = 0; closeSheet(); sfx('click'); renderPanel(); return; } const kind = k[0], i = +k.slice(1); if (kind === 'i' && i >= 0 && i < AUTO_SELL.item.length) AUTO_SELL.item[i] = AUTO_SELL.item[i] ? 0 : 1; if (kind === 'g' && i >= 0 && i < AUTO_SELL.gem.length) AUTO_SELL.gem[i] = AUTO_SELL.gem[i] ? 0 : 1; autoSellSheet(); });
+  }
   function renderPanel() {
     root.querySelectorAll('[data-a=tab]').forEach(b => b.classList.toggle('on', b.dataset.v === tab));
     const p = $('dpanel'); let h = '';
@@ -1318,7 +1324,7 @@ export function openDice(br) {
       case 'gemv': { const i = +v; if (selectedGems.includes(i)) selectedGems = selectedGems.filter(x => x !== i); else if (selectedGems.length < 2) selectedGems.push(i); else selectedGems = [selectedGems[1], i]; renderPanel(); return; }
       case 'automul': autoMul = +v; sfx('click'); renderPanel(); return;
       case 'speed': gameSpeed = +v; sfx('click'); renderPanel(); return;
-      case 'autoroll': autoRoll = !autoRoll; autoAcc = 0; sfx('click'); renderPanel(); return;
+      case 'autoroll': if (autoRoll) { autoRoll = false; autoAcc = 0; sfx('click'); renderPanel(); } else autoSellSheet(); return;
       case 'esel': selItem = findItem(+v); renderPanel(); return;
       case 'enh': return doEnh();
       case 'sock': return sockSheet(+v);
