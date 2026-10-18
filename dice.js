@@ -815,10 +815,7 @@ export function openDice(br) {
   }
   function itemPower(it) { const o = itemStats(it); return Math.round((o.atk || 0) * 6 + (o.mag || 0) * 6 + (o.hp || 0) * .35 + (o.def || 0) * 4 + (o.eva || 0) * 20 + (it.g || []).reduce((a, g) => a + (g ? g.v * 8 : 0), 0)); }
   function sellValue(it) { return Math.round(15 * RAR_MUL[it.r] * RAR_MUL[it.r] * LV_MUL(it.l) * (1 + it.e * .3)); }
-  function addItem(it) {
-    if (ST.inv.length >= 120) { const cand = ST.inv.filter(x => !x.k && x.r <= 1).sort((a, b) => itemPower(a) - itemPower(b)); const x = cand[0]; if (x) { ST.inv.splice(ST.inv.indexOf(x), 1); ST.gold += sellValue(x); } else { ST.gold += sellValue(it); return false; } }
-    ST.inv.push(it); return true;
-  }
+  function addItem(it) { ST.inv.push(it); return true; }
   /* ---------- DOM ---------- */
   const root = document.createElement('div'); root.className = 'dz';
   root.innerHTML = '<div class="dzb"><button class="dzx" data-a="close" aria-label="닫기">✕</button><div class="dzc" id="dcur"></div><button class="dzx" data-a="set" aria-label="설정">⚙</button></div>'
@@ -867,7 +864,7 @@ export function openDice(br) {
   function damageMon(m, d, crit) {
     if (mode.k === 'raid') {
       if (mode.over) return; mode.damage = (mode.damage || 0) + Math.max(0, d); m.hit = .14; num(Math.max(W*.58,m.x-W*.08), gy - mH(m) - 8, fS(d) + (crit ? '!' : ''), crit ? '#ffd24a' : '#ffffff', crit);
-      if (!mode.rewarded && mode.damage >= 1000000) { mode.rewarded = 1; const it = newItem(4, Math.max(1,ST.maxR)); it.ds = 1; if (it.s === 3) it.w = 0; if (ST.inv.length >= 120) { const weak = ST.inv.filter(x => !x.k).sort((a,b)=>itemPower(a)-itemPower(b))[0]; if (weak) ST.inv.splice(ST.inv.indexOf(weak),1); } ST.inv.push(it); mode.rewardName = itemName(it); banner('드래곤 슬레이어 획득!', mode.rewardName + ' · 임계 피해 달성'); sfx('legend'); flash=.8; mark(); hudCur(); }
+      if (!mode.rewarded && mode.damage >= 1000000) { mode.rewarded = 1; const it = newItem(4, Math.max(1,ST.maxR)); it.ds = 1; if (it.s === 3) it.w = 0; ST.inv.push(it); mode.rewardName = itemName(it); banner('드래곤 슬레이어 획득!', mode.rewardName + ' · 임계 피해 달성'); sfx('legend'); flash=.8; mark(); hudCur(); }
       m.hp = m.mh; return;
     }
     m.hp -= d; m.hit = .14; num(m.x, gy - mH(m) - 8, fS(d) + (crit ? '!' : ''), crit ? '#ffd24a' : '#ffffff', crit); if (m.hp <= 0 && !m.dead) killMon(m);
@@ -940,7 +937,7 @@ export function openDice(br) {
     mark(); hudCur();
   }
   function sheetResult(title, head, body) { setTimeout(() => sheet('<h4>' + title + '</h4><p style="font-size:20px;font-weight:900;color:#c8302a;margin:6px 0">' + head + '</p><p>' + body + '</p><button class="dbtn" style="width:100%" data-s="ok">필드로 돌아가기</button>', () => { closeSheet(); mode = { k: 'field' }; mons = []; P.hp = P.mh; hudStage(); }), 700); }
-  function addGem(g) { if (ST.gems.length >= 80) { ST.shard += 3; return; } if (g.r == null) g.r = 0; ST.gems.push(g); }
+  function addGem(g) { if (g.r == null) g.r = 0; ST.gems.push(g); }
   /* ---------- 갱신 ---------- */
   function step(dt) {
     T += dt; const s = SC(), px = PX(), W0 = S.wpn;
@@ -1156,15 +1153,15 @@ export function openDice(br) {
         + '<div class="mul">' + [1, 100, 1000, 5000].map(m => '<button data-a="mul" data-v="' + m + '" class="' + (mul === m ? 'on' : '') + '">×' + fN(m) + '</button>').join('') + '</div>'
         + '<button class="dbtn" data-a="roll" ' + (rolling || ST.dice < mul ? 'disabled' : '') + '>' + (rolling ? '굴리는 중…' : ST.dice < mul ? '주사위 부족' : '직접 ' + fN(mul) + '개 오픈') + '</button>'
         + '<div class="card" style="margin:0;padding:8px"><b>자동 굴리기</b><div class="mul" style="margin:7px 0">' + [10,100,1000,10000].map(m => '<button data-a="automul" data-v="' + m + '" class="' + (autoMul === m ? 'on' : '') + '">×' + fN(m) + '</button>').join('') + '</div><button class="dbtn ' + (autoRoll ? 'r' : 'g') + '" style="width:100%" data-a="autoroll">' + (autoRoll ? '■ 자동 굴리기 중지' : '▶ 자동 굴리기 시작') + ' · 1.5초마다</button><small style="display:block;margin-top:5px;color:#7a6a7e">직접 오픈은 한 번에 최대 5,000개, 자동 굴리기는 최대 10,000개씩 진행합니다.</small></div>'
-        + '<div class="row" style="margin:8px 0;align-items:center"><b style="font-size:12px;white-space:nowrap">게임 배속</b>' + [1,3,5].map(m=>'<button class="dbtn s ' + (gameSpeed===m?'g':'w') + '" aria-pressed="'+(gameSpeed===m)+'" data-a="speed" data-v="'+m+'" style="flex:1">'+m+'배'+(gameSpeed===m?' ✓':'')+'</button>').join('') + '</div><small style="display:block;color:#7a6a7e;margin:-3px 0 6px">전투 진행 속도: '+gameSpeed+'배</small>'
+        + '<div class="row" style="margin:8px 0;align-items:center"><b style="font-size:12px;white-space:nowrap">게임 배속</b>' + [1,5,10].map(m=>'<button class="dbtn s ' + (gameSpeed===m?'g':'w') + '" aria-pressed="'+(gameSpeed===m)+'" data-a="speed" data-v="'+m+'" style="flex:1">'+m+'배'+(gameSpeed===m?' ✓':'')+'</button>').join('') + '</div><small style="display:block;color:#7a6a7e;margin:-3px 0 6px">전투 진행 속도: '+gameSpeed+'배</small>'
         + '<div style="font-size:11.5px;color:#7a6a7e;line-height:1.5">⚀/⚅ 장비 주머니 · ⚁ 골드 · ⚂ 강화 주문서 · ⚃ 보석/조각 · ⚄ 골드+주문서/조각 (각 눈 1/6)</div>'
         + '<div class="log">' + (logs.join('<hr style="border:0;border-top:1px dashed #e0c898;margin:6px 0">') || '<div style="color:#a89a80">아직 굴린 기록이 없습니다</div>') + '</div></div>';
     } else if (tab === 'i') {
       const s = stats(); h = '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('b', 24) + '">장착 장비 <span class="sp"></span><span class="pw">⚔ ' + fN(s.power) + '</span></h3><div class="grid8">' + SLOTS.map(sl => { const it = ST.eq[sl.k]; return '<button class="slot' + (it ? ' has' : '') + '" data-a="eqv" data-v="' + sl.k + '">' + (it ? '<img alt="" src="' + itemIcon(sl.k, it.w >= 0 ? WEAPONS[it.w].k : null, it.r) + '">' + (it.e ? '<span class="e">+' + it.e + '</span>' : '') + '<span class="gm">' + (it.g || []).map(g => g ? '<img alt="" src="' + gemIcon(g.t, 20) + '">' : '').join('') + '</span>' : '<img alt="" style="opacity:.28;filter:grayscale(1)" src="' + itemIcon(sl.k, sl.k === 'weapon' ? 'sword' : null, 0) + '"><span style="position:absolute;bottom:3px">' + sl.n + '</span>') + '</button>'; }).join('') + '</div>'
         + '<div class="stats" style="margin-top:10px">' + [['공격력', fS(s.atk)], ['주문력', fS(s.mag)], ['방어력', fS(s.def)], ['체력', fS(s.hp)], ['회피', s.eva.toFixed(1) + '%'], ['공격 속도', s.aspd.toFixed(2) + '/초']].map(([a, b]) => '<div>' + a + '<b>' + b + '</b></div>').join('') + '</div>'
         + '<div class="row" style="margin-top:10px"><button class="dbtn s g" data-a="autoeq">⚡ 최강 장비 자동 장착</button><button class="dbtn s r" data-a="sellall">장비 일괄 판매</button></div></div>'
-        + '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('i', 24) + '">가방 <small style="font-size:12px;color:#7a6a7e">' + ST.inv.length + '/120</small></h3><div class="invg">' + ST.inv.slice().sort((a, b) => b.r - a.r || b.l - a.l || itemPower(b) - itemPower(a)).map(it => '<button class="slot has" data-a="item" data-v="' + it.i + '" style="border-color:' + RAR[it.r].c + '"><img alt="" src="' + itemIcon(SLOTS[it.s].k, it.w >= 0 ? WEAPONS[it.w].k : null, it.r) + '">' + (it.e ? '<span class="e">+' + it.e + '</span>' : '') + (it.k ? '<span style="position:absolute;left:3px;top:2px;font-size:10px">🔒</span>' : '') + '</button>').join('') + '</div>' + (ST.inv.length ? '' : '<p style="color:#a89a80;font-size:12.5px">주사위 ⚀·⚅ 이 나오면 장비 주머니를 얻습니다</p>') + '</div>'
-        + '<div class="card"><h3><img class="hi" alt="" src="' + gemIcon(1, 24) + '">보석 가방 <small style="font-size:12px;color:#7a6a7e">' + ST.gems.length + '/80</small><span class="sp"></span><button class="dbtn s b" data-a="craft">조각 10 → 보석</button></h3><div class="invg">' + ST.gems.map((g, i) => '<button class="slot has" data-a="gemv" data-v="' + i + '" title="' + GEM_RAR[gemR(g)].k + ' ' + GEMS[g.t].n + '" style="border-color:' + GEM_RAR[gemR(g)].c + (selectedGems.includes(i) ? ';box-shadow:0 0 0 3px #ffd24a' : '') + '"><img alt="" src="' + gemIcon(g.t, 40) + '" style="width:60%;height:60%"><span style="font-size:10px;color:' + GEM_RAR[gemR(g)].c + '">' + GEM_RAR[gemR(g)].k + ' · ' + g.v.toFixed(1) + '</span></button>').join('') + '</div><p style="font-size:11px;color:#7a6a7e">동일 등급 보석 2개를 선택해 합성하세요. 실패하면 두 보석 모두 사라집니다.</p><div class="row"><button class="dbtn s w" style="flex:1" data-a="fuse" ' + (selectedGems.length !== 2 ? 'disabled' : '') + '>선택 합성 (' + selectedGems.length + '/2)</button><button class="dbtn s b" style="flex:1" data-a="fuseall" ' + (ST.gems.length < 2 ? 'disabled' : '') + '>일괄 합성</button></div></div>';
+        + '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('i', 24) + '">가방 <small style="font-size:12px;color:#7a6a7e">' + ST.inv.length + '개 · 무제한</small></h3><div class="invg">' + ST.inv.slice().sort((a, b) => b.r - a.r || b.l - a.l || itemPower(b) - itemPower(a)).map(it => '<button class="slot has" data-a="item" data-v="' + it.i + '" style="border-color:' + RAR[it.r].c + '"><img alt="" src="' + itemIcon(SLOTS[it.s].k, it.w >= 0 ? WEAPONS[it.w].k : null, it.r) + '">' + (it.e ? '<span class="e">+' + it.e + '</span>' : '') + (it.k ? '<span style="position:absolute;left:3px;top:2px;font-size:10px">🔒</span>' : '') + '</button>').join('') + '</div>' + (ST.inv.length ? '' : '<p style="color:#a89a80;font-size:12.5px">주사위 ⚀·⚅ 이 나오면 장비 주머니를 얻습니다</p>') + '</div>'
+        + '<div class="card"><h3><img class="hi" alt="" src="' + gemIcon(1, 24) + '">보석 가방 <small style="font-size:12px;color:#7a6a7e">' + ST.gems.length + '개 · 무제한</small><span class="sp"></span><button class="dbtn s b" data-a="craft">조각 10 → 보석</button></h3><div class="invg">' + ST.gems.map((g, i) => '<button class="slot has" data-a="gemv" data-v="' + i + '" title="' + GEM_RAR[gemR(g)].k + ' ' + GEMS[g.t].n + '" style="border-color:' + GEM_RAR[gemR(g)].c + (selectedGems.includes(i) ? ';box-shadow:0 0 0 3px #ffd24a' : '') + '"><img alt="" src="' + gemIcon(g.t, 40) + '" style="width:60%;height:60%"><span style="font-size:10px;color:' + GEM_RAR[gemR(g)].c + '">' + GEM_RAR[gemR(g)].k + ' · ' + g.v.toFixed(1) + '</span></button>').join('') + '</div><p style="font-size:11px;color:#7a6a7e">동일 등급 보석 2개를 선택해 합성하세요. 실패하면 두 보석 모두 사라집니다.</p><div class="row"><button class="dbtn s w" style="flex:1" data-a="fuse" ' + (selectedGems.length !== 2 ? 'disabled' : '') + '>선택 합성 (' + selectedGems.length + '/2)</button><button class="dbtn s b" style="flex:1" data-a="fuseall" ' + (ST.gems.length < 2 ? 'disabled' : '') + '>일괄 합성</button></div></div>';
     } else if (tab === 'e') {
       const eqd = SLOTS.map(sl => ST.eq[sl.k]).filter(Boolean); if (!selItem || !findItem(selItem.i)) selItem = eqd[0] || ST.inv[0] || null;
       h = '<div class="card"><h3><img class="hi" alt="" src="' + tabIcon('e', 24) + '">강화할 장비 선택</h3><div class="invg">' + eqd.concat(ST.inv.filter(x => x.r >= 1).sort((a, b) => b.r - a.r)).slice(0, 40).map(it => '<button class="slot has" data-a="esel" data-v="' + it.i + '" style="border-color:' + RAR[it.r].c + (selItem && selItem.i === it.i ? ';box-shadow:0 0 0 3px #ffd24a' : '') + '"><img alt="" src="' + itemIcon(SLOTS[it.s].k, it.w >= 0 ? WEAPONS[it.w].k : null, it.r) + '">' + (it.e ? '<span class="e">+' + it.e + '</span>' : '') + (isEq(it) ? '<span style="position:absolute;left:3px;top:2px;font-size:9px;background:#2a1d2e;color:#fff;border-radius:4px;padding:0 3px">E</span>' : '') + '</button>').join('') + '</div></div>';
@@ -1232,7 +1229,7 @@ export function openDice(br) {
       + '<button class="dbtn w s" style="width:100%;margin-top:8px" data-s="x">닫기</button>', s => {
         if (s === 'x') return closeSheet();
         if (s === 'eq') { equip(it); sfx('up'); }
-        if (s === 'uneq') { if (ST.inv.length >= 120) { toast('가방이 가득 찼습니다'); return; } ST.eq[k] = null; ST.inv.push(it); refreshStats(); mark(); }
+        if (s === 'uneq') { ST.eq[k] = null; ST.inv.push(it); refreshStats(); mark(); }
         if (s === 'enh') { selItem = it; tab = 'e'; }
         if (s === 'lock') { it.k = it.k ? 0 : 1; mark(); }
         if (s === 'sell') { ST.inv.splice(ST.inv.indexOf(it), 1); ST.gold += sellValue(it); sfx('coin'); mark(); }
@@ -1265,11 +1262,11 @@ export function openDice(br) {
   }
   function sockSheet(i) {
     const it = selItem, g = it.g[i];
-    if (g) { if (ST.gems.length >= 80) return toast('보석 가방이 가득 찼습니다'); ST.gems.push(g); it.g[i] = null; refreshStats(); mark(); renderPanel(); return; }
+    if (g) { ST.gems.push(g); it.g[i] = null; refreshStats(); mark(); renderPanel(); return; }
     const ok = allowedGems(it);
     sheet('<h4>보석 장착</h4><p>' + itemName(it) + '에는 <b>' + ok.map(k => GEMS[GI[k]].n).join(', ') + '</b> 보석만 장착할 수 있습니다.<br>% 증가는 능력치에 곱해지고, 회피는 %p(퍼센트포인트)로 더해집니다.</p><div class="invg">' + ST.gems.map((x, j) => { const can = ok.includes(GEMS[x.t].k); return '<button class="slot has" data-s="g' + j + '" ' + (can ? '' : 'disabled style="opacity:.35" title="' + GEMS[x.t].n + ' 보석은 이 장비에 장착할 수 없습니다"') + '><img alt="" src="' + gemIcon(x.t, 40) + '" style="width:60%;height:60%"><span style="font-size:10px">' + x.v.toFixed(1) + (GEMS[x.t].pp ? '%p' : '%') + '</span></button>'; }).join('') + '</div>' + (ST.gems.length ? '' : '<p>보석이 없습니다. 주사위 ⚃ 또는 보석 던전에서 얻으세요.</p>') + '<button class="dbtn w s" style="width:100%;margin-top:10px" data-s="x">닫기</button>', s => { if (s === 'x') return closeSheet(); const j = +s.slice(1), x = ST.gems[j]; if (!x || !ok.includes(GEMS[x.t].k)) { toast('이 장비에 장착할 수 없는 보석입니다'); return; } ST.gems.splice(j, 1); it.g[i] = x; sfx('up'); refreshStats(); mark(); closeSheet(); renderPanel(); });
   }
-  function craftGem() { if (ST.shard < 10) return toast('보석 조각이 10개 필요합니다'); if (ST.gems.length >= 80) return toast('보석 가방이 가득 찼습니다'); ST.shard -= 10; const g = { t: ri(0, 5), v: gemVal(), r: 0 }; ST.gems.push(g); sfx('rare'); toast('보석 제작: ' + fmtGem(g)); mark(); hudCur(); renderPanel(); }
+  function craftGem() { if (ST.shard < 10) return toast('보석 조각이 10개 필요합니다'); ST.shard -= 10; const g = { t: ri(0, 5), v: gemVal(), r: 0 }; ST.gems.push(g); sfx('rare'); toast('보석 제작: ' + fmtGem(g)); mark(); hudCur(); renderPanel(); }
   function fuseGems() {
     if (selectedGems.length !== 2) return toast('합성할 보석 2개를 선택하세요');
     const ids = selectedGems.slice().sort((a,b)=>b-a), a = ST.gems[ids[0]], b = ST.gems[ids[1]];
