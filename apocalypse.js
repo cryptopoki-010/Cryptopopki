@@ -358,7 +358,7 @@ export function openApocalypse(br) {
       else if (ang >= Math.PI * 0.25 && ang < Math.PI * 0.75) player.face = 2; // S
       else if (ang >= -Math.PI * 0.75 && ang < -Math.PI * 0.25) player.face = 0; // N
       else player.face = 3; // W
-      player.walkT += dt * 10;
+      player.walkT += dt * 12;
       player.fatigue = Math.max(0, player.fatigue - dt * 1.5);
     } else { player.fatigue = Math.min(100, player.fatigue + dt * 3.5); player.walkT = 0; }
     player.x = clamp(player.x, 1, MAP - 2); player.y = clamp(player.y, 1, MAP - 2);
@@ -544,24 +544,28 @@ export function openApocalypse(br) {
   function drawChar(px, py, pz, color, weapon) {
     const p = w2s(px, py, pz);
     const face = player.face | 0;
-    const walking = player.walkT > 0 && (Math.hypot(moveX, moveY) > 0.08 || keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight || autoHunt);
-    const frame = walking ? Math.floor(player.walkT) % 4 : 0;
+    const moving = Math.hypot(player.dirX, player.dirY) > 0.01 && (
+      Math.hypot(moveX, moveY) > 0.05 || keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD ||
+      keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight || autoHunt
+    );
+    const frame = moving ? Math.floor(player.walkT) % 4 : 0;
     const attacking = (player.atkAnim || 0) > 0;
-    const flash = player.invuln > 0 && ((player.invuln * 20) | 0) % 2 === 0;
+    const flash = false; // no white flash
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
     ctx.ellipse(p.sx, p.sy + 4, 10, 4, 0, 0, TAU);
     ctx.fill();
     const S = getHeroCanvas(player.job, face, frame, attacking);
-    blit(ctx, S, p.sx, p.sy, 2.5, flash);
+    const bob = moving ? ((frame % 2) ? -1 : 0) : 0;
+    blit(ctx, S, p.sx, p.sy + bob, 2.5, false);
   }
+
 
 
   function drawMonster(e, ox, oy) {
     const zh = groundH(e.x, e.y);
     const p = w2s(ox, oy, zh);
-    const hurt = e.hurtT > 0;
     const frame = Math.floor(performance.now() / 160 + e.x * 3) % 4;
     const kind = e.kind;
     if (kind === 'sandling' || kind === 'jackal' || kind === 'sphinx' || kind === 'rock' || kind === 'cactus' || kind === 'wreck') {
@@ -571,7 +575,7 @@ export function openApocalypse(br) {
       ctx.fill();
       const S = getMonsterCanvas(kind, frame);
       const sc = kind === 'sphinx' ? 3.0 : kind === 'jackal' ? 2.6 : 2.4;
-      blit(ctx, S, p.sx, p.sy, sc, hurt);
+      blit(ctx, S, p.sx, p.sy, sc, false);
       if (e.boss) {
         ctx.fillStyle = '#000';
         ctx.fillRect(p.sx - 32, p.sy - 90, 64, 7);
@@ -585,7 +589,6 @@ export function openApocalypse(br) {
       }
       return;
     }
-    // fallback block for unknown
     drawBlock(ox, oy, zh + 1, 2, PAL.stone[0]);
   }
 
@@ -599,7 +602,6 @@ export function openApocalypse(br) {
     g.addColorStop(1, '#e89038');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
-    // sun
     ctx.beginPath();
     ctx.arc(W * 0.82, H * 0.14, 40, 0, TAU);
     ctx.fillStyle = '#ffb84a';
@@ -609,13 +611,11 @@ export function openApocalypse(br) {
     ctx.fillStyle = '#ffe0a0';
     ctx.fill();
 
-    // camera centers on player; vertical bias so character stays on screen
     const originX = W * 0.5;
     const originY = H * 0.42;
     const view = 14;
     const cx = Math.floor(cam.x), cy = Math.floor(cam.y);
 
-    // ---- PASS 1: terrain only (dense stacks) ----
     const cells = [];
     for (let iy = cy - view; iy <= cy + view; iy++) {
       for (let ix = cx - view; ix <= cx + view; ix++) {
@@ -631,7 +631,6 @@ export function openApocalypse(br) {
       const h = hi(c.x, c.y);
       const s = su(c.x, c.y);
       const maxStack = Math.min(Math.max(h, 0), 12);
-      // always draw at least ground slab
       for (let z = 0; z <= maxStack; z++) {
         const isTop = z === maxStack;
         let st = s;
@@ -642,15 +641,13 @@ export function openApocalypse(br) {
       }
     }
 
-    // ---- PASS 2: structures (live height) ----
     const stList = structures.slice().sort((a, b) => (a.x + a.y) - (b.x + b.y));
     for (const s of stList) {
       if (Math.abs(s.x - cam.x) > view + 2 || Math.abs(s.y - cam.y) > view + 2) continue;
-      s.h = hi(s.x, s.y); // live ground
+      s.h = hi(s.x, s.y);
       drawStruct(s, s.x - cam.x, s.y - cam.y);
     }
 
-    // ---- PASS 3: entities by depth ----
     const dyn = [];
     for (const e of ents) {
       if (e.hp <= 0 || e.dead) continue;
@@ -698,15 +695,10 @@ export function openApocalypse(br) {
       }
     }
 
-    // ---- PASS 4: PLAYER always on top, oversized, outlined ----
+    // player always on top — no flash
     {
       const zh = groundH(player.x, player.y);
-      const wpn = player.job === 'archer' ? 'bow' : player.job === 'shooter' ? 'gun' : player.job === 'rogue' ? 'knife' : 'sword';
-      const flash = player.invuln > 0 && ((player.invuln * 20) | 0) % 2 === 0;
-      const col = flash ? '#ffffff' : JOBS[player.job].color;
-      // slight lift so feet sit on top face
-      drawChar(player.x - cam.x, player.y - cam.y, zh + 0.15, col, wpn);
-      // name plate so never "invisible"
+      drawChar(player.x - cam.x, player.y - cam.y, zh + 0.15, JOBS[player.job].color, null);
       const pp = w2s(player.x - cam.x, player.y - cam.y, zh + 0.15);
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'center';
