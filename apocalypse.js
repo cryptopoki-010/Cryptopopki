@@ -1,4 +1,5 @@
 /* apocalypse.js — 7대 불가사의 생존 · 고밀도 아이소 블록 지형 */
+import { getHeroCanvas, getMonsterCanvas, blit } from './apocalypse-sprites.js';
 const APCSS = `.apoc{position:fixed;inset:0;z-index:9000;background:#0b0e14;color:#e8edf5;font-family:"IBM Plex Sans KR",system-ui,sans-serif;overflow:hidden;user-select:none}
 .apoc *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 .apoc #g{display:block;width:100%;height:100%;touch-action:none}
@@ -538,172 +539,54 @@ export function openApocalypse(br) {
   }
 
 
-  function drawChar(px, py, pz, color, weapon) {
-    const p = w2s(px, py, pz), x = p.sx, y = p.sy;
-    const face = player.face | 0; // 0 N, 1 E, 2 S, 3 W
-    const walking = player.walkT > 0 && (Math.hypot(moveX, moveY) > 0.08 || keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight || autoHunt);
-    const step = walking ? Math.floor(player.walkT) % 4 : 0;
-    const legA = [0, 1, 0, -1][step];
-    const legB = [0, -1, 0, 1][step];
-    const atk = player.atkAnim || 0;
-    const atkP = atk > 0 ? (1 - atk / 0.28) : 0; // 0→1 during swing
-    const sc = 0.72; // smaller character
 
+  function drawChar(px, py, pz, color, weapon) {
+    const p = w2s(px, py, pz);
+    const face = player.face | 0;
+    const walking = player.walkT > 0 && (Math.hypot(moveX, moveY) > 0.08 || keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight || autoHunt);
+    const frame = walking ? Math.floor(player.walkT) % 4 : 0;
+    const attacking = (player.atkAnim || 0) > 0;
+    const flash = player.invuln > 0 && ((player.invuln * 20) | 0) % 2 === 0;
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath();
-    ctx.ellipse(x, y + 5 * sc, 11 * sc, 5 * sc, 0, 0, TAU);
+    ctx.ellipse(p.sx, p.sy + 4, 10, 4, 0, 0, TAU);
     ctx.fill();
-
-    const flip = (face === 3); // face west → mirror
-    ctx.save();
-    ctx.translate(x, y);
-    if (flip) ctx.scale(-1, 1);
-
-    const skin = '#f0d2b0', hair = '#2a1a12', pants = '#1a2030', boot = '#0a0c10';
-    const ox = 0, oy = 0;
-
-    // legs (small)
-    ctx.fillStyle = pants;
-    ctx.fillRect((-5 + (flip ? 0 : 0)) * sc, (-2 + legA) * sc, 4 * sc, 8 * sc);
-    ctx.fillRect(1 * sc, (-2 + legB) * sc, 4 * sc, 8 * sc);
-    ctx.fillStyle = boot;
-    ctx.fillRect(-5 * sc, (5 + legA) * sc, 4 * sc, 3 * sc);
-    ctx.fillRect(1 * sc, (5 + legB) * sc, 4 * sc, 3 * sc);
-
-    // body
-    ctx.fillStyle = color;
-    ctx.fillRect(-7 * sc, -16 * sc, 14 * sc, 14 * sc);
-    ctx.fillStyle = shade(color, 0.28);
-    ctx.fillRect(-7 * sc, -16 * sc, 14 * sc, 4 * sc);
-    ctx.fillStyle = '#c8a040';
-    ctx.fillRect(-7 * sc, -4 * sc, 14 * sc, 2 * sc);
-
-    // arms — attack extends weapon arm
-    const armSwing = atk > 0 ? (-8 * Math.sin(atkP * Math.PI)) : 0;
-    ctx.fillStyle = skin;
-    // back arm
-    if (face === 0) {
-      // facing away — both arms thin
-      ctx.fillRect(-9 * sc, -14 * sc, 3 * sc, 9 * sc);
-      ctx.fillRect(6 * sc, -14 * sc, 3 * sc, 9 * sc);
-    } else {
-      ctx.fillRect(-10 * sc, (-14 + armSwing * 0.3) * sc, 4 * sc, 9 * sc);
-      ctx.fillRect(6 * sc, (-14 - armSwing) * sc, 4 * sc, 9 * sc);
-    }
-
-    // head
-    if (face === 0) {
-      // back of head
-      ctx.fillStyle = hair;
-      ctx.fillRect(-6 * sc, -26 * sc, 12 * sc, 10 * sc);
-      ctx.fillStyle = skin;
-      ctx.fillRect(-5 * sc, -22 * sc, 10 * sc, 6 * sc);
-    } else {
-      ctx.fillStyle = skin;
-      ctx.fillRect(-6 * sc, -26 * sc, 12 * sc, 10 * sc);
-      ctx.fillStyle = hair;
-      ctx.fillRect(-6 * sc, -26 * sc, 12 * sc, 3 * sc);
-      // eyes toward face dir
-      ctx.fillStyle = '#fff';
-      const eyeShift = face === 1 ? 1 : face === 3 ? -1 : 0;
-      ctx.fillRect((-4 + eyeShift) * sc, -21 * sc, 3 * sc, 3 * sc);
-      ctx.fillRect((2 + eyeShift) * sc, -21 * sc, 3 * sc, 3 * sc);
-      ctx.fillStyle = '#1a1018';
-      ctx.fillRect((-3 + eyeShift) * sc, -20 * sc, 2 * sc, 2 * sc);
-      ctx.fillRect((3 + eyeShift) * sc, -20 * sc, 2 * sc, 2 * sc);
-    }
-
-    // weapons with attack motion
-    const wExt = atk > 0 ? 6 * Math.sin(atkP * Math.PI) : 0;
-    if (weapon === 'bow') {
-      ctx.strokeStyle = '#8a5a28';
-      ctx.lineWidth = 2 * sc;
-      ctx.beginPath();
-      ctx.arc(10 * sc, -12 * sc, 8 * sc, -1.1, 1.1);
-      ctx.stroke();
-      if (atk > 0) {
-        // arrow flight
-        ctx.strokeStyle = '#d0d0d0';
-        ctx.beginPath();
-        ctx.moveTo(4 * sc, -12 * sc);
-        ctx.lineTo((14 + wExt * 2) * sc, -12 * sc);
-        ctx.stroke();
-      }
-    } else if (weapon === 'gun') {
-      ctx.fillStyle = '#3a4048';
-      const gx = (8 + wExt) * sc;
-      ctx.fillRect(gx, -14 * sc, 12 * sc, 4 * sc);
-      if (atk > 0) {
-        ctx.fillStyle = '#ffcc66';
-        ctx.fillRect((20 + wExt) * sc, -15 * sc, 5 * sc, 5 * sc);
-      }
-    } else if (weapon === 'knife') {
-      ctx.fillStyle = '#d0d8e0';
-      const ky = (-18 - wExt) * sc;
-      ctx.fillRect(8 * sc, ky, 3 * sc, 12 * sc);
-      ctx.fillStyle = '#8a6030';
-      ctx.fillRect(8 * sc, ky + 10 * sc, 3 * sc, 4 * sc);
-      // slash arc
-      if (atk > 0) {
-        ctx.strokeStyle = 'rgba(200,240,255,0.7)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(4 * sc, -10 * sc, (10 + wExt) * sc, -0.8 + atkP, 0.8 + atkP);
-        ctx.stroke();
-      }
-    } else {
-      // sword
-      const ang = atk > 0 ? -1.2 + atkP * 2.4 : -0.3;
-      ctx.save();
-      ctx.translate(8 * sc, -10 * sc);
-      ctx.rotate(ang);
-      ctx.fillStyle = '#c8d0d8';
-      ctx.fillRect(-2 * sc, -22 * sc, 4 * sc, 24 * sc);
-      ctx.fillStyle = '#e8eef4';
-      ctx.fillRect(-1 * sc, -22 * sc, 2 * sc, 24 * sc);
-      ctx.fillStyle = '#c8a040';
-      ctx.fillRect(-4 * sc, 0, 8 * sc, 3 * sc);
-      ctx.restore();
-      if (atk > 0) {
-        ctx.strokeStyle = 'rgba(255,220,150,0.55)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(4 * sc, -12 * sc, 18 * sc, ang - 0.5, ang + 0.5);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
+    const S = getHeroCanvas(player.job, face, frame, attacking);
+    blit(ctx, S, p.sx, p.sy, 2.0, flash);
   }
+
 
   function drawMonster(e, ox, oy) {
-    const zh = groundH(e.x, e.y); const p = w2s(ox, oy, zh); const hurt = e.hurtT > 0;
-    if (e.kind === 'sandling') {
-      ctx.fillStyle = hurt ? '#fff' : '#d4b070'; ctx.beginPath(); ctx.ellipse(p.sx, p.sy - 10, 14, 12, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#1a0808'; ctx.fillRect(p.sx - 8, p.sy - 14, 5, 5); ctx.fillRect(p.sx + 3, p.sy - 14, 5, 5);
-      ctx.fillStyle = '#ff5030'; ctx.fillRect(p.sx - 6, p.sy - 12, 2, 2); ctx.fillRect(p.sx + 5, p.sy - 12, 2, 2);
-    } else if (e.kind === 'jackal') {
-      ctx.fillStyle = hurt ? '#fff' : '#c4a060'; ctx.beginPath(); ctx.ellipse(p.sx, p.sy - 8, 16, 9, 0, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc(p.sx + 12, p.sy - 14, 7, 0, TAU); ctx.fill();
-      ctx.fillStyle = '#1a1010'; ctx.fillRect(p.sx + 10, p.sy - 16, 2, 2);
-      ctx.fillStyle = '#c4a060'; ctx.fillRect(p.sx + 14, p.sy - 22, 3, 6); ctx.fillRect(p.sx + 8, p.sy - 22, 3, 6);
-    } else if (e.kind === 'sphinx') {
-      for (let i = 0; i < 3; i++) drawBlock(ox, oy, zh + i + 1, 3, PAL.gold[1]);
-      ctx.fillStyle = hurt ? '#fff' : '#e8c060';
-      ctx.beginPath(); ctx.moveTo(p.sx - 32, p.sy - 18); ctx.lineTo(p.sx - 16, p.sy - 52); ctx.lineTo(p.sx + 16, p.sy - 52); ctx.lineTo(p.sx + 32, p.sy - 18); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = hurt ? '#fff' : '#f0d8a0'; ctx.beginPath(); ctx.arc(p.sx, p.sy - 60, 15, 0, TAU); ctx.fill();
-      for (let i = 0; i < 7; i++) { ctx.fillStyle = i % 2 ? '#2a1a40' : '#c8302a'; ctx.fillRect(p.sx - 18 + i * 5, p.sy - 74, 4, 18); }
-      ctx.fillStyle = '#000'; ctx.fillRect(p.sx - 32, p.sy - 86, 64, 7);
-      ctx.fillStyle = '#e8453c'; ctx.fillRect(p.sx - 32, p.sy - 86, 64 * (e.hp / e.mhp), 7);
-    } else if (e.kind === 'rock') drawBlock(ox, oy, zh + 1, 2, PAL.stone[0]);
-    else if (e.kind === 'wreck') drawStruct({ kind: 'wreck', h: zh }, ox, oy);
-    else if (e.kind === 'cactus') drawStruct({ kind: 'cactus', h: zh }, ox, oy);
-    if (!e.boss && e.hp < e.mhp && e.type !== 'prop') {
-      ctx.fillStyle = '#000'; ctx.fillRect(p.sx - 12, p.sy - 38, 24, 4);
-      ctx.fillStyle = '#e8453c'; ctx.fillRect(p.sx - 12, p.sy - 38, 24 * (e.hp / e.mhp), 4);
+    const zh = groundH(e.x, e.y);
+    const p = w2s(ox, oy, zh);
+    const hurt = e.hurtT > 0;
+    const frame = Math.floor(performance.now() / 160 + e.x * 3) % 4;
+    const kind = e.kind;
+    if (kind === 'sandling' || kind === 'jackal' || kind === 'sphinx' || kind === 'rock' || kind === 'cactus' || kind === 'wreck') {
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath();
+      ctx.ellipse(p.sx, p.sy + 4, kind === 'sphinx' ? 22 : 12, 5, 0, 0, TAU);
+      ctx.fill();
+      const S = getMonsterCanvas(kind, frame);
+      const sc = kind === 'sphinx' ? 2.6 : kind === 'jackal' ? 2.2 : 2.0;
+      blit(ctx, S, p.sx, p.sy, sc, hurt);
+      if (e.boss) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(p.sx - 32, p.sy - 90, 64, 7);
+        ctx.fillStyle = '#e8453c';
+        ctx.fillRect(p.sx - 32, p.sy - 90, 64 * (e.hp / e.mhp), 7);
+      } else if (e.hp < e.mhp && e.type !== 'prop') {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(p.sx - 12, p.sy - 36, 24, 4);
+        ctx.fillStyle = '#e8453c';
+        ctx.fillRect(p.sx - 12, p.sy - 36, 24 * (e.hp / e.mhp), 4);
+      }
+      return;
     }
+    // fallback block for unknown
+    drawBlock(ox, oy, zh + 1, 2, PAL.stone[0]);
   }
-
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
